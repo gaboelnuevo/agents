@@ -8,21 +8,46 @@ Abstracts read/write by memory type. The engine (or dedicated tools) invokes it.
 
 ```typescript
 interface MemoryAdapter {
-  save(agentId: string, memoryType: string, content: unknown): Promise<void>;
-  query(agentId: string, memoryType: string, filter?: unknown): Promise<unknown[]>;
-  delete(agentId: string, memoryType: string, filter?: unknown): Promise<void>;
-  getState(agentId: string): Promise<unknown>;
+  save(scope: MemoryScope, memoryType: string, content: unknown): Promise<void>;
+  query(scope: MemoryScope, memoryType: string, filter?: unknown): Promise<unknown[]>;
+  delete(scope: MemoryScope, memoryType: string, filter?: unknown): Promise<void>;
+  getState(scope: MemoryScope): Promise<unknown>;
 }
+
+interface MemoryScope {
+  projectId: string;
+  agentId: string;
+  sessionId: string;
+  endUserId?: string;
+}
+```
+
+The adapter uses `MemoryScope` to build storage keys. When `endUserId` is present, `longTerm` and `vectorMemory` are keyed by it instead of `sessionId`, enabling persistence across conversations for the same end-user. See [15-multi-tenancy.md §4.3](./15-multi-tenancy.md) for the full end-user memory model.
+
+### Key patterns
+
+```text
+{projectId}:{agentId}:{sessionId}:shortTerm:…          → recent turns (this conversation)
+{projectId}:{agentId}:{sessionId}:working:…             → session/run variables
+
+{projectId}:{agentId}:eu:{endUserId}:longTerm:…         → persistent facts (cross-session)
+{projectId}:{agentId}:eu:{endUserId}:vectorMemory:…     → semantic embeddings (cross-session)
+```
+
+When no `endUserId` is present (internal / operator use), `longTerm` falls back to `sessionId`-scoped keys:
+
+```text
+{projectId}:{agentId}:{sessionId}:longTerm:…
 ```
 
 ### Logical types (not all required in v1)
 
-| Type | Use in the engine |
-|------|-------------------|
-| `shortTerm` | Recent turns injected into context. |
-| `working` | Session/run variables (priority, flags). |
-| `longTerm` | Persistence across runs. |
-| `vectorMemory` | Semantic retrieval (optional). |
+| Type | Scoped by | Use in the engine |
+|------|-----------|-------------------|
+| `shortTerm` | `sessionId` | Recent turns injected into context. |
+| `working` | `sessionId` | Session/run variables (priority, flags). |
+| `longTerm` | `endUserId` (or `sessionId` fallback) | Persistence across runs and conversations. |
+| `vectorMemory` | `endUserId` (or `sessionId` fallback) | Semantic retrieval (optional). |
 
 The **Context Builder** decides which branches to read and in what order to build the prompt.
 
@@ -33,12 +58,22 @@ The **ToolRunner** resolves `action.tool` → executing instance.
 ```typescript
 interface ToolAdapter {
   name: string;
-  execute(input: unknown, context: unknown): Promise<unknown>;
+  execute(input: unknown, context: ToolContext): Promise<unknown>;
   validate?(input: unknown): boolean;
+}
+
+interface ToolContext {
+  projectId: string;
+  agentId: string;
+  runId: string;
+  sessionId: string;
+  endUserId?: string;
+  memoryAdapter: MemoryAdapter;
+  securityContext: SecurityContext;
 }
 ```
 
-- **context**: typically includes `agentId`, `runId`, memory adapter reference, scoped credentials, etc.
+- **context**: includes scope identifiers, memory adapter reference, scoped credentials, and SecurityContext. Tools that interact with end-user data can use `endUserId` to scope external API calls.
 - Output is normalized to an **observation** in history.
 
 ### Typical MVP engine tools
@@ -61,9 +96,9 @@ A **MessageBus** does not replace ToolRunner: it is usually **another tool** (`s
 
 ## Job queue adapter (primary: BullMQ)
 
-This is **not** a third core contract inside the loop (unlike `MemoryAdapter` / `ToolAdapter`). It is **pluggable infrastructure** used by **consumers**: workers dequeue jobs and call the same entry points as the SDK or REST — `run` / `resume` with `RunInput` / `ResumeInput`. The engine does not import BullMQ.
+This is **not** a third core contract inside the loop (unlike `MemoryAdapter` / `ToolAdapter`). It is **pluggable infrastructure** used by **consumers**: workers dequeue jobs and call the same entry points as the SDK or REST — `run` / `resume` with `RunInput` / `ResumeInput`. The engine core does not import BullMQ.
 
-**Implementation priority:** **BullMQ on Redis** is the **first-supported** path for async work and for waking runs after `wait` with `reason: scheduled` (delayed jobs, retries, DLQ, horizontal workers). Ship this adapter before or alongside other deployment pieces.
+**Implementation priority:** **BullMQ on Redis** is the **first-class** path for async work and for waking runs after `wait` with `reason: scheduled` (delayed jobs, retries, DLQ, horizontal workers). Use **`@agent-runtime/adapters-bullmq`** for typed **`createEngineQueue`**, **`createEngineWorker`**, and **`dispatchEngineJob`** (`EngineJobPayload`: `run` | `resume`). QStash stays a **secondary** HTTP-only alternative when you do not run Redis workers.
 
 | Use | Role |
 |-----|------|
@@ -71,14 +106,22 @@ This is **not** a third core contract inside the loop (unlike `MemoryAdapter` / 
 | **Scheduled `wait`** | Delayed or repeatable jobs call `resume(runId, …)` when `reason: scheduled`. |
 | **MessageBus backend** | Optional: one queue (or set of queues) per agent / `projectId` for `send_message` delivery with ordering and retries — still exposed to the engine as the same bus contract ([09-communication-multiagent.md](./09-communication-multiagent.md)). |
 
-**Redis:** BullMQ expects a Redis deployment that supports its commands and connection model. If you already use Redis for `MemoryAdapter`, you can use the **same cluster** or a **dedicated** Redis for queues; validate provider compatibility (some serverless Redis products differ — test before committing).
+**Redis:** BullMQ expects a Redis deployment that supports its commands and connection model. If you already use Redis for `MemoryAdapter`, you can use the **same cluster** or a **dedicated** Redis for queues; validate provider compatibility (some serverless Redis products differ — test before committing). Full cluster deployment model: [19-cluster-deployment.md](./19-cluster-deployment.md).
 
 ### Alternative: Upstash QStash
 
-When you **do not** want Redis-backed workers (e.g. purely serverless HTTP callbacks), **QStash** can trigger `POST /runs/:id/resume` (or equivalent) after a delay — same semantics as a BullMQ delayed job from the engine’s perspective, different operational model. Use QStash as the **secondary** option when BullMQ is not a fit.
+When you **do not** want Redis-backed workers (e.g. purely serverless HTTP callbacks), **QStash** can trigger `POST /runs/:id/resume` (or equivalent) after a delay — same semantics as a BullMQ delayed job from the engine's perspective, different operational model. Use QStash as the **secondary** option when BullMQ is not a fit.
 
 ---
 
-## Upstash (reference implementations)
+## Native TCP Redis (`@agent-runtime/adapters-redis`) — default for shared state
 
-**Redis** as `MemoryAdapter` (serverless persistence) and **Vector** for optional retrieval: same interfaces as on this page; scope in [06-mvp.md](./06-mvp.md#upstash-adapters-in-mvp). **Async / scheduled `resume`:** implement **BullMQ** first (above); **QStash** remains the documented **alternative** for HTTP-triggered wakeups without a worker process.
+**Prefer this package** when you have a normal **`redis://`** / **`REDIS_URL`** (Docker, k8s, VM, or a vendor’s TCP endpoint). **`RedisMemoryAdapter`**, **`RedisRunStore`**, and **`RedisMessageBus`** use **`ioredis`** and match the **same key and stream layout** as the Upstash HTTP adapters, so you can swap transports without changing engine code. This is the **same connection style as BullMQ** — one Redis cluster can back queues and engine state.
+
+**Vector** search is not in this package; use **`UpstashVectorAdapter`** from `@agent-runtime/adapters-upstash` for hosted vectors, or plug in another `VectorAdapter` implementation. See [19-cluster-deployment.md §7.1](./19-cluster-deployment.md#71-tcp-redis-vs-upstash-rest-vs-bullmq).
+
+---
+
+## Upstash REST (`@agent-runtime/adapters-upstash`) — HTTP Redis + vector
+
+Use **`@agent-runtime/adapters-upstash`** when you want **Upstash’s REST API** (serverless/edge-friendly, no long-lived TCP to Redis) or when you adopt **`UpstashVectorAdapter`** alongside **`UpstashRedisMemoryAdapter`** / **`UpstashRunStore`** / **`UpstashRedisMessageBus`** in one place. Same `MemoryAdapter` / `RunStore` / `MessageBus` contracts as above; scope in [06-mvp.md](./06-mvp.md#upstash-adapters-in-mvp). **Async / scheduled `resume`:** implement **BullMQ** first (above); **QStash** remains the documented **alternative** for HTTP-triggered wakeups without a worker process.

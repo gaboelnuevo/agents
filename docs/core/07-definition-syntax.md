@@ -2,6 +2,8 @@
 
 **Canonical** JSON shapes to configure the agent, invoke the engine, and parse LLM steps, plus **library syntax** (`Tool.define`, `Skill.define`, `Agent.define`, `Agent.load`). The protocol invariant is **discrimination by `type`** on each model turn.
 
+Related: [19-cluster-deployment.md §2](./19-cluster-deployment.md) (bootstrap — `configureRuntime`, built-in tools, `runStore`), [03-execution-model.md](./03-execution-model.md) (wait / resume).
+
 ---
 
 ## 1. Agent definition (`Agent`)
@@ -21,7 +23,7 @@
   },
   "llm": {
     "provider": "openai",
-    "model": "gpt-4",
+    "model": "gpt-4o",
     "temperature": 0.2
   }
 }
@@ -219,38 +221,38 @@ What **ToolRunner** needs; not the same as the LLM’s `action` step.
 
 ## 9. Library: `.define` syntax and loading
 
-Typical registration order (runtime persists to store — e.g. Redis/Upstash — and validates schemas):
+Typical registration order:
 
 ```
-Tool.define  →  Skill.define  →  Agent.define  →  Agent.load + run
+configureRuntime({ ... })  →  Tool.define (custom)  →  Skill.define  →  Agent.define  →  Agent.load + run
 ```
 
-The following objects are **conceptually equivalent** to the JSON in §1 and §8; `.define` methods serialize and version them in the store.
+Call **`configureRuntime`** once per process before `Agent.load`. It registers **built-in** tool handlers (`save_memory`, `get_memory`) and optionally vector / `send_message` handlers when the corresponding adapters are passed — you do **not** `Tool.define` those unless you are replacing defaults (advanced).
+
+The following objects are **conceptually equivalent** to the JSON in §1 and §8; `.define` persists definitions into the in-process registry (not an external document store unless your app adds one).
 
 ### 9.1 `Tool.define`
 
-Registers a tool in the engine catalog (name exposed to the LLM + metadata + scope).
+Registers a **custom** tool in the engine catalog (name exposed to the LLM + metadata + scope). Pass **`execute`** so the handler is registered in the same call.
 
 ```typescript
 import { Tool } from "@agent-runtime/core";
 
-// Global tool (all projects)
+// Example: global custom tool (all projects)
 await Tool.define({
-  id: "save_memory",
-  name: "Save memory",
+  id: "lookup_ticket",
   scope: "global",
-  description: "Persists content in the agent's memory.",
+  description: "Loads a support ticket by id.",
   inputSchema: {
     type: "object",
-    properties: {
-      memoryType: { enum: ["shortTerm", "longTerm", "working"] },
-      content: {},
-    },
-    required: ["memoryType", "content"],
+    properties: { id: { type: "string" } },
+    required: ["id"],
   },
-  outputSchema: { type: "object", properties: { success: { type: "boolean" } } },
-  roles: ["admin", "agent"],
+  roles: ["agent"],
+  execute: async (input) => ({ ticket: { id: (input as { id: string }).id, status: "open" } }),
 });
+
+// Built-ins: `save_memory` / `get_memory` match the shapes in §8 — registered by configureRuntime, not re-defined here.
 
 // Project-scoped tool (multi-tenant)
 await Tool.define({
@@ -268,10 +270,11 @@ await Tool.define({
     required: ["flowId"],
   },
   roles: ["admin", "agent"],
+  execute: async (input) => ({ triggered: true, flowId: (input as { flowId: string }).flowId }),
 });
 ```
 
-**Implementation note**: the **handler** (code that runs `execute`) is usually registered in the Node process under the same `id` as the persisted definition, or resolved via an internal adapter; the store document should not hold arbitrary code without a sandbox.
+**Implementation note**: with `Tool.define({ ..., execute })`, the handler is registered in-process under `def.id`. Without `execute`, only the definition is stored — the engine still needs a matching `registerToolHandler` from your bootstrap (unusual for app code).
 
 ### 9.2 `Skill.define`
 
@@ -336,7 +339,7 @@ await Agent.define({
     working: {},
   },
   defaultMemory: { notes: [] },
-  llm: { provider: "openai", model: "gpt-4", temperature: 0.2 },
+  llm: { provider: "openai", model: "gpt-4o", temperature: 0.2 },
   security: { roles: ["operator", "admin"] },
 });
 ```
@@ -348,6 +351,7 @@ Instantiate an agent already defined in the store, with a **session** to scope m
 ```typescript
 import { Agent, Session } from "@agent-runtime/core";
 
+// Internal / operator use — no end-user
 const session = new Session({
   id: "queue-east-2026-04-02",
   projectId: "acme-corp",
@@ -368,10 +372,44 @@ await agent
   .catch((err) => console.error(err));
 ```
 
-Resume after `wait`:
+**`onWait`**: if the callback returns a **string**, the engine **continues the same run in-process** (equivalent to `resume` with `type: "text"`). If it returns **`undefined`**, the run stays **`waiting`** — use **`agent.resume(runId, input)`** (requires **`configureRuntime({ runStore })`** for cross-worker resume; see [19-cluster-deployment.md §3](./19-cluster-deployment.md)).
+
+End-user facing session (B2B2C — e.g. support bot):
+
+```typescript
+const session = new Session({
+  id: "customer-456:conv-20260407-001",
+  projectId: "acme-support",
+  endUserId: "customer-456",
+});
+
+const agent = await Agent.load("support-bot", { session });
+await agent.run("My order #8812 hasn't arrived");
+```
+
+When `endUserId` is present, the MemoryAdapter scopes `longTerm` and `vectorMemory` by `endUserId` instead of `sessionId`, enabling persistence across conversations. See [15-multi-tenancy.md §4](./15-multi-tenancy.md).
+
+Resume after `wait` (requires `runStore` in `configureRuntime`; loads persisted `Run`, injects resume message, continues the loop):
 
 ```typescript
 await agent.resume(runId, { type: "text", content: "yes" }).then(...);
+```
+
+**Custom orchestration (queue workers, HTTP handlers)** — same loop as `RunBuilder`, without the fluent API: **`buildEngineDeps(agent, session)`** → **`createRun`** → **`executeRun`** with **`startedAtMs`** (and **`resumeMessages`** after a `wait`). If you bypass `Agent.resume`, persist **`waiting`** runs via **`runStore`** yourself. See [14-consumers.md](./14-consumers.md) and [19-cluster-deployment.md](./19-cluster-deployment.md).
+
+```typescript
+import {
+  buildEngineDeps,
+  createRun,
+  executeRun,
+  getAgentDefinition,
+} from "@agent-runtime/core";
+
+const agent = getAgentDefinition("acme-corp", "ops-analyst")!;
+const base = buildEngineDeps(agent, session);
+const run = createRun(agent.id, session.id, "user text");
+
+await executeRun(run, { ...base, startedAtMs: Date.now() });
 ```
 
 ### 9.5 `scope` / `projectId` resolution
@@ -427,11 +465,18 @@ interface SkillDefinition {
   tools: string[];
   description?: string;
   roles?: string[];
-  execute?: (ctx: {
-    input: unknown;
-    context: Record<string, unknown>;
-  }) => Promise<unknown>;
+  execute?: SkillExecute;
 }
+
+type SkillExecute = (args: {
+  input: unknown;
+  context: {
+    agentId: string;
+    runId: string;
+    memory: MemoryAdapter;
+    invokeTool: (name: string, input: unknown) => Promise<unknown>;
+  };
+}) => Promise<unknown>;
 
 interface AgentDefinitionPersisted extends AgentDefinition {
   name?: string;
@@ -439,7 +484,27 @@ interface AgentDefinitionPersisted extends AgentDefinition {
   defaultMemory?: Record<string, unknown>;
   security?: { roles?: string[]; scopes?: string[] };
 }
+
+/** Session scoping for Agent.load */
+interface SessionOptions {
+  id: string;
+  projectId: string;
+  endUserId?: string;
+}
+
+/** Injected by SecurityLayer before the engine runs */
+interface SecurityContext {
+  principalId: string;
+  kind: "user" | "service" | "end_user" | "internal";
+  organizationId: string;
+  projectId: string;
+  endUserId?: string;
+  roles: string[];
+  scopes: string[];
+}
 ```
+
+Detail on `SecurityContext` fields and principal kinds: [08-scope-and-security.md](./08-scope-and-security.md). Full multi-tenancy model: [15-multi-tenancy.md](./15-multi-tenancy.md).
 
 ---
 

@@ -55,7 +55,7 @@ All external entry should pass through the **SecurityLayer** first (see [08-scop
 | `LLMAdapter` | OpenAI, Anthropic, etc. Contract in [10-llm-adapter.md](./10-llm-adapter.md). |
 | `ToolRunner` | Registry `name → ToolAdapter`. |
 
-**CLI** and **REST API** are **clients** of the same engine; they do not duplicate loop logic. Other consumers: [14-consumers.md](./14-consumers.md).
+**CLI** and **REST API** are **clients** of the same engine; they do not duplicate loop logic. Other consumers: [14-consumers.md](./14-consumers.md). Multi-process / cluster deployment model: [19-cluster-deployment.md](./19-cluster-deployment.md).
 
 ## Data flow (summary)
 

@@ -53,7 +53,7 @@ Export errors as **stable** classes or codes (`RUN_INVALID_STATE`, `STEP_SCHEMA_
 |-------|----------|
 | **Global run** | Timer at `run` start; on expiry, abort LLM and `failed` with `timeout`. |
 | **Per iteration** | Each LLM call has a deadline; counts against global. |
-| **Tool** | Per-tool timeout in ToolRunner; return `observation` with `success: false` or propagate to `failed` if the tool is critical. |
+| **Tool** | Optional `configureRuntime({ toolTimeoutMs })` → `ToolRunner` races tool `execute`; on expiry, **`ToolTimeoutError`** (`TOOL_TIMEOUT`) becomes an error `observation` (`success: false`) like other tool failures. Does not cancel in-flight work. |
 
 Timeouts should honor the same `AbortSignal` when it is the shared controller.
 

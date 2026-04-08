@@ -1,0 +1,24 @@
+{
+  "name": "agent-runtime",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "test:ci": "turbo run test --concurrency=1",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "eslint": "^9",
+    "prettier": "^3",
+    "tsup": "^8",
+    "turbo": "^2",
+    "typescript": "^5.7",
+    "typescript-eslint": "^8.58.1",
+    "vitest": "^3"
+  }
+}

@@ -47,9 +47,11 @@ When the model returns `wait`:
 
 1. Save `status: waiting`, `pending` (reason + minimal context).
 2. Return to the caller what is needed to continue (`runId`, question, etc.).
-3. `resume(runId, input)` reinjects the response/event and returns to **running**.
+3. **`resume(runId, input)`** (or **`RunBuilder.onWait` returning a string** in the same process) reinjects the response and returns to **running**.
 
 Typical `wait` reasons: `user_input`, `external_event`, `scheduled`.
+
+For multi-worker clusters, persist with **`RunStore`** and call **`resume`** on whichever node handles the next request — see [19-cluster-deployment.md §3](./19-cluster-deployment.md).
 
 ## System input (minimal contract)
 
@@ -71,4 +73,4 @@ The engine may add `sessionId` or other scopes **by policy** without changing th
 
 ## Hooks (engine boundary)
 
-The engine emits events to the SDK or server: `onThought`, `onAction`, `onObservation`, `onWait`. They are **observability and control**; loop semantics live **inside** the engine.
+The engine emits events to the SDK or server: `onThought`, `onAction`, `onObservation`, and a synchronous **`onWait`** on `EngineHooks` (notification). **`RunBuilder.onWait`** additionally accepts an async callback whose **returned string** continues the run in-process without a separate `resume` call.

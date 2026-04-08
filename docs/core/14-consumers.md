@@ -6,7 +6,7 @@ Everything that **starts** or **observes** runs shares the same core: **Security
 
 ## Library / SDK (Node or other runtime)
 
-Embedded use: `Agent.load`, `run`, `resume`, hooks. No dedicated server. Syntax reference: [07-definition-syntax.md](./07-definition-syntax.md) §9.
+Embedded use: `Agent.load`, `run`, `resume`, hooks. For **queue workers** or custom orchestration, call **`buildEngineDeps`**, then **`createRun`** + **`executeRun`** (add **`startedAtMs`**; optional **`resumeMessages`**). You can assemble `EngineDeps` manually with **`ContextBuilder`**, **`ToolRunner`**, **`resolveToolRegistry`**, **`getAgentDefinition`**, **`effectiveToolAllowlist`**, and **`getEngineConfig`** if you need a custom layout. Syntax reference: [07-definition-syntax.md](./07-definition-syntax.md) §9. Cluster: [19-cluster-deployment.md](./19-cluster-deployment.md).
 
 ---
 

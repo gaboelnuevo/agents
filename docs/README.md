@@ -2,11 +2,17 @@
 
 A **stateful agent runtime** for Node.js.
 
+Developer **monorepo** entry (packages, `pnpm` commands): [README](../README.md) at the repository root.
+
 > **Name TBD.** There is no final product, org, or npm scope name yet. The repository folder is a working codename only — it is **not** the intended public brand.
 
 Not a chat wrapper. Not a prompt chain. Not a graph orchestrator.
 
 A **control system** where the LLM proposes and the engine decides — with layered memory that persists across runs, tools that only the engine can execute, skills that shape agent behavior, multi-agent coordination via a message bus, and durable pauses until the real world responds.
+
+### Current repository status
+
+Nine workspace packages (`core`, `utils`, `adapters-openai`, `adapters-upstash`, `adapters-redis`, **`adapters-bullmq`**, `rag`, `scaffold`, `cli`) build and test together. **BullMQ** (`@agent-runtime/adapters-bullmq`) is the **priority** path for background runs and workers (`createEngineQueue`, `dispatchEngineJob`, …). **TCP Redis** adapters are the **default** for shared engine state; pair with the same Redis for queues when it fits ops. **Upstash REST** + **Upstash Vector** when you want HTTP-only Redis. **Per-tool timeouts**: `configureRuntime({ toolTimeoutMs })`. **CI**: `pnpm turbo run build test lint` ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)). Roadmap: [`plan.md`](./plan.md); gaps: [`technical-debt.md`](./technical-debt.md).
 
 ---
 
@@ -57,7 +63,7 @@ These are not configurable. They are what makes the engine predictable:
 
 ## Dynamic agent definitions
 
-Agents, tools, and skills are **defined once and persisted to a store** (Redis, Upstash, or any adapter). Any process — SDK, CLI, REST, or an MCP server that proxies to the same API — can load them by ID without redeployment. You can create a new agent at runtime, update its config, and the next `Agent.load` picks it up immediately.
+Agents, tools, and skills are **defined once and persisted to a store** (TCP Redis, Upstash REST, or any adapter). Any process — SDK, CLI, REST, or an MCP server that proxies to the same API — can load them by ID without redeployment. You can create a new agent at runtime, update its config, and the next `Agent.load` picks it up immediately.
 
 ```
 Tool.define()     →  stored in registry (global or per project)
@@ -205,7 +211,7 @@ await agent.resume(runId, { type: "text", content: "approved — escalate to bil
 
 ## Layered memory
 
-Memory is not a flat key-value store. It's layered by purpose, accessed only through the `MemoryAdapter` interface — swappable between in-memory, Redis, Upstash, Postgres, or anything else:
+Memory is not a flat key-value store. It's layered by purpose, accessed only through the `MemoryAdapter` interface — swappable between in-memory, TCP Redis (`adapters-redis`), Upstash REST, Postgres, or anything else:
 
 | Layer | Purpose |
 |-------|---------|
@@ -295,32 +301,33 @@ Messages are scoped to `projectId` by default — no cross-tenant leakage.
 
 ---
 
-## Upstash integration
+## Production Redis and Upstash
 
-In production the engine plugs into **Upstash** without changing the loop or the adapter contracts:
+The engine uses **interfaces**; production usually wires **`configureRuntime`** with shared stores. Prefer **TCP Redis** (`@agent-runtime/adapters-redis`) when you have a normal `REDIS_URL` — it matches **BullMQ** and typical deployments. Use **`@agent-runtime/adapters-upstash`** for **REST** Redis, **Upstash Vector**, or serverless-friendly HTTP access.
 
-| Service | Role |
-|---------|------|
-| **Upstash Redis** | `MemoryAdapter` for `longTerm` and `working` memory; store for agent/tool/skill definitions; run history |
-| **Upstash Vector** | `MemoryAdapter` for `vectorMemory` — semantic search over past context |
-| **BullMQ (primary)** | Redis-backed **job queue adapter** — first implementation for async `run` / `resume`, scheduled `wait`, retries/DLQ, optional **MessageBus**; workers call the same engine API as SDK/REST — [`core/05-adapters.md`](./core/05-adapters.md#job-queue-adapter-primary-bullmq). |
-| **Upstash QStash (alternative)** | HTTP callback to `resume` after a scheduled `wait` when you prefer not to run BullMQ workers — same wake semantics, different ops model. |
+| Piece | Typical choice |
+|-------|----------------|
+| **TCP Redis** (`ioredis`) | `RedisMemoryAdapter`, `RedisRunStore`, `RedisMessageBus` in `@agent-runtime/adapters-redis` — **default** for cluster memory, `wait`/`resume` across workers, and `send_message`. |
+| **Upstash REST** | `UpstashRedisMemoryAdapter`, `UpstashRunStore`, `UpstashRedisMessageBus` when you want HTTP-only Redis. |
+| **Upstash Vector** | `UpstashVectorAdapter` for `vector_search` / RAG — lives in `@agent-runtime/adapters-upstash`. |
+| **BullMQ (primary job queue)** | Not shipped in-repo; your worker calls `buildEngineDeps` + `executeRun` — [`core/05-adapters.md`](./core/05-adapters.md#job-queue-adapter-primary-bullmq). |
+| **Upstash QStash (alternative)** | HTTP callback to `resume` after a scheduled `wait` if you skip BullMQ workers — same wake semantics, different ops model. |
 
 ```typescript
-import { UpstashMemoryAdapter } from "@agent-runtime/adapters-upstash";
+import { configureRuntime } from "@agent-runtime/core";
+import { RedisMemoryAdapter, RedisRunStore } from "@agent-runtime/adapters-redis";
+import Redis from "ioredis";
 
-const memory = new UpstashMemoryAdapter({
-  redis:  { url: process.env.UPSTASH_REDIS_URL,  token: process.env.UPSTASH_REDIS_TOKEN },
-  vector: { url: process.env.UPSTASH_VECTOR_URL, token: process.env.UPSTASH_VECTOR_TOKEN },
+const redis = new Redis(process.env.REDIS_URL!);
+configureRuntime({
+  memoryAdapter: new RedisMemoryAdapter(redis),
+  runStore: new RedisRunStore(redis),
+  // llmAdapter, …
 });
-
-const agent = await Agent.load("ops-analyst", { session, memory });
-// Same engine. Same loop. Different adapter.
+// Same engine and loop; swap adapters for local dev or Upstash REST.
 ```
 
-Swap back to `InMemoryAdapter` for local dev — no other change required.
-
-**BullMQ** is the **default job-queue path** to implement first (not a third engine interface): workers are **consumers** that call the same `run` / `resume` semantics as the SDK or REST. **QStash** is the **alternative** when you want serverless HTTP wakeups instead of Redis workers.
+**BullMQ** is the **default job-queue path** to implement in your app (not a third engine interface). **QStash** is the **alternative** when you want serverless HTTP wakeups instead of Redis workers.
 
 ---
 
@@ -503,7 +510,7 @@ src/
 ## Design principles
 
 - **Semi-agent first.** Few decisions per request, bounded loop, strict JSON. Autonomy scales when control is proven.
-- **Adapters, not vendors.** Redis, Postgres, Upstash, in-memory — swappable by design. The engine core never imports a specific store.
+- **Adapters, not vendors.** TCP Redis, Postgres, Upstash REST, in-memory — swappable by design. The engine core never imports a specific store.
 - **Traceability as a primitive.** If you can't reproduce and audit a run step by step, it's not production-ready.
 - **One engine, multiple consumers.** SDK, CLI, REST, and MCP-oriented surfaces share the same loop semantics when they delegate into the engine. No duplicated loop logic across entry points.
 
