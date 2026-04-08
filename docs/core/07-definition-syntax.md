@@ -36,7 +36,7 @@ Related: [19-cluster-deployment.md §2](./19-cluster-deployment.md) (bootstrap �
 | `skills` | no | List of ids resolved by the Skills module. |
 | `tools` | no | Allowlist of names registered in ToolRunner. |
 | `memoryConfig` | no | Policy for Context Builder and memory tools. |
-| `llm` | yes* | *Required if the engine calls the adapter; may default globally. |
+| `llm` | yes* | *Required if the engine calls the adapter unless a global default is set in **`configureRuntime`** — see [19-cluster-deployment.md §2](./19-cluster-deployment.md). |
 
 ---
 
