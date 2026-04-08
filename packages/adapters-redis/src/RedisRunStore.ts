@@ -14,6 +14,34 @@ export class RedisRunStore implements RunStore {
     await this.redis.sadd(`run:agent:${run.agentId}`, run.runId);
   }
 
+  async saveIfStatus(run: Run, expectedStatus: RunStatus): Promise<boolean> {
+    const key = `run:data:${run.runId}`;
+    const agentKey = `run:agent:${run.agentId}`;
+    await this.redis.watch(key);
+    const raw = await this.redis.get(key);
+    if (raw == null || raw === "") {
+      await this.redis.unwatch();
+      return false;
+    }
+    let existing: Run;
+    try {
+      existing = JSON.parse(raw) as Run;
+    } catch {
+      await this.redis.unwatch();
+      return false;
+    }
+    if (existing.status !== expectedStatus) {
+      await this.redis.unwatch();
+      return false;
+    }
+    const execResult = await this.redis
+      .multi()
+      .set(key, JSON.stringify(run))
+      .sadd(agentKey, run.runId)
+      .exec();
+    return execResult != null;
+  }
+
   async load(runId: string): Promise<Run | null> {
     const raw = await this.redis.get(`run:data:${runId}`);
     if (raw == null || raw === "") return null;

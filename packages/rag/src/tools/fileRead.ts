@@ -1,14 +1,15 @@
 import type { ToolAdapter, ToolContext } from "@agent-runtime/core";
-import { resolveSource, parseFile } from "@agent-runtime/utils";
+import { parseFile } from "@agent-runtime/utils";
+import { resolveSourceForTool } from "./resolveFileSource.js";
 
 export const fileReadTool: ToolAdapter = {
   name: "file_read",
   description:
     "Reads a file and returns its extracted text content. " +
     "Supports: txt, md, json, csv, html.",
-  async execute(input: unknown, _ctx: ToolContext): Promise<unknown> {
+  async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as { source: string };
-    const resolved = await resolveSource(o.source);
+    const resolved = await resolveSourceForTool(o.source, ctx);
     const parsed = await parseFile(resolved.buffer, resolved.mimeType);
     return {
       success: true,
@@ -25,7 +26,12 @@ export const fileReadDefinition = {
   inputSchema: {
     type: "object",
     properties: {
-      source: { type: "string", description: "File path or URL" },
+      source: {
+        type: "string",
+        description:
+          "http(s) URL only if Session.allowHttpFileSources (optional httpFileSourceHostsAllowlist); " +
+          "or local path relative to Session.fileReadRoot unless allowFileReadOutsideRoot",
+      },
     },
     required: ["source"],
   },

@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
   InMemoryRunStore,
   SessionExpiredError,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -24,7 +23,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("session expiry", () => {
@@ -33,7 +31,7 @@ describe("session expiry", () => {
     const llm = new QueueLLM([
       JSON.stringify({ type: "result", content: "never" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "a-exp",
@@ -48,7 +46,7 @@ describe("session expiry", () => {
       projectId: "p1",
       expiresAtMs: Date.now() - 1,
     });
-    const agent = await Agent.load("a-exp", { session });
+    const agent = await Agent.load("a-exp", rt, { session });
 
     await expect(agent.run("hello")).rejects.toThrow(SessionExpiredError);
   });
@@ -63,7 +61,7 @@ describe("session expiry", () => {
       }),
       JSON.stringify({ type: "result", content: "resumed" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       runStore: store,
@@ -79,11 +77,11 @@ describe("session expiry", () => {
     });
 
     const session = new Session({ id: "s-res", projectId: "p1" });
-    const agent = await Agent.load("a-res-exp", { session });
+    const agent = await Agent.load("a-res-exp", rt, { session });
     const waiting = await agent.run("start");
     expect(waiting.status).toBe("waiting");
 
-    const agentExpired = await Agent.load("a-res-exp", {
+    const agentExpired = await Agent.load("a-res-exp", rt, {
       session: new Session({
         id: "s-res",
         projectId: "p1",
@@ -115,7 +113,7 @@ describe("session expiry", () => {
       JSON.stringify({ type: "thought", content: "t" }),
       JSON.stringify({ type: "result", content: "ok" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "a-fut",
@@ -130,7 +128,7 @@ describe("session expiry", () => {
       projectId: "p1",
       expiresAtMs: Date.now() + 60_000,
     });
-    const agent = await Agent.load("a-fut", { session });
+    const agent = await Agent.load("a-fut", rt, { session });
     const run = await agent.run("hi");
     expect(run.status).toBe("completed");
   });

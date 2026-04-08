@@ -2,7 +2,7 @@
 
 Component that **assembles** LLM input on each loop iteration: block order, truncation, security filtering, and exposing tools/skills to the model.
 
-Low-level provider: [10-llm-adapter.md](./10-llm-adapter.md). Skills: [12-skills.md](./12-skills.md). Security: [08-scope-and-security.md](./08-scope-and-security.md). Multi-tenancy and end-user memory: [15-multi-tenancy.md](./15-multi-tenancy.md).
+Related: [02-architecture.md](./02-architecture.md); [07-definition-syntax.md](./07-definition-syntax.md) (**Step** / JSON rule); [08-scope-and-security.md](./08-scope-and-security.md) (**SecurityContext** filtering); [10-llm-adapter.md](./10-llm-adapter.md); [12-skills.md](./12-skills.md); [15-multi-tenancy.md](./15-multi-tenancy.md) (memory scope).
 
 ---
 

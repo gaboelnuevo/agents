@@ -9,17 +9,27 @@ import type { Step } from "../protocol/types.js";
 import type { BuiltContext, ContextBuilderInput } from "../context/types.js";
 import type { AgentDefinition } from "../define/types.js";
 import type { MessageBus } from "../bus/MessageBus.js";
+import type { SendMessageTargetPolicy } from "../tools/sendMessagePolicy.js";
+import type { RagFileSourceEntry } from "../ragCatalogTypes.js";
 
 export type { ContextBuilderInput, BuiltContext } from "../context/types.js";
 
 export interface EngineDeps {
   agent: AgentDefinition;
   session: Session;
+  /**
+   * Effective file sandbox root: `session.fileReadRoot ?? runtime.config.fileReadRoot`.
+   * Set by {@link buildEngineDeps}; omit only when assembling deps manually.
+   */
+  fileReadRoot?: string;
   memoryAdapter: MemoryAdapter;
   llmAdapter: LLMAdapter;
   embeddingAdapter?: EmbeddingAdapter;
   vectorAdapter?: VectorAdapter;
   messageBus?: MessageBus;
+  sendMessageTargetPolicy?: SendMessageTargetPolicy;
+  /** From `AgentRuntime.registerRagCatalog(session.projectId, …)` when set (including `[]`). */
+  ragFileCatalog?: ReadonlyArray<RagFileSourceEntry>;
   toolRunner: import("../tools/ToolRunner.js").ToolRunner;
   toolRegistry: Map<string, ToolAdapter>;
   contextBuilder: {

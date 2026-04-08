@@ -9,6 +9,15 @@ export type EngineRunJobPayload = {
   projectId: string;
   agentId: string;
   sessionId: string;
+  /** When set, forwarded to {@link Session} for B2B2C memory (`longTerm` / `vectorMemory` scoping). */
+  endUserId?: string;
+  /** When set, `dispatchEngineJob` throws if `Date.now()` exceeds this (Unix ms). */
+  expiresAtMs?: number;
+  /** Forwarded to `Session` for sandboxed `file_read` / `file_ingest` local paths. */
+  fileReadRoot?: string;
+  allowFileReadOutsideRoot?: boolean;
+  allowHttpFileSources?: boolean;
+  httpFileSourceHostsAllowlist?: string[];
   userInput: string;
 };
 
@@ -17,6 +26,14 @@ export type EngineResumeJobPayload = {
   projectId: string;
   agentId: string;
   sessionId: string;
+  /** When set, forwarded to {@link Session} for B2B2C memory (`longTerm` / `vectorMemory` scoping). */
+  endUserId?: string;
+  /** When set, `dispatchEngineJob` throws if `Date.now()` exceeds this (Unix ms). */
+  expiresAtMs?: number;
+  fileReadRoot?: string;
+  allowFileReadOutsideRoot?: boolean;
+  allowHttpFileSources?: boolean;
+  httpFileSourceHostsAllowlist?: string[];
   runId: string;
   resumeInput: EngineResumeInput;
 };

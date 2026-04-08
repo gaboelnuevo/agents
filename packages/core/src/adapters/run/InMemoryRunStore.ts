@@ -9,6 +9,13 @@ export class InMemoryRunStore implements RunStore {
     this.runs.set(run.runId, structuredClone(run));
   }
 
+  async saveIfStatus(run: Run, expectedStatus: RunStatus): Promise<boolean> {
+    const cur = this.runs.get(run.runId);
+    if (!cur || cur.status !== expectedStatus) return false;
+    this.runs.set(run.runId, structuredClone(run));
+    return true;
+  }
+
   async load(runId: string): Promise<Run | null> {
     const r = this.runs.get(runId);
     return r ? structuredClone(r) : null;

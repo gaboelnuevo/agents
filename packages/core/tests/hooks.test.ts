@@ -1,15 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
   buildEngineDeps,
-  configureRuntime,
   createRun,
   executeRun,
   getAgentDefinition,
   InMemoryMemoryAdapter,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -26,7 +25,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("EngineHooks ordering", () => {
@@ -42,7 +40,7 @@ describe("EngineHooks ordering", () => {
       }),
       JSON.stringify({ type: "result", content: "done" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "hook-agent",
@@ -56,7 +54,7 @@ describe("EngineHooks ordering", () => {
     expect(agentDef).toBeDefined();
     const session = new Session({ id: "s-hooks", projectId: "p-hooks" });
 
-    const base = buildEngineDeps(agentDef!, session, {
+    const base = buildEngineDeps(agentDef!, session, rt, {
       hooks: {
         onLLMResponse: () => {
           events.push("onLLMResponse");
@@ -102,7 +100,7 @@ describe("EngineHooks ordering", () => {
     const llm = new QueueLLM([
       JSON.stringify({ type: "wait", reason: "need_input" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "hook-wait",
@@ -114,7 +112,7 @@ describe("EngineHooks ordering", () => {
 
     const agentDef = getAgentDefinition("p-hooks", "hook-wait");
     const session = new Session({ id: "s-w", projectId: "p-hooks" });
-    const base = buildEngineDeps(agentDef!, session, {
+    const base = buildEngineDeps(agentDef!, session, rt, {
       hooks: {
         onLLMResponse: () => events.push("onLLMResponse"),
         onLLMAfterParse: () => events.push("onLLMAfterParse"),

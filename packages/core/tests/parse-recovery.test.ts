@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
   StepSchemaError,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -23,7 +22,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("parse recovery", () => {
@@ -34,7 +32,7 @@ describe("parse recovery", () => {
       JSON.stringify({ type: "thought", content: "recovered" }),
       JSON.stringify({ type: "result", content: "done" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       maxIterations: 10,
@@ -50,7 +48,7 @@ describe("parse recovery", () => {
     });
 
     const session = new Session({ id: "s-parse", projectId: "p-parse" });
-    const agent = await Agent.load("parse-agent", { session });
+    const agent = await Agent.load("parse-agent", rt, { session });
     const run = await agent.run("hi");
 
     expect(run.status).toBe("completed");
@@ -64,7 +62,7 @@ describe("parse recovery", () => {
   it("throws StepSchemaError when parse recovery is exhausted", async () => {
     const mem = new InMemoryMemoryAdapter();
     const llm = new QueueLLM(["bad-first", "bad-second"]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       maxIterations: 10,
@@ -80,7 +78,7 @@ describe("parse recovery", () => {
     });
 
     const session = new Session({ id: "s-fail", projectId: "p-parse" });
-    const agent = await Agent.load("parse-fail", { session });
+    const agent = await Agent.load("parse-fail", rt, { session });
     await expect(agent.run("hi")).rejects.toThrow(StepSchemaError);
   });
 });

@@ -36,6 +36,25 @@ describe("RedisRunStore", () => {
     expect(await rs.load("r1")).toBeNull();
     expect(await rs.listByAgent("a1")).toHaveLength(0);
   });
+
+  it("saveIfStatus succeeds only when Redis row still has expected status", async () => {
+    const rs = new RedisRunStore(redis);
+    const waiting: Run = {
+      runId: "r-cas",
+      agentId: "a1",
+      sessionId: "s1",
+      status: "waiting",
+      history: [],
+      state: { iteration: 0, pending: null, parseAttempts: 0, userInput: "" },
+    };
+    await rs.save(waiting);
+    const completed = { ...waiting, status: "completed" as const };
+    expect(await rs.saveIfStatus(completed, "waiting")).toBe(true);
+    expect((await rs.load("r-cas"))!.status).toBe("completed");
+    expect(await rs.saveIfStatus({ ...waiting, status: "failed" }, "waiting")).toBe(
+      false,
+    );
+  });
 });
 
 describe("RedisMemoryAdapter", () => {
@@ -59,5 +78,31 @@ describe("RedisMemoryAdapter", () => {
     expect(await mem.query(scope, "working")).toHaveLength(0);
 
     expect(await mem.getState(scope)).toEqual({});
+  });
+
+  it("concurrent save does not drop entries (LIST + RPUSH)", async () => {
+    const mem = new RedisMemoryAdapter(redis);
+    const scope = { projectId: "p1", agentId: "a1", sessionId: "s-conc" };
+    const n = 80;
+    await Promise.all(
+      Array.from({ length: n }, (_, i) => mem.save(scope, "working", { i })),
+    );
+    const rows = (await mem.query(scope, "working")) as { i: number }[];
+    expect(rows).toHaveLength(n);
+    const is = rows.map((r) => r.i).sort((a, b) => a - b);
+    expect(is).toEqual(Array.from({ length: n }, (_, i) => i));
+  });
+
+  it("migrates legacy STRING JSON array to LIST on first save", async () => {
+    const mem = new RedisMemoryAdapter(redis);
+    const scope = { projectId: "p1", agentId: "a1", sessionId: "s-mig" };
+    const key = `${memoryKeyPrefix(scope)}:working`;
+    await redis.set(key, JSON.stringify([{ legacy: true }]));
+    await mem.save(scope, "working", { next: true });
+    const rows = await mem.query(scope, "working");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({ legacy: true });
+    expect(rows[1]).toEqual({ next: true });
+    expect(await redis.type(key)).toBe("list");
   });
 });

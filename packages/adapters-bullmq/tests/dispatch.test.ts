@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
+  EngineJobExpiredError,
   InMemoryMemoryAdapter,
   InMemoryRunStore,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "@agent-runtime/core";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "@agent-runtime/core";
+import Redis from "ioredis-mock";
+import { RedisMemoryAdapter } from "@agent-runtime/adapters-redis";
 import { dispatchEngineJob } from "../src/dispatch.js";
 
 class QueueLLM implements LLMAdapter {
@@ -24,7 +26,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("dispatchEngineJob", () => {
@@ -34,7 +35,7 @@ describe("dispatchEngineJob", () => {
       JSON.stringify({ type: "thought", content: "t" }),
       JSON.stringify({ type: "result", content: "done" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "a1",
@@ -44,7 +45,7 @@ describe("dispatchEngineJob", () => {
       llm: { provider: "openai", model: "gpt-4o" },
     });
 
-    const run = await dispatchEngineJob({
+    const run = await dispatchEngineJob(rt, {
       kind: "run",
       projectId: "p1",
       agentId: "a1",
@@ -62,7 +63,7 @@ describe("dispatchEngineJob", () => {
       JSON.stringify({ type: "wait", reason: "x" }),
       JSON.stringify({ type: "result", content: "after" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       runStore: store,
@@ -77,7 +78,7 @@ describe("dispatchEngineJob", () => {
       llm: { provider: "openai", model: "gpt-4o" },
     });
 
-    const waiting = await dispatchEngineJob({
+    const waiting = await dispatchEngineJob(rt, {
       kind: "run",
       projectId: "p1",
       agentId: "a2",
@@ -86,7 +87,7 @@ describe("dispatchEngineJob", () => {
     });
     expect(waiting.status).toBe("waiting");
 
-    const done = await dispatchEngineJob({
+    const done = await dispatchEngineJob(rt, {
       kind: "resume",
       projectId: "p1",
       agentId: "a2",
@@ -95,5 +96,65 @@ describe("dispatchEngineJob", () => {
       resumeInput: { type: "message", content: "ok" },
     });
     expect(done.status).toBe("completed");
+  });
+
+  it("forwards optional endUserId for B2B2C memory keys (Redis adapter)", async () => {
+    const redis = new Redis();
+    const mem = new RedisMemoryAdapter(redis);
+    const llm = new QueueLLM([
+      JSON.stringify({
+        type: "action",
+        tool: "save_memory",
+        input: { memoryType: "longTerm", content: { note: "eu-scoped" } },
+      }),
+      JSON.stringify({ type: "result", content: "done" }),
+    ]);
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+
+    await Agent.define({
+      id: "a3",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: ["save_memory"],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    await dispatchEngineJob(rt, {
+      kind: "run",
+      projectId: "p1",
+      agentId: "a3",
+      sessionId: "sess-b2b",
+      endUserId: "customer-99",
+      userInput: "hello",
+    });
+
+    const keys = await redis.keys("m:p1:a3:sess-b2b:*");
+    expect(keys.some((k) => k.includes("eu:customer-99"))).toBe(true);
+  });
+
+  it("throws EngineJobExpiredError when expiresAtMs is in the past", async () => {
+    const rt = new AgentRuntime({
+      llmAdapter: new QueueLLM([JSON.stringify({ type: "result", content: "x" })]),
+      memoryAdapter: new InMemoryMemoryAdapter(),
+      maxIterations: 10,
+    });
+    await Agent.define({
+      id: "a-exp",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    await expect(
+      dispatchEngineJob(rt, {
+        kind: "run",
+        projectId: "p1",
+        agentId: "a-exp",
+        sessionId: "s1",
+        userInput: "hi",
+        expiresAtMs: Date.now() - 60_000,
+      }),
+    ).rejects.toThrow(EngineJobExpiredError);
   });
 });

@@ -3,10 +3,11 @@ import type { AgentDefinitionPersisted } from "./types.js";
 import type { Session } from "./Session.js";
 import type { Run } from "../protocol/types.js";
 import type { Step } from "../protocol/types.js";
+import type { RunStore } from "../adapters/run/RunStore.js";
 import type { EngineHooks, LLMResponseMeta, LLMParseOutcome } from "../engine/types.js";
 import { createRun, executeRun } from "../engine/Engine.js";
 import { buildEngineDeps } from "../engine/buildEngineDeps.js";
-import { getEngineConfig } from "../runtime/configure.js";
+import type { AgentRuntime } from "../runtime/AgentRuntime.js";
 import { RunInvalidStateError, SessionExpiredError } from "../errors/index.js";
 
 function throwIfSessionExpired(session: Session): void {
@@ -30,6 +31,7 @@ export class RunBuilder implements PromiseLike<Run> {
   private waitContinuation?: (step: Step) => Promise<string | undefined>;
 
   constructor(
+    private readonly runtime: AgentRuntime,
     private readonly agent: AgentDefinitionPersisted,
     private readonly session: Session,
     private readonly init:
@@ -102,9 +104,31 @@ export class RunBuilder implements PromiseLike<Run> {
     return this.execute().catch(onrejected as never);
   }
 
+  /**
+   * After `executeRun`, persist with compare-and-swap when advancing from a **`waiting`** row
+   * (`Agent.resume` or in-process `onWait` after a prior save that left `waiting`).
+   */
+  private async persistAfterExecute(
+    store: RunStore,
+    result: Run,
+    opts: { resumePath: boolean; lastPersistedWasWaiting: boolean },
+  ): Promise<void> {
+    const useCas = opts.resumePath || opts.lastPersistedWasWaiting;
+    if (useCas) {
+      const ok = await store.saveIfStatus(result, "waiting");
+      if (!ok) {
+        throw new RunInvalidStateError(
+          `Run ${result.runId} is no longer waiting (concurrent resume or stale job)`,
+        );
+      }
+      return;
+    }
+    await store.save(result);
+  }
+
   private async execute(): Promise<Run> {
     throwIfSessionExpired(this.session);
-    const cfg = getEngineConfig();
+    const cfg = this.runtime.config;
 
     let run: Run;
     let resumeMessages:
@@ -116,7 +140,7 @@ export class RunBuilder implements PromiseLike<Run> {
     } else {
       if (!cfg.runStore) {
         throw new RunInvalidStateError(
-          "configureRuntime({ runStore }) is required for resume()",
+          "AgentRuntime({ runStore }) is required for resume()",
         );
       }
       const loaded = await cfg.runStore.load(this.init.runId);
@@ -133,6 +157,14 @@ export class RunBuilder implements PromiseLike<Run> {
           `Cannot resume run ${this.init.runId}: status is "${loaded.status}", expected "waiting"`,
         );
       }
+      if (
+        loaded.sessionId != null &&
+        loaded.sessionId !== this.session.id
+      ) {
+        throw new RunInvalidStateError(
+          `Run ${this.init.runId} belongs to a different session`,
+        );
+      }
       run = loaded;
       run.status = "running";
       run.state.pending = null;
@@ -145,8 +177,11 @@ export class RunBuilder implements PromiseLike<Run> {
       ];
     }
 
-    const baseDeps = buildEngineDeps(this.agent, this.session, { hooks: this.hooks });
+    const baseDeps = buildEngineDeps(this.agent, this.session, this.runtime, {
+      hooks: this.hooks,
+    });
 
+    let lastPersistedWasWaiting = false;
     let result = await executeRun(run, {
       ...baseDeps,
       startedAtMs: Date.now(),
@@ -154,7 +189,11 @@ export class RunBuilder implements PromiseLike<Run> {
     });
 
     if (cfg.runStore) {
-      await cfg.runStore.save(result);
+      await this.persistAfterExecute(cfg.runStore, result, {
+        resumePath: typeof this.init !== "string",
+        lastPersistedWasWaiting,
+      });
+      lastPersistedWasWaiting = result.status === "waiting";
     }
 
     const isFreshRun = typeof this.init === "string";
@@ -184,7 +223,11 @@ export class RunBuilder implements PromiseLike<Run> {
       });
 
       if (cfg.runStore) {
-        await cfg.runStore.save(result);
+        await this.persistAfterExecute(cfg.runStore, result, {
+          resumePath: false,
+          lastPersistedWasWaiting,
+        });
+        lastPersistedWasWaiting = result.status === "waiting";
       }
     }
 

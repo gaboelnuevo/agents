@@ -28,4 +28,9 @@ export interface RuntimeConfig {
     maxIterations: number;
     runTimeoutMs: number;
   };
+  /**
+   * Passed to `AgentRuntime`: intersects with each agent’s tool allowlist.
+   * Omit or `"*"` for no extra restriction (default).
+   */
+  allowedToolIds?: readonly string[] | "*";
 }

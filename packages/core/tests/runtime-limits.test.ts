@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
   buildEngineDeps,
-  configureRuntime,
   createRun,
   executeRun,
   getAgentDefinition,
@@ -11,7 +11,6 @@ import {
   RunCancelledError,
   RunTimeoutError,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -28,7 +27,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("runtime limits (Phase 9.6)", () => {
@@ -37,7 +35,7 @@ describe("runtime limits (Phase 9.6)", () => {
     const llm = new QueueLLM([
       JSON.stringify({ type: "result", content: "never reached" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       maxIterations: 10,
@@ -55,7 +53,7 @@ describe("runtime limits (Phase 9.6)", () => {
     const agentDef = getAgentDefinition("p-rl", "t-out");
     expect(agentDef).toBeDefined();
     const session = new Session({ id: "s-rl", projectId: "p-rl" });
-    const base = buildEngineDeps(agentDef!, session);
+    const base = buildEngineDeps(agentDef!, session, rt);
     const run = createRun("t-out", session.id, "hi");
 
     await expect(
@@ -73,7 +71,7 @@ describe("runtime limits (Phase 9.6)", () => {
     const llm = new QueueLLM([
       JSON.stringify({ type: "result", content: "never" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "t-abort",
@@ -87,7 +85,7 @@ describe("runtime limits (Phase 9.6)", () => {
     const session = new Session({ id: "s-ab", projectId: "p-rl" });
     const ac = new AbortController();
     ac.abort();
-    const base = buildEngineDeps(agentDef!, session, { signal: ac.signal });
+    const base = buildEngineDeps(agentDef!, session, rt, { signal: ac.signal });
     const run = createRun("t-abort", session.id, "hi");
 
     await expect(

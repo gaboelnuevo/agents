@@ -48,3 +48,8 @@ export class SecurityError extends EngineError {
 export class SessionExpiredError extends EngineError {
   readonly code = "SESSION_EXPIRED";
 }
+
+/** Queued job included **`expiresAtMs`** and the worker ran after that deadline (see `adapters-bullmq` payload). */
+export class EngineJobExpiredError extends EngineError {
+  readonly code = "ENGINE_JOB_EXPIRED";
+}

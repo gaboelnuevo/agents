@@ -2,6 +2,7 @@ import { access, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
+import { assertProjectRelativeSafe } from "../src/fs-utils.ts";
 import { scaffold } from "../src/index.ts";
 
 describe("scaffold", () => {
@@ -75,5 +76,10 @@ describe("scaffold", () => {
       tools: ["save_memory"],
     });
     expect(m.created).toContain("skills/intakeSummary.ts");
+  });
+
+  it("assertProjectRelativeSafe rejects path traversal", () => {
+    expect(() => assertProjectRelativeSafe("agents/../evil.ts")).toThrow(/Unsafe relative path/);
+    expect(() => assertProjectRelativeSafe("agents/foo.ts")).not.toThrow();
   });
 });

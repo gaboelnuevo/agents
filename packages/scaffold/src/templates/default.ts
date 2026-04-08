@@ -23,6 +23,11 @@ export function defaultTemplateFiles(opts: {
         },
         dependencies: {
           "@agent-runtime/core": "^0.0.0",
+          ...(llm === "openai" ? { "@agent-runtime/adapters-openai": "^0.0.0" } : {}),
+          ...(adapter === "redis"
+            ? { "@agent-runtime/adapters-redis": "^0.0.0", ioredis: "^5" }
+            : {}),
+          ...(adapter === "upstash" ? { "@agent-runtime/adapters-upstash": "^0.0.0" } : {}),
         },
         devDependencies: {
           "@types/node": "^22",
@@ -82,7 +87,7 @@ REDIS_URL=
 };
 `,
 
-    "agents/example-agent.ts": `import { Agent, Session, type SessionOptions } from "@agent-runtime/core";
+    "agents/example-agent.ts": `import { Agent, Session, type AgentRuntime, type SessionOptions } from "@agent-runtime/core";
 
 const SYSTEM = ${JSON.stringify(
       "You are a helpful assistant. Each model turn must be a single JSON object with a \"type\" field: thought | action | wait | result.",
@@ -102,9 +107,9 @@ export async function registerExampleAgent(): Promise<void> {
   });
 }
 
-export async function loadExampleAgent(sessionOpts: SessionOptions) {
+export async function loadExampleAgent(runtime: AgentRuntime, sessionOpts: SessionOptions) {
   const session = new Session(sessionOpts);
-  return Agent.load("example-agent", { session });
+  return Agent.load("example-agent", runtime, { session });
 }
 `,
 

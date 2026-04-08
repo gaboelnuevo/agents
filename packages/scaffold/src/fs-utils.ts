@@ -18,12 +18,21 @@ export function toProjectRelative(root: string, absolutePath: string): string {
   return path.relative(root, absolutePath).split(path.sep).join("/");
 }
 
+/** Reject `..` segments so CLI `generate` cannot write outside the project root. */
+export function assertProjectRelativeSafe(relativePosix: string): void {
+  const parts = relativePosix.split("/").filter(Boolean);
+  if (parts.some((p) => p === "..")) {
+    throw new Error(`Unsafe relative path (no ".."): ${relativePosix}`);
+  }
+}
+
 export async function writeTextFile(
   root: string,
   relativePosix: string,
   contents: string,
   opts: { force: boolean },
 ): Promise<"created" | "skipped"> {
+  assertProjectRelativeSafe(relativePosix);
   const abs = path.join(root, ...relativePosix.split("/"));
   const exists = await pathExists(abs);
   if (exists && !opts.force) {

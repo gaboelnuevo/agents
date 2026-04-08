@@ -4,9 +4,13 @@ import type { SecurityContext } from "../security/types.js";
 import type { EngineDeps, EngineHooks } from "./types.js";
 import { ContextBuilder } from "../context/ContextBuilder.js";
 import { ToolRunner } from "../tools/ToolRunner.js";
-import { getEngineConfig } from "../runtime/configure.js";
+import type { AgentRuntime } from "../runtime/AgentRuntime.js";
+import { resolveLlmAdapterForProvider } from "../runtime/resolveLlmAdapter.js";
 import { resolveToolRegistry } from "../define/registry.js";
-import { effectiveToolAllowlist } from "../define/effectiveToolAllowlist.js";
+import {
+  applyRuntimeToolAllowlist,
+  effectiveToolAllowlist,
+} from "../define/effectiveToolAllowlist.js";
 
 /** Derives the engine `SecurityContext` from a loaded agent and session (same as `RunBuilder`). */
 export function securityContextForAgent(
@@ -25,30 +29,36 @@ export function securityContextForAgent(
 }
 
 /**
- * Builds the static part of {@link EngineDeps} after `configureRuntime` and agent/skill registration.
- * Pass the result to {@link executeRun} together with `startedAtMs`, and optionally `resumeMessages`.
+ * Builds the static part of {@link EngineDeps} for {@link executeRun}.
+ * Pass the result together with `startedAtMs`, and optionally `resumeMessages`.
  */
 export function buildEngineDeps(
   agent: AgentDefinitionPersisted,
   session: Session,
+  runtime: AgentRuntime,
   opts?: { hooks?: EngineHooks; signal?: AbortSignal },
 ): Omit<EngineDeps, "resumeMessages" | "startedAtMs"> {
-  const cfg = getEngineConfig();
+  const cfg = runtime.config;
   const toolRegistry = resolveToolRegistry(session.projectId);
-  const allow = effectiveToolAllowlist(agent, session.projectId);
+  const agentAllow = effectiveToolAllowlist(agent, session.projectId);
+  const allow = applyRuntimeToolAllowlist(agentAllow, cfg.allowedToolIds);
   const runner = new ToolRunner(toolRegistry, allow, {
     toolTimeoutMs: cfg.toolTimeoutMs,
   });
   const cb = new ContextBuilder();
+  const llmAdapter = resolveLlmAdapterForProvider(cfg, agent.llm?.provider);
 
   return {
     agent,
     session,
+    fileReadRoot: session.fileReadRoot ?? cfg.fileReadRoot,
     memoryAdapter: cfg.memoryAdapter,
-    llmAdapter: cfg.llmAdapter,
+    llmAdapter,
     embeddingAdapter: cfg.embeddingAdapter,
     vectorAdapter: cfg.vectorAdapter,
     messageBus: cfg.messageBus,
+    sendMessageTargetPolicy: cfg.sendMessageTargetPolicy,
+    ragFileCatalog: runtime.ragCatalogForProject(session.projectId),
     toolRunner: runner,
     toolRegistry,
     contextBuilder: cb,

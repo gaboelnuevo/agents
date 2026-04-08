@@ -10,10 +10,10 @@ Related: [05-adapters.md](./05-adapters.md) (adapters + BullMQ), [09-communicati
 
 | Area | Implemented | Planned / design only |
 |------|-------------|------------------------|
-| **RunStore** | `RunStore` in `@agent-runtime/core`; `InMemoryRunStore`; **`RedisRunStore`** (`@agent-runtime/adapters-redis`); `UpstashRunStore` (`@agent-runtime/adapters-upstash`); `configureRuntime({ runStore })`; `RunBuilder` persists after each run; `Agent.resume(runId, input)` | DB-backed `RunStore`, TTL/cleanup policies |
+| **RunStore** | `RunStore` in `@agent-runtime/core`; `InMemoryRunStore`; **`RedisRunStore`** (`@agent-runtime/adapters-redis`); `UpstashRunStore` (`@agent-runtime/adapters-upstash`); pass **`runStore`** into **`new AgentRuntime({ … })`**; `RunBuilder` persists after each run; `Agent.resume(runId, input)` | DB-backed `RunStore`, TTL/cleanup policies |
 | **Job queue** | **`@agent-runtime/adapters-bullmq`** — `createEngineQueue`, `createEngineWorker`, `dispatchEngineJob` (BullMQ **priority**) | QStash HTTP handler **not** in monorepo; delayed `resume` orchestration still app-specific |
 | **MessageBus** | `InProcessMessageBus`, **`RedisMessageBus`** (`@agent-runtime/adapters-redis`), `UpstashRedisMessageBus` | BullMQ-as-transport for messages (alternative pattern) |
-| **Bootstrap** | `configureRuntime()` registers built-in tools (`save_memory`, `get_memory`) and optional vector / `send_message` handlers | — |
+| **Bootstrap** | **`new AgentRuntime({ … })`** registers built-in tools (`save_memory`, `get_memory`) and optional vector / `send_message` handlers (same as constructor side effects) | — |
 | **Direct engine API** | `buildEngineDeps`, `createRun`, `executeRun`, `getAgentDefinition` — same loop as `RunBuilder`; use when a job handler should not use `Agent.run` | You must call `runStore.save` after each `executeRun` when using `runStore` (including `waiting`) |
 
 ---
@@ -35,23 +35,23 @@ Related: [05-adapters.md](./05-adapters.md) (adapters + BullMQ), [09-communicati
    ║  Worker 1 ║   ║  Worker 2 ║   ║  Worker N ║
    ║───────────║   ║───────────║   ║───────────║
    ║ Registry  ║   ║ Registry  ║   ║ Registry  ║   ← identical bootstrap
-   ║ Config    ║   ║ Config    ║   ║ Config    ║   ← configureRuntime()
+   ║ Runtime   ║   ║ Runtime   ║   ║ Runtime   ║   ← new AgentRuntime({ … })
    ║ Engine    ║   ║ Engine    ║   ║ Engine    ║   ← stateless per-run
    ║ Adapters  ║   ║ Adapters  ║   ║ Adapters  ║   ← point to shared infra
    ╚═══════════╝   ╚═══════════╝   ╚═══════════╝
 ```
 
-Legend: **✓** = adapter(s) in repo. **○** = job queue layer not implemented here; integrate BullMQ/QStash in your app.
+Legend: **✓** = adapter(s) in repo. **○** = your app wires BullMQ (or another queue) around Redis — **`@agent-runtime/adapters-bullmq`** supplies typed helpers; queue infra is not implied by the diagram alone.
 
 ### 1.1 Per-process (replicated on every node)
 
 | Component | Why per-process | Cluster requirement |
 |-----------|----------------|---------------------|
 | **Definition registry** (`registry.ts`) | Module-level `Map`s — tool, skill, and agent definitions | Every worker must end up with the **same** registered definitions. Usually that means identical `Tool.define` / `Skill.define` / `Agent.define` at startup. Alternatively, load **JSON** from Redis/DB and call **`Skill.define`** / **`Skill.defineBatch`** so each process fills its own `Map` — still no cross-process live sync of the `Map` itself. |
-| **Runtime config** (`configureRuntime()`) | Singleton `let config` | Each worker calls `configureRuntime({ llmAdapter, memoryAdapter, ... })` at boot. Config is identical across nodes. |
+| **Runtime** (`AgentRuntime`) | One instance per worker (holds merged `EngineConfig`) | Each worker constructs **`new AgentRuntime({ llmAdapter, memoryAdapter, runStore?, … })`** at boot with the **same** adapter wiring. Pass that instance to **`Agent.load(..., runtime, …)`** and **`dispatchEngineJob(runtime, …)`**. |
 | **Tool handlers** | Registered via `registerToolHandler` into a process-local `Map` | Each worker registers the same handler set. Handlers contain code (functions), not serializable. |
 | **Engine loop** (`executeRun`) | Pure function: takes `Run` + `EngineDeps`, returns `Run` | Stateless — any worker can execute any run as long as it can read/write the `Run` from a shared store. |
-| **Built-in tools** (`save_memory`, `get_memory`) | Registered by `configureRuntime` | Same on every node — they delegate to the shared `MemoryAdapter`. |
+| **Built-in tools** (`save_memory`, `get_memory`) | Registered when **`AgentRuntime`** is constructed | Same on every node — they delegate to the shared `MemoryAdapter`. |
 
 **Key rule**: **tool handlers** stay in-process (functions). For **definitions**, either ship them in code (redeploy all workers when they change) or **hydrate from a store** on boot (and on invalidation) so every node registers the same metadata. There is no magic replication of the module-level `Map`s — only identical bootstrap logic per worker. Skill JSON + code `execute`: [07-definition-syntax.md](./07-definition-syntax.md) §9.2b.
 
@@ -60,9 +60,9 @@ Legend: **✓** = adapter(s) in repo. **○** = job queue layer not implemented 
 | Component | Implementation | Cluster role |
 |-----------|---------------|-------------|
 | **MemoryAdapter** | **`RedisMemoryAdapter`** (TCP, `@agent-runtime/adapters-redis`), `UpstashRedisMemoryAdapter` (REST), Postgres | All workers read/write the same memory store. `InMemoryMemoryAdapter` is **single-process only** (tests / local dev). |
-| **RunStore** | `InMemoryRunStore` (tests/local), **`RedisRunStore`** (TCP, `@agent-runtime/adapters-redis`), `UpstashRunStore` (HTTP, `@agent-runtime/adapters-upstash`) | Persists `Run` so `wait` on node A can be `resume`d on node B. Wired via `configureRuntime({ runStore })` — see §3. |
-| **Job queue** (BullMQ / QStash) | *Design / planned* — not implemented in this monorepo | Distributes `run` / `resume` jobs across workers. You add a BullMQ worker or QStash endpoint that calls `Agent.load` + `agent.run` / `agent.resume`. |
-| **MessageBus** | `InProcessMessageBus` (single process), **`RedisMessageBus`** (TCP Streams, `@agent-runtime/adapters-redis`), `UpstashRedisMessageBus` (REST) | Delivers `send_message` across workers with `configureRuntime({ messageBus })`. |
+| **RunStore** | `InMemoryRunStore` (tests/local), **`RedisRunStore`** (TCP, `@agent-runtime/adapters-redis`), `UpstashRunStore` (HTTP, `@agent-runtime/adapters-upstash`) | Persists `Run` so `wait` on node A can be `resume`d on node B. Pass **`runStore`** into **`AgentRuntime`** — see §3. |
+| **Job queue** (BullMQ / QStash) | **`@agent-runtime/adapters-bullmq`** — typed queue/worker + **`dispatchEngineJob(runtime, payload)`** | Distributes `run` / `resume` jobs across workers. QStash remains app-integrated (not packaged here). |
+| **MessageBus** | `InProcessMessageBus` (single process), **`RedisMessageBus`** (TCP Streams, `@agent-runtime/adapters-redis`), `UpstashRedisMessageBus` (REST) | Delivers `send_message` across workers when **`messageBus`** is set on **`AgentRuntime`**. |
 | **VectorAdapter** | Upstash Vector | Shared semantic index — stateless queries from any node. |
 
 ---
@@ -72,16 +72,16 @@ Legend: **✓** = adapter(s) in repo. **○** = job queue layer not implemented 
 Every worker process must execute this sequence before handling jobs:
 
 ```typescript
-import { configureRuntime, Agent, Tool, Skill } from "@agent-runtime/core";
+import { AgentRuntime, Agent, Tool, Skill } from "@agent-runtime/core";
 import { OpenAILLMAdapter } from "@agent-runtime/adapters-openai";
 import { RedisMemoryAdapter, RedisRunStore, RedisMessageBus } from "@agent-runtime/adapters-redis";
 import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL!);
 
-// 1. Adapters pointing to shared infrastructure (built-in tools register inside configureRuntime).
+// 1. Adapters pointing to shared infrastructure (built-in tools register in the AgentRuntime constructor).
 // Prefer TCP Redis (`adapters-redis`) for the same connection style as BullMQ and typical production clusters.
-configureRuntime({
+const runtime = new AgentRuntime({
   llmAdapter: new OpenAILLMAdapter(process.env.OPENAI_API_KEY!),
   memoryAdapter: new RedisMemoryAdapter(redis),
   runStore: new RedisRunStore(redis), // required for wait/resume across workers
@@ -92,7 +92,7 @@ configureRuntime({
 // import { UpstashRedisMemoryAdapter, UpstashRunStore, UpstashRedisMessageBus } from "@agent-runtime/adapters-upstash";
 // const redisUrl = process.env.UPSTASH_REDIS_URL!;
 // const redisToken = process.env.UPSTASH_REDIS_TOKEN!;
-// configureRuntime({
+// const runtime = new AgentRuntime({
 //   llmAdapter: new OpenAILLMAdapter(process.env.OPENAI_API_KEY!),
 //   memoryAdapter: new UpstashRedisMemoryAdapter(redisUrl, redisToken),
 //   runStore: new UpstashRunStore(redisUrl, redisToken),
@@ -100,7 +100,7 @@ configureRuntime({
 // });
 
 // 2. Definitions — identical on every node (your domain tools/skills/agents only).
-// Do NOT re-define built-ins: save_memory / get_memory are registered by configureRuntime.
+// Do NOT re-define built-ins: save_memory / get_memory are registered by AgentRuntime construction.
 await Tool.define({
   id: "lookup_ticket",
   scope: "global",
@@ -111,7 +111,7 @@ await Tool.define({
 await Skill.define({ id: "intakeSummary", /* ... */ });
 await Agent.define({ id: "ops-analyst", /* ... */ });
 
-// 3. Start consuming jobs (your BullMQ worker, HTTP server, etc.) — see §4
+// 3. Pass `runtime` into Agent.load / dispatchEngineJob / HTTP handlers — see §4
 ```
 
 If step 2 differs between workers, behavior is undefined: one node may refuse a tool another node allows.
@@ -127,6 +127,7 @@ The engine keeps a `Run` in memory during `executeRun`. For clusters, **`RunBuil
 ```typescript
 interface RunStore {
   save(run: Run): Promise<void>;
+  saveIfStatus(run: Run, expectedStatus: RunStatus): Promise<boolean>;
   load(runId: string): Promise<Run | null>;
   delete(runId: string): Promise<void>;
   listByAgent(agentId: string, status?: RunStatus): Promise<Run[]>;
@@ -143,12 +144,20 @@ interface RunStore {
 
 ### 3.3 Integration points
 
-- `Agent.run()` / `Agent.resume()` → `RunBuilder` calls `runStore.save(run)` after every `executeRun` when `runStore` is configured (including `status: waiting` so another worker can resume).
+- `Agent.run()` / `Agent.resume()` → `RunBuilder` persists after every `executeRun` when `runStore` is configured (including `status: waiting` so another worker can resume): unconditional **`save`** for the first write of a new run; **`saveIfStatus(..., "waiting")`** when resuming or continuing in-process after a **`waiting`** persist (see §3.4).
 - **`buildEngineDeps` + `createRun` + `executeRun`** (no `RunBuilder`) → you must **`runStore.save(run)`** after each `executeRun` when `runStore` is set, same as `RunBuilder` (including `waiting`).
 - `Agent.resume(runId, input)` → `runStore.load(runId)` (must be `waiting`), injects a user `resumeMessages` turn, then `executeRun` continues the loop.
 - On `completed` / `failed` → same save applies; optionally delete or archive in your app if you do not want long-term retention.
 
-Pass the adapter via `configureRuntime({ ..., runStore })` alongside `memoryAdapter` and `llmAdapter`.
+Pass **`runStore`** (and other adapters) in the **`AgentRuntime`** constructor alongside **`memoryAdapter`** and **`llmAdapter`**.
+
+### 3.4 Concurrency and integrity (multi-worker)
+
+- **`RunStore.saveIfStatus` (bundled adapters):** after **`resume`** and after in-process **`onWait`** when the run was last persisted as **`waiting`**, **`RunBuilder`** calls **`saveIfStatus(..., "waiting")`** so only one writer succeeds; the other gets **`RunInvalidStateError`**. **`RedisRunStore`** uses **`WATCH`/`MULTI`/`EXEC`**; **`UpstashRunStore`** uses one **`EVAL`** per commit. The **first** persist of a brand-new run still uses unconditional **`save`**. Prefer **BullMQ `jobId`** dedupe anyway to avoid wasted work.
+- **Memory adapters (`Redis` / `Upstash`)** use **read–modify–write** for **`save`** (append to a JSON list). Concurrent **`save_memory`** for the **same** session + `memoryType` can **lose** updates. Use app-level serialization, **Lua** / **`WATCH`**, or list primitives if you need atomic append under load.
+- **`EngineJobPayload`** (BullMQ) includes **`sessionId`**, optional **`endUserId`**, and optional **`expiresAtMs`**. **`dispatchEngineJob`** forwards **`endUserId`** into **`Session`** and throws **`EngineJobExpiredError`** if the job is processed after **`expiresAtMs`** — treat as **non-retryable** in BullMQ if appropriate. For B2B2C **`longTerm`** / **`vectorMemory`**, enqueue jobs with **`endUserId`** set when the run is on behalf of an end-user ([15-multi-tenancy.md §4](./15-multi-tenancy.md)).
+
+Full table: [`technical-debt.md` §8](../../technical-debt.md).
 
 ---
 
@@ -165,16 +174,17 @@ The job queue is **not** inside `packages/core` — it is **infrastructure** tha
 
 ### 4.1 BullMQ (primary) — `adapters-bullmq`
 
-- **Package**: `createEngineQueue`, `createEngineWorker`, `dispatchEngineJob`, `DEFAULT_ENGINE_QUEUE_NAME`, typed **`EngineJobPayload`** (`kind: "run" | "resume"`).
+- **Package**: `createEngineQueue`, `createEngineWorker`, `dispatchEngineJob`, `DEFAULT_ENGINE_QUEUE_NAME`, typed **`EngineJobPayload`** (`kind: "run" | "resume"`; optional **`expiresAtMs`**).
 - **Design**: one or more workers per queue, all running the same bootstrap (§2).
-- Worker **processor** typically **`await dispatchEngineJob(job.data)`** after `configureRuntime` + definitions — or (low-level) `getAgentDefinition` + `buildEngineDeps` + `createRun` / `executeRun` with `runStore.save` as in §3.3.
+- Worker **processor** typically **`await dispatchEngineJob(runtime, job.data)`** after constructing **`AgentRuntime`** + definitions — or (low-level) `getAgentDefinition` + `buildEngineDeps(agent, session, runtime)` + `createRun` / `executeRun` with `runStore.save` as in §3.3.
 - Retries, backoff, dead-letter are BullMQ config — the engine sees a normal run.
 - `wait` → worker completes the job (run is persisted in `RunStore`). A **delayed `addResume`** or **separate scheduled job** later processes `resume`.
 - **Horizontal scaling**: add worker processes; BullMQ + Redis coordinate (see §7).
 
-Minimal worker (same bootstrap as §2 — `configureRuntime` + definitions before `Worker` starts):
+Minimal worker (same bootstrap as §2 — **`AgentRuntime`** + definitions before `Worker` starts):
 
 ```typescript
+import { AgentRuntime } from "@agent-runtime/core";
 import {
   DEFAULT_ENGINE_QUEUE_NAME,
   createEngineWorker,
@@ -185,11 +195,15 @@ import type { Job } from "bullmq";
 // connection: BullMQ `ConnectionOptions` — often `{ url: process.env.REDIS_URL }` for TCP Redis
 const connection = { url: process.env.REDIS_URL! };
 
+const runtime = new AgentRuntime({
+  // llmAdapter, memoryAdapter, runStore, … — same object shape as §2
+});
+
 createEngineWorker(
   DEFAULT_ENGINE_QUEUE_NAME,
   connection,
   async (job: Job) => {
-    await dispatchEngineJob(job.data);
+    await dispatchEngineJob(runtime, job.data);
   },
 );
 ```
@@ -248,7 +262,7 @@ In cluster mode, `send_message` from agent A (on worker 1) writes to Redis; agen
 ├─────────────────────────────┤
 │  N × Worker process         │
 │  (identical code, same env) │
-│  configureRuntime(…)        │
+│  new AgentRuntime(…)       │
 │  Tool/Skill/Agent.define(…) │
 │  Your BullMQ Worker.on ○    │
 └─────────────────────────────┘
@@ -304,7 +318,7 @@ services:
       replicas: 2
 ```
 
-- **Two replicas** of the same image run the same bootstrap (§2); both call `configureRuntime` with shared Upstash URLs for `memoryAdapter`, `runStore`, and optionally `messageBus`.
+- **Two replicas** of the same image run the same bootstrap (§2); both construct **`AgentRuntime`** with shared Upstash URLs for `memoryAdapter`, `runStore`, and optionally `messageBus`.
 - **BullMQ** (when you add it) would use `REDIS_URL` against `redis:6379` for the queue only, while Upstash remains for REST-backed adapters if you keep that split (§7.1).
 - For **local-only** experiments, point all adapters at `redis:6379` only if you implement TCP Redis variants — the shipped Upstash adapters expect the **Upstash REST** URL format.
 

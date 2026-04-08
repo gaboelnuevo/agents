@@ -5,8 +5,8 @@
 import type { LLMAdapter, LLMRequest, LLMResponse } from "@agent-runtime/core";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
 } from "@agent-runtime/core";
 
@@ -29,7 +29,7 @@ class DeterministicDemoLlm implements LLMAdapter {
 }
 
 async function main(): Promise<void> {
-  configureRuntime({
+  const runtime = new AgentRuntime({
     llmAdapter: new DeterministicDemoLlm(),
     memoryAdapter: new InMemoryMemoryAdapter(),
     maxIterations: 10,
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     projectId: "demo-project",
   });
 
-  const agent = await Agent.load("demo-greeter", { session });
+  const agent = await Agent.load("demo-greeter", runtime, { session });
   const run = await agent.run("Say hello.");
 
   console.log("status:", run.status);

@@ -2,6 +2,11 @@ import type { ToolAdapter, ToolContext } from "../adapters/tool/ToolAdapter.js";
 import type { EmbeddingAdapter } from "../adapters/embedding/EmbeddingAdapter.js";
 import type { VectorAdapter, VectorDocument } from "../adapters/vector/VectorAdapter.js";
 import { registerToolDefinition, registerToolHandler } from "../define/registry.js";
+import {
+  clampVectorTopK,
+  isValidVectorDeleteInput,
+  MAX_VECTOR_UPSERT_DOCS,
+} from "./vectorLimits.js";
 
 function getVectorNamespace(ctx: ToolContext): string {
   return ctx.endUserId
@@ -13,7 +18,7 @@ function requireAdapter<T>(ctx: ToolContext, key: string): T {
   const adapter = (ctx as Record<string, unknown>)[key];
   if (!adapter) {
     throw new Error(
-      `${key} is required for vector tools. Pass it via configureRuntime().`,
+      `${key} is required for vector tools. Pass it via AgentRuntime({ embeddingAdapter, vectorAdapter }).`,
     );
   }
   return adapter as T;
@@ -22,6 +27,11 @@ function requireAdapter<T>(ctx: ToolContext, key: string): T {
 const vectorSearch: ToolAdapter = {
   name: "vector_search",
   description: "Searches the knowledge base for semantically relevant fragments.",
+  validate(input: unknown): boolean {
+    if (!input || typeof input !== "object") return false;
+    const o = input as Record<string, unknown>;
+    return typeof o.query === "string" && o.query.trim().length > 0;
+  },
   async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as {
       query: string;
@@ -34,7 +44,7 @@ const vectorSearch: ToolAdapter = {
     const qv = await embedding.embed(o.query);
     const results = await vector.query(getVectorNamespace(ctx), {
       vector: qv,
-      topK: o.topK ?? 5,
+      topK: clampVectorTopK(o.topK),
       scoreThreshold: o.scoreThreshold,
       filter: o.filter,
       includeData: true,
@@ -47,6 +57,19 @@ const vectorSearch: ToolAdapter = {
 const vectorUpsert: ToolAdapter = {
   name: "vector_upsert",
   description: "Stores text fragments with embeddings in the knowledge base.",
+  validate(input: unknown): boolean {
+    if (!input || typeof input !== "object") return false;
+    const o = input as { documents?: unknown };
+    if (!Array.isArray(o.documents)) return false;
+    if (o.documents.length === 0 || o.documents.length > MAX_VECTOR_UPSERT_DOCS)
+      return false;
+    return o.documents.every(
+      (d) =>
+        d &&
+        typeof d === "object" &&
+        typeof (d as { content?: unknown }).content === "string",
+    );
+  },
   async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as {
       documents: Array<{ id?: string; content: string; metadata?: Record<string, unknown> }>;
@@ -69,6 +92,7 @@ const vectorUpsert: ToolAdapter = {
 const vectorDelete: ToolAdapter = {
   name: "vector_delete",
   description: "Deletes fragments from the knowledge base by ID or metadata filter.",
+  validate: isValidVectorDeleteInput,
   async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as {
       ids?: string[];

@@ -1397,7 +1397,7 @@ Each phase builds on the previous. Interfaces from §2 are implemented progressi
 | 12 | Engine loop | `src/engine/Engine.ts` | Everything above |
 | 13 | Security types + MVP stub | `src/security/*.ts` | — |
 | 14 | Barrel export | `src/index.ts` | All modules |
-| 15 | `RunBuilder`, `RunStore`, `Agent.resume`, `configureRuntime({ runStore })` | `RunBuilder.ts`, `adapters/run/*` | Overlaps Phase 4b below |
+| 15 | `RunBuilder`, `RunStore`, `Agent.resume`, **`AgentRuntime`** + **`runStore`** | `RunBuilder.ts`, `adapters/run/*`, `runtime/AgentRuntime.ts` | Overlaps Phase 4b below |
 | 16 | `buildEngineDeps`, `effectiveToolAllowlist`, exported registry helpers | `engine/buildEngineDeps.ts`, `define/effectiveToolAllowlist.ts` | Worker-shaped `executeRun` tests |
 | 17 | `RunBuilder.onWait` | `RunBuilder.ts` | In-process wait continuation |
 
@@ -1551,7 +1551,8 @@ export { watchUsage } from "./engine/watchUsage";
 export { createRun, executeRun } from "./engine/Engine";
 export { buildEngineDeps, securityContextForAgent } from "./engine/buildEngineDeps";
 
-export { configureRuntime } from "./runtime/configure";
+export { AgentRuntime } from "./runtime/AgentRuntime";
+export type { EngineConfig, ResolvedEngineConfig } from "./runtime/engineConfig";
 export { InMemoryMemoryAdapter } from "./adapters/memory/InMemoryMemoryAdapter";
 export { InMemoryRunStore } from "./adapters/run/InMemoryRunStore";
 export { InProcessMessageBus } from "./bus/InProcessMessageBus";
@@ -1576,11 +1577,11 @@ export {
 
 **Cluster / worker usage (not duplicated in the export block above):**
 
-- **`configureRuntime({ runStore })`** — persist `waiting` runs; **`Agent.resume`** loads from the store (see `docs/core/19-cluster-deployment.md`).
-- **`configureRuntime({ toolTimeoutMs })`** — optional per-tool wall-clock limit (`ToolTimeoutError` / `TOOL_TIMEOUT`).
+- **`new AgentRuntime({ runStore, … })`** — persist `waiting` runs; **`Agent.resume`** loads from the store (see `docs/core/19-cluster-deployment.md`).
+- **`toolTimeoutMs`** on **`AgentRuntime`** — optional per-tool wall-clock limit (`ToolTimeoutError` / `TOOL_TIMEOUT`).
 - **`RunBuilder.onWait`** — optional in-process continuation: callback returns a **string** to inject `[resume:text] …`; **`undefined`** keeps `waiting` (use **`Agent.resume`** for cross-worker).
-- **`createRun` + `executeRun`** — same engine loop as **`RunBuilder`**. Prefer **`buildEngineDeps(agent, session)`** then spread into **`executeRun`** with **`startedAtMs`** (and **`resumeMessages`** after a wait). Lower-level pieces: **`ContextBuilder`**, **`ToolRunner`**, **`resolveToolRegistry`**, **`getAgentDefinition`**, **`effectiveToolAllowlist`**, **`getEngineConfig`**. See `packages/core/tests/engine.test.ts`.
-- **`@agent-runtime/adapters-bullmq`** — **`createEngineQueue`**, **`createEngineWorker`**, **`dispatchEngineJob`**, **`EngineJobPayload`** (see `packages/adapters-bullmq/src/index.ts`).
+- **`createRun` + `executeRun`** — same engine loop as **`RunBuilder`**. Prefer **`buildEngineDeps(agent, session, runtime)`** then spread into **`executeRun`** with **`startedAtMs`** (and **`resumeMessages`** after a wait). Lower-level pieces: **`ContextBuilder`**, **`ToolRunner`**, **`resolveToolRegistry`**, **`getAgentDefinition`**, **`effectiveToolAllowlist`**, **`runtime.config`**. See `packages/core/tests/engine.test.ts`.
+- **`@agent-runtime/adapters-bullmq`** — **`createEngineQueue`**, **`createEngineWorker`**, **`dispatchEngineJob(runtime, payload)`**, **`EngineJobPayload`** (see `packages/adapters-bullmq/src/index.ts`).
 
 ---
 

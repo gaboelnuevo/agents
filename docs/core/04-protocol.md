@@ -1,5 +1,7 @@
 # Internal engine protocol
 
+Related: [03-execution-model.md](./03-execution-model.md) (state machine, **wait**/**resume**), [07-definition-syntax.md](./07-definition-syntax.md) (full JSON shapes), [19-cluster-deployment.md](./19-cluster-deployment.md) (**RunStore** persistence).
+
 Full **JSON shapes** (agent, run, `Step` steps, etc.) are in [07-definition-syntax.md](./07-definition-syntax.md).
 
 ## Principle
@@ -33,11 +35,11 @@ Every relevant exchange is a **typed message**. The LLM produces **proposals** i
   "messages": [],
   "state": {},
   "tools": [],
-  "status": "running | completed"
+  "status": "running | waiting | completed | failed"
 }
 ```
 
-Useful for logs, debugging, and replaying reasoning.
+Useful for logs, debugging, and replaying reasoning. Match **`Run`** / **RunStore** payloads in code ([03-execution-model.md](./03-execution-model.md)); **`waiting`** implies a **resume** path (same process or shared **RunStore**).
 
 ## Action toward tools
 
@@ -71,7 +73,7 @@ Response in history as `observation`:
 1. **The LLM does not execute tools**: it only proposes `action`; the **ToolRunner** executes.
 2. **All side effects go through the engine**: permissions, limits, logging.
 3. **History is immutable**: **append** only.
-4. **Durable state** (business memory, wait) lives **outside** the model’s volatile context; the prompt reflects a **snapshot**, not the sole source of truth.
+4. **Durable state** (business memory, **`waiting`** runs) lives **outside** the model’s volatile context: **MemoryAdapter** and, for cross-process **resume**, **RunStore** wired on **`AgentRuntime`**. The prompt reflects a **snapshot**, not the sole source of truth.
 
 ## Logical security
 

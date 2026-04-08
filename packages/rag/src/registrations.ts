@@ -2,6 +2,8 @@ import type { ToolAdapter, ToolDefinition, SkillDefinition } from "@agent-runtim
 import { fileReadTool, fileReadDefinition } from "./tools/fileRead.js";
 import { fileIngestTool, fileIngestDefinition } from "./tools/fileIngest.js";
 import { fileListTool, fileListDefinition } from "./tools/fileList.js";
+import { listRagSourcesTool, listRagSourcesDefinition } from "./tools/listRagSources.js";
+import { ingestRagSourceTool, ingestRagSourceDefinition } from "./tools/ingestRagSource.js";
 import { ragSkill, ragReaderSkill } from "./skills/rag.js";
 
 export interface RagRegistration {
@@ -16,6 +18,8 @@ export interface RagRegistration {
 export function getRagRegistrations(): RagRegistration {
   return {
     tools: [
+      { definition: listRagSourcesDefinition as ToolDefinition, handler: listRagSourcesTool },
+      { definition: ingestRagSourceDefinition as ToolDefinition, handler: ingestRagSourceTool },
       { definition: fileReadDefinition as ToolDefinition, handler: fileReadTool },
       { definition: fileIngestDefinition as ToolDefinition, handler: fileIngestTool },
       { definition: fileListDefinition as ToolDefinition, handler: fileListTool },

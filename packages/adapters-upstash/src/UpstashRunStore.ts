@@ -8,6 +8,18 @@ import type { Run, RunStatus, RunStore } from "@agent-runtime/core";
  * - `run:agent:{agentId}` — SET of `runId` values for listing
  */
 export class UpstashRunStore implements RunStore {
+  /** Atomic CAS in one round-trip (REST cannot `WATCH` across requests). */
+  private static readonly SAVE_IF_STATUS_LUA = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return 0 end
+local expected = ARGV[1]
+local status = string.match(raw, '"status":"([^"]*)"')
+if not status or status ~= expected then return 0 end
+redis.call('SET', KEYS[1], ARGV[2])
+redis.call('SADD', 'run:agent:' .. ARGV[3], ARGV[4])
+return 1
+`;
+
   constructor(
     private readonly url: string,
     private readonly token: string,
@@ -33,6 +45,21 @@ export class UpstashRunStore implements RunStore {
     const key = `run:data:${run.runId}`;
     await this.cmd(["SET", key, JSON.stringify(run)]);
     await this.cmd(["SADD", `run:agent:${run.agentId}`, run.runId]);
+  }
+
+  async saveIfStatus(run: Run, expectedStatus: RunStatus): Promise<boolean> {
+    const key = `run:data:${run.runId}`;
+    const n = await this.cmd([
+      "EVAL",
+      UpstashRunStore.SAVE_IF_STATUS_LUA,
+      "1",
+      key,
+      expectedStatus,
+      JSON.stringify(run),
+      run.agentId,
+      run.runId,
+    ]);
+    return n === 1 || n === true;
   }
 
   async load(runId: string): Promise<Run | null> {

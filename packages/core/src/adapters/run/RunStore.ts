@@ -11,6 +11,12 @@ import type { Run, RunStatus } from "../../protocol/types.js";
  */
 export interface RunStore {
   save(run: Run): Promise<void>;
+  /**
+   * Atomically persist `run` only if the stored document for `run.runId` exists and
+   * `status === expectedStatus`. Returns whether the write happened. Used after **`resume`**
+   * (and in-process **`wait`** continuations) so two workers cannot both overwrite a **`waiting`** run.
+   */
+  saveIfStatus(run: Run, expectedStatus: RunStatus): Promise<boolean>;
   load(runId: string): Promise<Run | null>;
   delete(runId: string): Promise<void>;
   listByAgent(agentId: string, status?: RunStatus): Promise<Run[]>;

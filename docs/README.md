@@ -12,7 +12,7 @@ A **control system** where the LLM proposes and the engine decides — with laye
 
 ### Current repository status
 
-Nine workspace packages (`core`, `utils`, `adapters-openai`, `adapters-upstash`, `adapters-redis`, **`adapters-bullmq`**, `rag`, `scaffold`, `cli`) build and test together. **BullMQ** (`@agent-runtime/adapters-bullmq`) is the **priority** path for background runs and workers (`createEngineQueue`, `dispatchEngineJob`, …). **TCP Redis** adapters are the **default** for shared engine state; pair with the same Redis for queues when it fits ops. **Upstash REST** + **Upstash Vector** when you want HTTP-only Redis. **Per-tool timeouts**: `configureRuntime({ toolTimeoutMs })`. **CI**: `pnpm turbo run build test lint` ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)). Roadmap: [`plan.md`](./plan.md); gaps: [`technical-debt.md`](./technical-debt.md).
+Nine workspace packages (`core`, `utils`, `adapters-openai`, `adapters-upstash`, `adapters-redis`, **`adapters-bullmq`**, `rag`, `scaffold`, `cli`) build and test together. **BullMQ** (`@agent-runtime/adapters-bullmq`) is the **priority** path for background runs and workers (`createEngineQueue`, `dispatchEngineJob(runtime, payload)`, …). **TCP Redis** adapters are the **default** for shared engine state; pair with the same Redis for queues when it fits ops. **Upstash REST** + **Upstash Vector** when you want HTTP-only Redis. **Per-tool timeouts**: set **`toolTimeoutMs`** on **`AgentRuntime`**. **CI**: `pnpm turbo run build test lint` ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)). Roadmap: [`plan.md`](./plan.md); gaps: [`technical-debt.md`](./technical-debt.md).
 
 ---
 
@@ -303,23 +303,23 @@ Messages are scoped to `projectId` by default — no cross-tenant leakage.
 
 ## Production Redis and Upstash
 
-The engine uses **interfaces**; production usually wires **`configureRuntime`** with shared stores. Prefer **TCP Redis** (`@agent-runtime/adapters-redis`) when you have a normal `REDIS_URL` — it matches **BullMQ** and typical deployments. Use **`@agent-runtime/adapters-upstash`** for **REST** Redis, **Upstash Vector**, or serverless-friendly HTTP access.
+The engine uses **interfaces**; production usually constructs **`AgentRuntime`** with shared adapters. Prefer **TCP Redis** (`@agent-runtime/adapters-redis`) when you have a normal `REDIS_URL` — it matches **BullMQ** and typical deployments. Use **`@agent-runtime/adapters-upstash`** for **REST** Redis, **Upstash Vector**, or serverless-friendly HTTP access.
 
 | Piece | Typical choice |
 |-------|----------------|
 | **TCP Redis** (`ioredis`) | `RedisMemoryAdapter`, `RedisRunStore`, `RedisMessageBus` in `@agent-runtime/adapters-redis` — **default** for cluster memory, `wait`/`resume` across workers, and `send_message`. |
 | **Upstash REST** | `UpstashRedisMemoryAdapter`, `UpstashRunStore`, `UpstashRedisMessageBus` when you want HTTP-only Redis. |
 | **Upstash Vector** | `UpstashVectorAdapter` for `vector_search` / RAG — lives in `@agent-runtime/adapters-upstash`. |
-| **BullMQ (primary job queue)** | Not shipped in-repo; your worker calls `buildEngineDeps` + `executeRun` — [`core/05-adapters.md`](./core/05-adapters.md#job-queue-adapter-primary-bullmq). |
+| **BullMQ (primary job queue)** | **`@agent-runtime/adapters-bullmq`** — `dispatchEngineJob(runtime, payload)` or `buildEngineDeps` + `executeRun` — [`core/05-adapters.md`](./core/05-adapters.md#job-queue-adapter-primary-bullmq). |
 | **Upstash QStash (alternative)** | HTTP callback to `resume` after a scheduled `wait` if you skip BullMQ workers — same wake semantics, different ops model. |
 
 ```typescript
-import { configureRuntime } from "@agent-runtime/core";
+import { AgentRuntime } from "@agent-runtime/core";
 import { RedisMemoryAdapter, RedisRunStore } from "@agent-runtime/adapters-redis";
 import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL!);
-configureRuntime({
+const runtime = new AgentRuntime({
   memoryAdapter: new RedisMemoryAdapter(redis),
   runStore: new RedisRunStore(redis),
   // llmAdapter, …

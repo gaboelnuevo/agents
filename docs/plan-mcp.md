@@ -20,7 +20,7 @@
 | Approach | Pros | Cons |
 |----------|------|------|
 | **A — MCP → REST** | One backend contract ([`plan-rest.md`](./plan-rest.md)); MCP server is a thin HTTP client; easy multi-tenant and auth at the API layer. | Extra hop; requires REST to exist. |
-| **B — MCP → SDK in-process** | Low latency; good for single-user local dev. | Must embed `configureRuntime` + secrets in the MCP host process; harder to share across teams. |
+| **B — MCP → SDK in-process** | Low latency; good for single-user local dev. | Must embed **`AgentRuntime`** + secrets in the MCP host process; harder to share across teams. |
 | **C — MCP tools = subset of ToolRunner** | Aligns names/inputs with existing **tools** and **skills**. | Mapping and versioning discipline; security: MCP must not bypass **`SecurityLayer`**. |
 
 Recommended default for a **platform**: **A** or **A + C** (MCP tool list is a curated projection of allowed tools, each delegating to REST).

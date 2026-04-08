@@ -49,6 +49,8 @@ export type { BuiltContext, ContextBuilderInput } from "./context/types.js";
 
 export type { RuntimeConfig } from "./config/RuntimeConfig.js";
 
+export type { RagFileSourceEntry } from "./ragCatalogTypes.js";
+
 export type {
   EngineDeps,
   EngineHooks,

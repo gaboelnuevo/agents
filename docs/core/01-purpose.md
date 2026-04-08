@@ -10,7 +10,7 @@ An **Agent Engine** (or *runtime*) that:
 
 The LLM is only the **inference engine**; the engine is the **control system**.
 
-Related: [02-architecture.md](./02-architecture.md) (components and data flow), [19-cluster-deployment.md](./19-cluster-deployment.md) (per-process **`configureRuntime`**, **`RunStore`**, **`messageBus`**).
+Related: [02-architecture.md](./02-architecture.md) (components and data flow), [19-cluster-deployment.md](./19-cluster-deployment.md) (per-process **`AgentRuntime`**, **`RunStore`**, **`messageBus`**).
 
 ## Purpose in one line
 

@@ -3,7 +3,9 @@ import type { EngineDeps, EngineHooks } from "./types.js";
 import type { Run } from "../protocol/types.js";
 import type { Step } from "../protocol/types.js";
 import type { ToolContext } from "../adapters/tool/ToolAdapter.js";
+import { normalizeLlmStepContent } from "./normalizeLlmStepContent.js";
 import { parseStep } from "./parseStep.js";
+import { observationForToolFailure } from "./toolFailureObservation.js";
 import {
   MaxIterationsError,
   RunCancelledError,
@@ -64,10 +66,17 @@ function toolContext(deps: EngineDeps, run: Run): ToolContext {
     endUserId: deps.session.endUserId,
     memoryAdapter: deps.memoryAdapter,
     securityContext: deps.securityContext,
+    fileReadRoot: deps.fileReadRoot ?? deps.session.fileReadRoot,
+    allowFileReadOutsideRoot: deps.session.allowFileReadOutsideRoot,
+    allowHttpFileSources: deps.session.allowHttpFileSources,
+    httpFileSourceHostsAllowlist: deps.session.httpFileSourceHostsAllowlist,
   };
   if (deps.embeddingAdapter) ctx.embeddingAdapter = deps.embeddingAdapter;
   if (deps.vectorAdapter) ctx.vectorAdapter = deps.vectorAdapter;
   if (deps.messageBus) ctx.messageBus = deps.messageBus;
+  if (deps.sendMessageTargetPolicy)
+    ctx.sendMessageTargetPolicy = deps.sendMessageTargetPolicy;
+  if (deps.ragFileCatalog !== undefined) ctx.ragFileCatalog = deps.ragFileCatalog;
   return ctx;
 }
 
@@ -98,7 +107,7 @@ export function createRun(
 /**
  * Runs the thought → action → observation loop until `result`, `wait`, failure, or max iterations.
  * Prefer {@link buildEngineDeps} for the static part of {@link EngineDeps}, then add
- * `startedAtMs` and optional `resumeMessages`. Requires prior {@link configureRuntime}.
+ * `startedAtMs` and optional `resumeMessages`. Adapters come from {@link AgentRuntime}.
  */
 export async function executeRun(run: Run, deps: EngineDeps): Promise<Run> {
   run.status = "running";
@@ -133,7 +142,7 @@ export async function executeRun(run: Run, deps: EngineDeps): Promise<Run> {
     });
     firstBuild = false;
 
-    const llmResponse = await deps.llmAdapter.generate({
+    const llmResponseRaw = await deps.llmAdapter.generate({
       provider: deps.agent.llm!.provider,
       model: deps.agent.llm!.model,
       messages: built.messages,
@@ -152,7 +161,9 @@ export async function executeRun(run: Run, deps: EngineDeps): Promise<Run> {
       agentId: deps.agent.id,
       runId: run.runId,
     };
-    hooks?.onLLMResponse?.(llmResponse, llmMeta);
+    hooks?.onLLMResponse?.(llmResponseRaw, llmMeta);
+
+    const llmResponse = normalizeLlmStepContent(llmResponseRaw);
 
     let step: Step;
     try {
@@ -199,10 +210,7 @@ export async function executeRun(run: Run, deps: EngineDeps): Promise<Run> {
             toolContext(deps, run),
           );
         } catch (e) {
-          obs = {
-            success: false,
-            error: e instanceof Error ? e.message : String(e),
-          };
+          obs = observationForToolFailure(e);
         }
         appendObservation(run, obs);
         hooks?.onObservation?.(obs);

@@ -3,7 +3,8 @@ import { getRagRegistrations } from "./registrations.js";
 
 /**
  * Registers all RAG tool definitions/handlers and skills in the core in-process registry.
- * Call once at process startup after `configureRuntime` if you use RAG tools.
+ * Call once at process startup after constructing `AgentRuntime` (or before `Agent.load`) if you use RAG tools.
+ * File catalog: prefer **`registerRagCatalog(runtime, projectId, entries)`** from this package; `registerRagFileCatalog` is only for the legacy global map.
  */
 export async function registerRagToolsAndSkills(): Promise<void> {
   const { tools, skills } = getRagRegistrations();

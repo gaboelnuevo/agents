@@ -1,12 +1,16 @@
 # Engine consumers
 
+Related: [02-architecture.md](./02-architecture.md), [05-adapters.md](./05-adapters.md), [19-cluster-deployment.md](./19-cluster-deployment.md).
+
 Everything that **starts** or **observes** runs shares the same core: **SecurityLayer** (if applicable) → **Agent Engine**. Only **consumer types** are named here; engine contracts live in the rest of `docs/core/`.
 
 ---
 
 ## Library / SDK (Node or other runtime)
 
-Embedded use: `Agent.load`, `run`, `resume`, hooks. For **queue workers** or custom orchestration, call **`buildEngineDeps`**, then **`createRun`** + **`executeRun`** (add **`startedAtMs`**; optional **`resumeMessages`**). You can assemble `EngineDeps` manually with **`ContextBuilder`**, **`ToolRunner`**, **`resolveToolRegistry`**, **`getAgentDefinition`**, **`effectiveToolAllowlist`**, and **`getEngineConfig`** if you need a custom layout. Syntax reference: [07-definition-syntax.md](./07-definition-syntax.md) §9. Cluster: [19-cluster-deployment.md](./19-cluster-deployment.md).
+Embedded use: **`Agent.load(agentId, runtime, { session })`**, `run`, `resume`, hooks. Every worker constructs **`new AgentRuntime({ … })`** once (**`llmAdapter`**, **`memoryAdapter`**, optional **`runStore`** for cluster **`wait`/`resume`**, **`messageBus`** for cross-worker **`send_message`**, etc.) before handling jobs — [19-cluster-deployment.md §2](./19-cluster-deployment.md).
+
+For **queue workers** or custom orchestration, call **`buildEngineDeps(agent, session, runtime)`**, then **`createRun`** + **`executeRun`** (add **`startedAtMs`**; optional **`resumeMessages`**). When **`runStore`** is set, **persist** the returned **`Run`** after each **`executeRun`** (including **`waiting`**). You can assemble `EngineDeps` manually with **`ContextBuilder`**, **`ToolRunner`**, **`resolveToolRegistry`**, **`getAgentDefinition`**, **`effectiveToolAllowlist`**, and values from **`runtime.config`** if you need a custom layout. Syntax reference: [07-definition-syntax.md](./07-definition-syntax.md) §9. Cluster: [19-cluster-deployment.md](./19-cluster-deployment.md).
 
 ---
 
@@ -32,7 +36,7 @@ HTTP/JSON: list agents, `POST` run/resume, memory, logs, inter-agent send, defin
 
 External triggers (Stripe, GitHub, messaging): handler validates signature, builds `RunInput`, calls the engine or internal API. Same rule: **one** entry point into the loop.
 
-Often the handler **enqueues** a job — **BullMQ** on Redis is the **primary** supported pattern — and returns quickly; a **worker** then calls the engine with the same payload. Retries, backoff, and dead-letter queues live in the queue layer, not in the engine core. **Upstash QStash** is an **alternative** that POSTs to `resume` without a worker process. Detail: [05-adapters.md](./05-adapters.md#job-queue-adapter-primary-bullmq).
+Often the handler **enqueues** a job — **BullMQ** on Redis is the **primary** supported pattern — and returns quickly; a **worker** then calls **`dispatchEngineJob(runtime, payload)`** (or equivalent) with the same payload. If the run may **`wait`** and the **resume** request is handled by **another** instance, include **`runStore`** on **`AgentRuntime`** so the **`Run`** is durable — [19-cluster-deployment.md §3](./19-cluster-deployment.md). Retries, backoff, and dead-letter queues live in the queue layer, not in the engine core. **Upstash QStash** is an **alternative** that POSTs to `resume` without a worker process. Detail: [05-adapters.md](./05-adapters.md#job-queue-adapter-primary-bullmq).
 
 ---
 
@@ -54,3 +58,9 @@ Periodic execution or `wait` with `reason: scheduled`: prefer **BullMQ** delayed
 | Job workers (**BullMQ** primary) | Async `run` / `resume`; optional MessageBus — [05-adapters.md](./05-adapters.md#job-queue-adapter-primary-bullmq); **QStash** as alt |
 
 Deeper implementation of each is **out of scope** for this file.
+
+---
+
+## Production note
+
+Any **SDK** or **queue** consumer that faces the internet should sit behind **authentication**, **tenant resolution** (`projectId`, optional `endUserId`), and **rate limits** before calling `Agent.load` / `dispatchEngineJob`. Reuse the checklist in [08-scope-and-security.md §7](./08-scope-and-security.md) and the concrete gaps in [`technical-debt.md` §7–§9](../../technical-debt.md) (tool leakage, `RunStore` races, job idempotency).

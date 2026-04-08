@@ -1,6 +1,6 @@
 # Engine MVP and risks
 
-Related: [02-architecture.md](./02-architecture.md) (components), [07-definition-syntax.md](./07-definition-syntax.md) (`.define` + bootstrap), [19-cluster-deployment.md](./19-cluster-deployment.md) (**`configureRuntime`**, **RunStore**, adapters).
+Related: [02-architecture.md](./02-architecture.md) (components), [07-definition-syntax.md](./07-definition-syntax.md) (`.define` + bootstrap), [19-cluster-deployment.md](./19-cluster-deployment.md) (**`AgentRuntime`**, **RunStore**, adapters).
 
 ## Minimum core scope
 
@@ -25,8 +25,8 @@ Production deployments use **adapters** that satisfy the same core interfaces ([
 
 Criteria to count them “inside MVP”:
 
-- **Minimum viable cloud**: a **Redis-backed** `MemoryAdapter` (TCP or REST) + same `save_memory` / `get_memory` tools (registered by **`configureRuntime`** — do not hand-roll unless replacing defaults).
-- **Cluster `wait` / `resume`**: add **`configureRuntime({ runStore })`** with **`RedisRunStore`** or **`UpstashRunStore`** so a **waiting** run can be loaded and continued on any worker.
+- **Minimum viable cloud**: a **Redis-backed** `MemoryAdapter` (TCP or REST) + same `save_memory` / `get_memory` tools (registered when **`AgentRuntime`** is constructed — do not hand-roll unless replacing defaults).
+- **Cluster `wait` / `resume`**: add **`runStore`** (**`RedisRunStore`** or **`UpstashRunStore`**) to **`AgentRuntime`** so a **waiting** run can be loaded and continued on any worker.
 - **No core coupling**: credentials and keyspace prefixes only in the adapter factory, not in `AgentExecution`.
 
 ## Out of engine MVP

@@ -1,75 +1,23 @@
-import type { ToolAdapter, ToolContext, EmbeddingAdapter, VectorAdapter } from "@agent-runtime/core";
-import { resolveSource, parseFile, chunkText } from "@agent-runtime/utils";
+import type { ToolAdapter, ToolContext } from "@agent-runtime/core";
 import type { ChunkOptions } from "@agent-runtime/utils";
-
-function getVectorNamespace(ctx: ToolContext): string {
-  const endUserId = (ctx as unknown as Record<string, unknown>).endUserId as string | undefined;
-  return endUserId
-    ? `${ctx.projectId}:${ctx.agentId}:eu:${endUserId}`
-    : `${ctx.projectId}:${ctx.agentId}`;
-}
-
-function requireAdapter<T>(ctx: ToolContext, key: string): T {
-  const adapter = (ctx as unknown as Record<string, unknown>)[key];
-  if (!adapter) {
-    throw new Error(`${key} is required for file_ingest.`);
-  }
-  return adapter as T;
-}
+import { runFileIngestPipeline } from "./fileIngestCore.js";
 
 export const fileIngestTool: ToolAdapter = {
   name: "file_ingest",
   description:
     "Ingests a file into the vector knowledge base. " +
-    "Reads, splits into chunks, generates embeddings, and stores them.",
+    "Reads, splits into chunks, generates embeddings, and stores them. " +
+    "Prefer ingest_rag_source when documents are registered in the RAG file catalog.",
   async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as {
       source: string;
       chunkStrategy?: Partial<ChunkOptions>;
       metadata?: Record<string, unknown>;
     };
-
-    const embedding = requireAdapter<EmbeddingAdapter>(ctx, "embeddingAdapter");
-    const vector = requireAdapter<VectorAdapter>(ctx, "vectorAdapter");
-
-    const resolved = await resolveSource(o.source);
-    const parsed = await parseFile(resolved.buffer, resolved.mimeType);
-
-    const strategy: ChunkOptions = {
-      method: o.chunkStrategy?.method ?? "recursive",
-      maxTokens: o.chunkStrategy?.maxTokens ?? 512,
-      overlap: o.chunkStrategy?.overlap ?? 50,
-    };
-
-    const chunks = chunkText(parsed.text, strategy);
-    const texts = chunks.map((c) => c.content);
-    const vectors = await embedding.embedBatch(texts);
-
-    const documentId = `doc_${Date.now()}`;
-    const docs = chunks.map((c, i) => ({
-      id: `${documentId}_chunk_${i}`,
-      vector: vectors[i]!,
-      data: c.content,
-      metadata: {
-        ...o.metadata,
-        documentId,
-        source: o.source,
-        chunkIndex: c.index,
-        startOffset: c.startOffset,
-        endOffset: c.endOffset,
-        fileName: resolved.name,
-        mimeType: resolved.mimeType,
-      },
-    }));
-
-    await vector.upsert(getVectorNamespace(ctx), docs);
-
-    return {
-      success: true,
-      documentId,
-      chunksCreated: chunks.length,
-      status: "completed",
-    };
+    return runFileIngestPipeline(ctx, o.source, {
+      chunkStrategy: o.chunkStrategy,
+      metadata: o.metadata,
+    });
   },
 };
 
@@ -80,7 +28,12 @@ export const fileIngestDefinition = {
   inputSchema: {
     type: "object",
     properties: {
-      source: { type: "string", description: "File path, URL, or storage reference" },
+      source: {
+        type: "string",
+        description:
+          "http(s) URL only with Session.allowHttpFileSources (optional host allowlist); " +
+          "or local path relative to Session.fileReadRoot unless allowFileReadOutsideRoot",
+      },
       chunkStrategy: {
         type: "object",
         properties: {

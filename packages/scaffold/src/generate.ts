@@ -35,7 +35,7 @@ export async function generateAgent(
   const skillsJson = JSON.stringify(skills);
   const toolsJson = JSON.stringify(tools);
 
-  const contents = `import { Agent, Session, type SessionOptions } from "@agent-runtime/core";
+  const contents = `import { Agent, Session, type AgentRuntime, type SessionOptions } from "@agent-runtime/core";
 
 const SYSTEM = "You are ${agentId}. Each model turn must be a single JSON Step object.";
 
@@ -51,9 +51,9 @@ export async function register${toPascal(fileBase)}(): Promise<void> {
   });
 }
 
-export async function load${toPascal(fileBase)}(sessionOpts: SessionOptions) {
+export async function load${toPascal(fileBase)}(runtime: AgentRuntime, sessionOpts: SessionOptions) {
   const session = new Session(sessionOpts);
-  return Agent.load(${JSON.stringify(agentId)}, { session });
+  return Agent.load(${JSON.stringify(agentId)}, runtime, { session });
 }
 `;
 

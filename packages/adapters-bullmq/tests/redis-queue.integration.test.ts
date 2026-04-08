@@ -3,10 +3,9 @@ import type { ConnectionOptions, Worker } from "bullmq";
 import type { Run } from "@agent-runtime/core";
 import {
   Agent,
-  configureRuntime,
+  AgentRuntime,
   InMemoryMemoryAdapter,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "@agent-runtime/core";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "@agent-runtime/core";
 import {
@@ -41,7 +40,6 @@ describe.skipIf(!runIntegration)("BullMQ + Redis integration", () => {
 
   beforeEach(async () => {
     clearAllRegistriesForTests();
-    __resetRuntimeConfigForTests();
   });
 
   afterEach(async () => {
@@ -55,7 +53,7 @@ describe.skipIf(!runIntegration)("BullMQ + Redis integration", () => {
       JSON.stringify({ type: "thought", content: "t" }),
       JSON.stringify({ type: "result", content: "from-queue" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "int-a1",
@@ -70,7 +68,7 @@ describe.skipIf(!runIntegration)("BullMQ + Redis integration", () => {
 
     let finished: Run | undefined;
     worker = createEngineWorker(queueName, connection, async (job) => {
-      finished = await dispatchEngineJob(job.data);
+      finished = await dispatchEngineJob(rt, job.data);
     });
 
     await new Promise((r) => setTimeout(r, 150));

@@ -1,6 +1,6 @@
 # Internal engine architecture
 
-Each process calls **`configureRuntime`** once at boot (adapters, built-in tools, optional **`runStore`** / **`messageBus`**) before handling runs — see [19-cluster-deployment.md §2](./19-cluster-deployment.md). Definitions (**`Tool.define`**, **`Skill.define`** / **`defineBatch`**, **`Agent.define`**) fill the in-process registry; skills may also be hydrated from JSON ([07-definition-syntax.md §9.2b](./07-definition-syntax.md)).
+Each worker process constructs **`new AgentRuntime({ … })`** at boot (adapters, built-in tools, optional **`runStore`** / **`messageBus`**) and passes that instance into **`Agent.load`** / job dispatch — see [19-cluster-deployment.md §2](./19-cluster-deployment.md). Definitions (**`Tool.define`**, **`Skill.define`** / **`defineBatch`**, **`Agent.define`**) fill the in-process registry; skills may also be hydrated from JSON ([07-definition-syntax.md §9.2b](./07-definition-syntax.md)). **Production:** auth and tenant isolation live **outside** the engine package — [08-scope-and-security.md §7](./08-scope-and-security.md), [`technical-debt.md`](../technical-debt.md) §7–§9.
 
 ## Component view
 
@@ -44,7 +44,7 @@ All external entry should pass through the **SecurityLayer** first (see [08-scop
 | **ToolRunner** | Resolve tool name → adapter; `validate?` → `execute` → return observation to history. |
 | **Memory** | Accessed only via **MemoryAdapter** (or tools that use it); the engine core does not couple to Mongo/Redis. |
 | **Run / AgentExecution** | In-process `runId`, `status`, `history`, `state` for the loop, **wait**/**resume**, and debugging. |
-| **RunStore** | When set via **`configureRuntime({ runStore })`**, persists **`Run`** so a **waiting** run can be **resumed** on another worker. Omit for single-process or in-memory tests. [19-cluster-deployment.md §3](./19-cluster-deployment.md). |
+| **RunStore** | When **`runStore`** is set on **`AgentRuntime`**, persists **`Run`** so a **waiting** run can be **resumed** on another worker. Omit for single-process or in-memory tests. [19-cluster-deployment.md §3](./19-cluster-deployment.md). |
 | **SecurityLayer** | Validates identity and permissions; attaches `SecurityContext` to the run; does not execute tools. |
 | **Scope** | `projectId`, `sessionId`, and global vs project resolution for definitions and memory (see doc 08). |
 

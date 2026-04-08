@@ -56,11 +56,30 @@ REDIS_URL=
 
     "config/runtime.ts": buildRuntimeTs({ adapter, llm }),
 
-    "agent.ts": `import { Agent, Session } from "@agent-runtime/core";
+    "agent.ts": `import type { LLMAdapter, LLMRequest, LLMResponse } from "@agent-runtime/core";
+import { Agent, AgentRuntime, InMemoryMemoryAdapter, Session } from "@agent-runtime/core";
 
 const SYSTEM = "Minimal single-file agent. Respond with one JSON Step per turn.";
 
+/** Swap for OpenAILLMAdapter etc. when you add API keys — keeps the template dependency-free. */
+class StubLlm implements LLMAdapter {
+  private i = 0;
+  async generate(_req: LLMRequest): Promise<LLMResponse> {
+    const content =
+      this.i++ === 0
+        ? JSON.stringify({ type: "thought", content: "Plan a one-line reply." })
+        : JSON.stringify({ type: "result", content: "Hello from the minimal scaffold." });
+    return { content };
+  }
+}
+
 async function main() {
+  const runtime = new AgentRuntime({
+    llmAdapter: new StubLlm(),
+    memoryAdapter: new InMemoryMemoryAdapter(),
+    maxIterations: 10,
+  });
+
   await Agent.define({
     id: "minimal-agent",
     name: "Minimal agent",
@@ -72,7 +91,7 @@ async function main() {
   });
 
   const session = new Session({ id: "dev", projectId: "default" });
-  const agent = await Agent.load("minimal-agent", { session });
+  const agent = await Agent.load("minimal-agent", runtime, { session });
   const out = await agent.run("Hello");
   console.log(out);
 }

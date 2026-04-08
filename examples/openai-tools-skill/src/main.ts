@@ -1,17 +1,16 @@
 /**
- * OpenAI + custom tool + skill: the skill exposes `roll_dice`; the agent uses it via
- * the engine JSON protocol (or native tool_calls, bridged in openAiProtocolBridge).
+ * OpenAI + custom tool + skill: the skill exposes `roll_dice`. The engine maps native
+ * `tool_calls` (empty `content`) into `action` steps — no extra LLM wrapper required.
  */
 import { OpenAILLMAdapter } from "@agent-runtime/adapters-openai";
 import {
   Agent,
+  AgentRuntime,
   Session,
   Skill,
   Tool,
-  configureRuntime,
   InMemoryMemoryAdapter,
 } from "@agent-runtime/core";
-import { OpenAiProtocolBridgeLlm } from "./openAiProtocolBridge.js";
 
 const PROJECT_ID = "demo-openai";
 
@@ -24,8 +23,8 @@ async function main(): Promise<void> {
 
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
 
-  configureRuntime({
-    llmAdapter: new OpenAiProtocolBridgeLlm(new OpenAILLMAdapter(apiKey)),
+  const runtime = new AgentRuntime({
+    llmAdapter: new OpenAILLMAdapter(apiKey),
     memoryAdapter: new InMemoryMemoryAdapter(),
     maxIterations: 15,
   });
@@ -76,7 +75,7 @@ async function main(): Promise<void> {
     projectId: PROJECT_ID,
   });
 
-  const agent = await Agent.load("demo-gamer", { session });
+  const agent = await Agent.load("demo-gamer", runtime, { session });
   const run = await agent.run("Roll a twenty-sided die once and tell me only the number.");
 
   console.log("status:", run.status);

@@ -13,3 +13,19 @@ export function effectiveToolAllowlist(
   }
   return s;
 }
+
+/**
+ * Applies an optional per-runtime tool allowlist (`EngineConfig.allowedToolIds`).
+ * `undefined` or `"*"` leaves `agentTools` unchanged; otherwise returns the intersection.
+ */
+export function applyRuntimeToolAllowlist(
+  agentTools: Set<string>,
+  runtimeAllowed?: ReadonlySet<string> | readonly string[] | "*",
+): Set<string> {
+  if (runtimeAllowed == null || runtimeAllowed === "*") {
+    return new Set(agentTools);
+  }
+  const rt =
+    runtimeAllowed instanceof Set ? runtimeAllowed : new Set(runtimeAllowed);
+  return new Set([...agentTools].filter((id) => rt.has(id)));
+}

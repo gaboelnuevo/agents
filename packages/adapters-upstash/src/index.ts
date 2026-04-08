@@ -7,6 +7,10 @@ import type {
   VectorQuery,
   VectorResult,
 } from "@agent-runtime/core";
+import {
+  appendMemoryListEntryUpstash,
+  readMemoryListUpstash,
+} from "./upstashMemoryList.js";
 
 function scopePrefix(scope: MemoryScope): string {
   const eu = scope.endUserId ? `eu:${scope.endUserId}` : "sess";
@@ -14,7 +18,8 @@ function scopePrefix(scope: MemoryScope): string {
 }
 
 /**
- * Memory adapter backed by Upstash Redis REST (key–value JSON blobs per memory type).
+ * Memory adapter backed by Upstash Redis REST. Each memory type uses a Redis **LIST** (`RPUSH`)
+ * for atomic append under concurrency; legacy STRING blobs (JSON array) migrate on first write.
  * Uses `fetch` only — add `@upstash/redis` in your app if you prefer the official client.
  */
 export class UpstashRedisMemoryAdapter implements MemoryAdapter {
@@ -41,19 +46,12 @@ export class UpstashRedisMemoryAdapter implements MemoryAdapter {
 
   async save(scope: MemoryScope, memoryType: string, content: unknown): Promise<void> {
     const key = `${scopePrefix(scope)}:${memoryType}`;
-    const raw = await this.cmd(["GET", key]);
-    const list: unknown[] =
-      typeof raw === "string" && raw ? (JSON.parse(raw) as unknown[]) : [];
-    list.push(content);
-    await this.cmd(["SET", key, JSON.stringify(list)]);
+    await appendMemoryListEntryUpstash((a) => this.cmd(a), key, content);
   }
 
   async query(scope: MemoryScope, memoryType: string, _filter?: unknown): Promise<unknown[]> {
     const key = `${scopePrefix(scope)}:${memoryType}`;
-    const raw = await this.cmd(["GET", key]);
-    if (raw == null || raw === "") return [];
-    if (typeof raw !== "string") return [];
-    return JSON.parse(raw) as unknown[];
+    return readMemoryListUpstash((a) => this.cmd(a), key);
   }
 
   async delete(scope: MemoryScope, memoryType: string, _filter?: unknown): Promise<void> {

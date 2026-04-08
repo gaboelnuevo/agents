@@ -1,0 +1,21 @@
+{
+  "name": "@agent-runtime/example-rag",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "RAG demo: registerRagCatalog(runtime, …) + ingest_rag_source / vector_search; fake LLM by default; optional OpenAI (start:openai).",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "start:openai": "tsx src/openaiMain.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agent-runtime/adapters-openai": "workspace:*",
+    "@agent-runtime/core": "workspace:*",
+    "@agent-runtime/rag": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,6 +1,8 @@
 # Adapters: engine contracts
 
-The engine core depends on **interfaces**, not specific databases. Two essential families: **memory** and **tools**.
+Related: [02-architecture.md](./02-architecture.md), [03-execution-model.md](./03-execution-model.md), [19-cluster-deployment.md](./19-cluster-deployment.md) (**`AgentRuntime`**, shared Redis / RunStore).
+
+The engine core depends on **interfaces**, not specific databases. Two essential families in the loop: **memory** and **tools**. **Run** persistence uses **RunStore** (below), passed into **`AgentRuntime`**.
 
 ## Memory adapter
 
@@ -23,6 +25,8 @@ interface MemoryScope {
 ```
 
 The adapter uses `MemoryScope` to build storage keys. When `endUserId` is present, `longTerm` and `vectorMemory` are keyed by it instead of `sessionId`, enabling persistence across conversations for the same end-user. See [15-multi-tenancy.md §4.3](./15-multi-tenancy.md) for the full end-user memory model.
+
+**`RedisMemoryAdapter` / `UpstashRedisMemoryAdapter`:** each `(keyPrefix):(memoryType)` is stored as a Redis **LIST**; **`save`** uses **`RPUSH`** so concurrent workers do not drop each other’s appends. Older deployments that used a **STRING** value (JSON array) are migrated to LIST on the first write after upgrade ([`technical-debt.md` §8](../../technical-debt.md)).
 
 ### Key patterns
 
@@ -84,6 +88,14 @@ interface ToolContext {
 | `update_state` | Bounded working memory. |
 
 Others (`http_request`, messages to other agents) are extensions: the **loop** stays the same.
+
+## RunStore
+
+Persists **`Run`** snapshots so a **`waiting`** run can be **resumed** later — including on **another worker** after a queue handoff or load-balanced HTTP request. Not a substitute for **MemoryAdapter** (different contract).
+
+- **Wiring**: pass **`runStore`** (and other adapters) into **`new AgentRuntime({ … })`** once per worker ([19-cluster-deployment.md §2–§3](./19-cluster-deployment.md)).
+- **Implementations**: **`InMemoryRunStore`** (tests / single process), **`RedisRunStore`** (`@agent-runtime/adapters-redis`), **`UpstashRunStore`** (`@agent-runtime/adapters-upstash`).
+- **Consumers** using **`executeRun`** directly must **`runStore.save`** after each invocation when **`runStore`** is enabled (including **`waiting`** exits) — same persistence rules as **`RunBuilder`** / **`Agent.resume`**.
 
 ## Hooks vs adapters
 

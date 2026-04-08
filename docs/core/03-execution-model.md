@@ -1,5 +1,7 @@
 # Execution model: Run, states, and loop
 
+Related: [02-architecture.md](./02-architecture.md), [04-protocol.md](./04-protocol.md), [19-cluster-deployment.md](./19-cluster-deployment.md) (**`AgentRuntime`** + **RunStore** for cluster **resume**).
+
 ## Run entity
 
 Represents **one** concrete execution of the agent.
@@ -25,7 +27,7 @@ initialized → running ⇄ waiting → running → completed
 ```
 
 - **running**: the loop may invoke the LLM and tools.
-- **waiting**: run persisted; the loop **does not** continue until `resume` or an external event per design.
+- **waiting**: the loop **does not** continue until **`resume`** (or **`onWait`** returning a string in-process). With **`runStore`** on **`AgentRuntime`**, the run is **durable** across workers — see [19-cluster-deployment.md §3](./19-cluster-deployment.md).
 - **completed**: there is a final `result` for the caller.
 - **failed**: unrecoverable error or policy violation (timeout, iterations, validation).
 

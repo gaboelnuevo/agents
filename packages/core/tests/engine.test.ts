@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
   Skill,
   Tool,
   buildEngineDeps,
-  configureRuntime,
   createRun,
   effectiveToolAllowlist,
   executeRun,
@@ -13,7 +13,6 @@ import {
   InMemoryMemoryAdapter,
   InMemoryRunStore,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { AgentDefinitionPersisted } from "../src/types.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
@@ -31,7 +30,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("engine", () => {
@@ -61,13 +59,59 @@ describe("engine", () => {
     expect(run.state.userInput).toBe("hello");
   });
 
+  it("buildEngineDeps uses runtime fileReadRoot when session omits it", async () => {
+    const mem = new InMemoryMemoryAdapter();
+    const llm = new QueueLLM([JSON.stringify({ type: "result", content: "ok" })]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      fileReadRoot: "/data/runtime-root",
+    });
+    await Agent.define({
+      id: "a-fr",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+    const agentDef = getAgentDefinition("p1", "a-fr");
+    const session = new Session({ id: "s-fr", projectId: "p1" });
+    const base = buildEngineDeps(agentDef!, session, rt);
+    expect(base.fileReadRoot).toBe("/data/runtime-root");
+  });
+
+  it("buildEngineDeps prefers session fileReadRoot over runtime", async () => {
+    const mem = new InMemoryMemoryAdapter();
+    const llm = new QueueLLM([JSON.stringify({ type: "result", content: "ok" })]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      fileReadRoot: "/runtime",
+    });
+    await Agent.define({
+      id: "a-fr2",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+    const agentDef = getAgentDefinition("p1", "a-fr2");
+    const session = new Session({
+      id: "s-fr2",
+      projectId: "p1",
+      fileReadRoot: "/session",
+    });
+    const base = buildEngineDeps(agentDef!, session, rt);
+    expect(base.fileReadRoot).toBe("/session");
+  });
+
   it("executeRun completes with manually built EngineDeps", async () => {
     const mem = new InMemoryMemoryAdapter();
     const llm = new QueueLLM([
       JSON.stringify({ type: "thought", content: "direct" }),
       JSON.stringify({ type: "result", content: "via executeRun" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "a5",
@@ -81,7 +125,7 @@ describe("engine", () => {
     expect(agentDef).toBeDefined();
 
     const session = new Session({ id: "s-direct", projectId: "p1" });
-    const base = buildEngineDeps(agentDef!, session);
+    const base = buildEngineDeps(agentDef!, session, rt);
 
     const run = createRun("a5", session.id, "hi");
     const result = await executeRun(run, {
@@ -101,7 +145,7 @@ describe("engine", () => {
       JSON.stringify({ type: "thought", content: "thinking" }),
       JSON.stringify({ type: "result", content: "done" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "a1",
@@ -112,7 +156,7 @@ describe("engine", () => {
     });
 
     const session = new Session({ id: "s1", projectId: "p1" });
-    const agent = await Agent.load("a1", { session });
+    const agent = await Agent.load("a1", rt, { session });
     const run = await agent.run("hello");
 
     expect(run.status).toBe("completed");
@@ -130,7 +174,7 @@ describe("engine", () => {
       }),
       JSON.stringify({ type: "result", content: "saved" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem });
 
     await Agent.define({
       id: "a2",
@@ -141,7 +185,7 @@ describe("engine", () => {
     });
 
     const session = new Session({ id: "s1", projectId: "p1" });
-    const agent = await Agent.load("a2", { session });
+    const agent = await Agent.load("a2", rt, { session });
     const run = await agent.run("go");
 
     expect(run.status).toBe("completed");
@@ -150,6 +194,56 @@ describe("engine", () => {
       "working",
     );
     expect(rows.length).toBe(1);
+  });
+
+  it("maps native toolCalls to action when content is empty", async () => {
+    class ToolCallsThenResult implements LLMAdapter {
+      private i = 0;
+      async generate(): Promise<LLMResponse> {
+        if (this.i++ === 0) {
+          return {
+            content: "",
+            toolCalls: [{ name: "echo_tool", arguments: JSON.stringify({ msg: "hi" }) }],
+          };
+        }
+        return { content: JSON.stringify({ type: "result", content: "done" }) };
+      }
+    }
+
+    const rt = new AgentRuntime({
+      llmAdapter: new ToolCallsThenResult(),
+      memoryAdapter: new InMemoryMemoryAdapter(),
+      maxIterations: 10,
+    });
+
+    await Tool.define({
+      id: "echo_tool",
+      scope: "global",
+      description: "Echo",
+      inputSchema: {
+        type: "object",
+        properties: { msg: { type: "string" } },
+        required: ["msg"],
+      },
+      execute: async (input) => ({ echoed: (input as { msg: string }).msg }),
+    });
+
+    await Agent.define({
+      id: "a-toolcalls",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: ["echo_tool"],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const session = new Session({ id: "s-tc", projectId: "p1" });
+    const agent = await Agent.load("a-toolcalls", rt, { session });
+    const run = await agent.run("go");
+
+    expect(run.status).toBe("completed");
+    expect(run.history.some((h) => h.type === "action")).toBe(true);
+    const obs = run.history.find((h) => h.type === "observation");
+    expect(obs?.content).toEqual({ echoed: "hi" });
   });
 
   it("persists wait and resumes with runStore", async () => {
@@ -162,7 +256,7 @@ describe("engine", () => {
       }),
       JSON.stringify({ type: "result", content: "resumed" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       runStore: store,
@@ -178,7 +272,7 @@ describe("engine", () => {
     });
 
     const session = new Session({ id: "s1", projectId: "p1" });
-    const agent = await Agent.load("a3", { session });
+    const agent = await Agent.load("a3", rt, { session });
     const waiting = await agent.run("start");
 
     expect(waiting.status).toBe("waiting");
@@ -193,6 +287,37 @@ describe("engine", () => {
     expect(
       done.history.some((h) => h.type === "result" && h.content === "resumed"),
     ).toBe(true);
+  });
+
+  it("resume rejects when sessionId does not match stored run", async () => {
+    const mem = new InMemoryMemoryAdapter();
+    const store = new InMemoryRunStore();
+    const llm = new QueueLLM([JSON.stringify({ type: "wait", reason: "x" })]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      runStore: store,
+      maxIterations: 10,
+    });
+
+    await Agent.define({
+      id: "a-sess",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const session1 = new Session({ id: "s-correct", projectId: "p1" });
+    const agent1 = await Agent.load("a-sess", rt, { session: session1 });
+    const waiting = await agent1.run("start");
+    expect(waiting.status).toBe("waiting");
+
+    const session2 = new Session({ id: "s-wrong", projectId: "p1" });
+    const agent2 = await Agent.load("a-sess", rt, { session: session2 });
+    await expect(
+      agent2.resume(waiting.runId, { type: "text", content: "nope" }),
+    ).rejects.toThrow(/different session/);
   });
 
   it("records tool timeout as failed observation when toolTimeoutMs is set", async () => {
@@ -216,7 +341,7 @@ describe("engine", () => {
       }),
       JSON.stringify({ type: "result", content: "after timeout" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       maxIterations: 10,
@@ -232,14 +357,15 @@ describe("engine", () => {
     });
 
     const session = new Session({ id: "s1", projectId: "p1" });
-    const agent = await Agent.load("a-timeout", { session });
+    const agent = await Agent.load("a-timeout", rt, { session });
     const run = await agent.run("go");
 
     expect(run.status).toBe("completed");
     const obs = run.history.find((h) => h.type === "observation");
     expect(obs?.type).toBe("observation");
-    const content = obs?.content as { success?: boolean; error?: string };
+    const content = obs?.content as { success?: boolean; error?: string; code?: string };
     expect(content.success).toBe(false);
+    expect(content.code).toBe("TOOL_TIMEOUT");
     expect(content.error).toMatch(/timed out/i);
   });
 
@@ -249,7 +375,7 @@ describe("engine", () => {
       JSON.stringify({ type: "wait", reason: "need_ok" }),
       JSON.stringify({ type: "result", content: "after wait" }),
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "a4",
@@ -260,7 +386,7 @@ describe("engine", () => {
     });
 
     const session = new Session({ id: "s1", projectId: "p1" });
-    const agent = await Agent.load("a4", { session });
+    const agent = await Agent.load("a4", rt, { session });
     const run = await agent.run("go").onWait(async () => "proceed");
 
     expect(run.status).toBe("completed");

@@ -6,7 +6,7 @@ Runnable sample programs under **`examples/*`**, linked as **`pnpm` workspace** 
 
 Most examples use **`InMemoryMemoryAdapter`**: it is **in-process only** (heap), **not durable** across restarts, and **wrong for multiple workers** — each process has its own empty store.
 
-For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-runtime/adapters-redis`, TCP `REDIS_URL`) or **`UpstashRedisMemoryAdapter`** (`@agent-runtime/adapters-upstash`, HTTP), and keep the same `configureRuntime({ memoryAdapter: … })` pattern. Cluster guidance: [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md) §1.2; adapter inventory: [`docs/core/05-adapters.md`](../docs/core/05-adapters.md).
+For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-runtime/adapters-redis`, TCP `REDIS_URL`) or **`UpstashRedisMemoryAdapter`** (`@agent-runtime/adapters-upstash`, HTTP), and pass that adapter into **`new AgentRuntime({ memoryAdapter: … })`**. Cluster guidance: [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md) §1.2; adapter inventory: [`docs/core/05-adapters.md`](../docs/core/05-adapters.md).
 
 ---
 
@@ -15,8 +15,9 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | Package | Directory | Summary |
 |---------|-----------|---------|
 | `@agent-runtime/example-minimal-run` | [`minimal-run/`](./minimal-run/) | **`Agent.run()`** end-to-end with a **deterministic mock LLM** and **`InMemoryMemoryAdapter`**. No network, no API keys. |
-| `@agent-runtime/example-openai-tools-skill` | [`openai-tools-skill/`](./openai-tools-skill/) | **`OpenAILLMAdapter`** (with a small **protocol bridge** for native `tool_calls`), custom **`Tool.define`** (`roll_dice`), **`Skill.define`** (`dice-skill`), **`Agent.define`**. Requires **`OPENAI_API_KEY`** (paid API usage). |
+| `@agent-runtime/example-openai-tools-skill` | [`openai-tools-skill/`](./openai-tools-skill/) | **`OpenAILLMAdapter`** (engine maps native `tool_calls` when `content` is empty), custom **`Tool.define`** (`roll_dice`), **`Skill.define`**, **`Agent.define`**. Requires **`OPENAI_API_KEY`**. |
 | `@agent-runtime/example-console-wait` | [`console-wait/`](./console-wait/) | Interactive **terminal**: mock LLM emits **`wait`**, **`RunBuilder.onWait`** reads stdin (`readline`), then continues in-process. No API keys. |
+| `@agent-runtime/example-rag` | [`rag/`](./rag/) | **`registerRagCatalog(runtime, …)`** (per project) + **`ingest_rag_source`** / **`vector_search`**; in-memory vector + hash embeddings (no API keys); optional OpenAI script. |
 
 ### `minimal-run` — `@agent-runtime/example-minimal-run`
 
@@ -49,6 +50,16 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | **Run** | `pnpm --filter @agent-runtime/example-console-wait start` (interactive); or pipe a line: `printf 'hello\\n' \| pnpm --filter @agent-runtime/example-console-wait start` |
 | **Docs** | [console-wait/README.md](./console-wait/README.md) |
 
+### `rag` — `@agent-runtime/example-rag`
+
+| | |
+|--|--|
+| **Workspace deps** | `@agent-runtime/core`, `@agent-runtime/rag` |
+| **Scripts** | `pnpm start` → `tsx src/main.ts`; `pnpm typecheck` |
+| **Build first** | `pnpm turbo run build --filter=@agent-runtime/core --filter=@agent-runtime/rag` (add `--filter=@agent-runtime/adapters-openai` for `start:openai`) |
+| **Run** | `pnpm --filter @agent-runtime/example-rag start` (no keys); optional `pnpm --filter @agent-runtime/example-rag run start:openai` + `OPENAI_API_KEY` |
+| **Docs** | [rag/README.md](./rag/README.md) |
+
 ---
 
 ## Backlog — ideas for more examples (TODO)
@@ -57,7 +68,7 @@ Prioritize by what you want to teach (operators vs integrators). None of these e
 
 ### Engine loop & lifecycle
 
-- [ ] **`wait` + `resume`** — `Run` pauses with `wait`; `configureRuntime({ runStore })` + `InMemoryRunStore` or **`RedisRunStore`**; second process or same script calls `Agent.resume` (see [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md)).
+- [ ] **`wait` + `resume`** — `Run` pauses with `wait`; **`AgentRuntime`** with **`runStore`** (`InMemoryRunStore` or **`RedisRunStore`**); second process or same script calls `Agent.resume` (see [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md)).
 - [x] **`RunBuilder.onWait`** (in-process) — covered by [`console-wait/`](./console-wait/) (stdin). **`runStore` + `resume`** across workers remains in the item above.
 - [ ] **Session expiry** — `Session({ expiresAtMs })` + **`SessionExpiredError`** on `run` / `resume` after expiry.
 - [ ] **Hooks + `watchUsage`** — `onThought` / `onAction` logging; token totals and “wasted” tokens after failed parses.
@@ -71,7 +82,7 @@ Prioritize by what you want to teach (operators vs integrators). None of these e
 ### Tools, memory, RAG
 
 - [ ] **Built-in memory tools** — `save_memory` / `get_memory` with **`InMemoryMemoryAdapter`** or Redis-backed memory; show scopes (`shortTerm` / `working` / `longTerm`).
-- [ ] **`@agent-runtime/rag`** — `file_read` / `file_ingest` + **`OpenAIEmbeddingAdapter`** + vector adapter; minimal file on disk.
+- [x] **`@agent-runtime/rag`** — covered by [`rag/`](./rag/) (**`registerRagCatalog(runtime, projectId, sources)`**, catalog ingest tools, in-memory vector); swap embeddings/vector/OpenAI per [rag/README.md](./rag/README.md).
 - [ ] **Vector tools only** — `vector_upsert` / `vector_search` with **`UpstashVectorAdapter`** or another **`VectorAdapter`** implementation.
 
 ### Multi-agent

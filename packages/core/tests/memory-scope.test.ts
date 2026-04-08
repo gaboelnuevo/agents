@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -22,7 +21,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("InMemoryMemoryAdapter end-user scoping (Phase 9.2)", () => {
@@ -91,7 +89,7 @@ describe("InMemoryMemoryAdapter end-user scoping (Phase 9.2)", () => {
       }),
       JSON.stringify({ type: "result", content: "done" }),
     ]);
-    configureRuntime({ llmAdapter: llmS1, memoryAdapter: mem, maxIterations: 10 });
+    const rt1 = new AgentRuntime({ llmAdapter: llmS1, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "mem-agent",
@@ -106,12 +104,11 @@ describe("InMemoryMemoryAdapter end-user scoping (Phase 9.2)", () => {
       projectId: "p-mem",
       endUserId: "eu-99",
     });
-    const agent1 = await Agent.load("mem-agent", { session: session1 });
+    const agent1 = await Agent.load("mem-agent", rt1, { session: session1 });
     await agent1.run("save prefs");
 
     clearAllRegistriesForTests();
-    __resetRuntimeConfigForTests();
-    configureRuntime({ llmAdapter: llmS2, memoryAdapter: mem, maxIterations: 10 });
+    const rt2 = new AgentRuntime({ llmAdapter: llmS2, memoryAdapter: mem, maxIterations: 10 });
     await Agent.define({
       id: "mem-agent",
       projectId: "p-mem",
@@ -125,7 +122,7 @@ describe("InMemoryMemoryAdapter end-user scoping (Phase 9.2)", () => {
       projectId: "p-mem",
       endUserId: "eu-99",
     });
-    const agent2 = await Agent.load("mem-agent", { session: session2 });
+    const agent2 = await Agent.load("mem-agent", rt2, { session: session2 });
     const run2 = await agent2.run("read prefs");
 
     expect(run2.status).toBe("completed");

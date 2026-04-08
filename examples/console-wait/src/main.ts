@@ -8,8 +8,8 @@ import { stdin as input, stdout as output } from "node:process";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "@agent-runtime/core";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
 } from "@agent-runtime/core";
 
@@ -43,7 +43,7 @@ class WaitThenEchoLlm implements LLMAdapter {
 async function main(): Promise<void> {
   const userLine = { value: "" };
 
-  configureRuntime({
+  const runtime = new AgentRuntime({
     llmAdapter: new WaitThenEchoLlm(userLine),
     memoryAdapter: new InMemoryMemoryAdapter(),
     maxIterations: 10,
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   });
 
   const session = new Session({ id: "session-cli", projectId: PROJECT_ID });
-  const agent = await Agent.load("demo-cli-wait", { session });
+  const agent = await Agent.load("demo-cli-wait", runtime, { session });
 
   const run = await agent
     .run("Start the interactive flow.")

@@ -19,10 +19,10 @@
 | Track | Status |
 |-------|--------|
 | **Phases 0–4** (monorepo → core loop → **TCP Redis** + Upstash REST → OpenAI LLM → hooks / global + **per-tool** timeout / abort) | **Done** — `pnpm turbo run build test lint` passes workspace-wide |
-| **RunStore + resume** (`configureRuntime({ runStore })`, `InMemoryRunStore`, **`RedisRunStore`** / `UpstashRunStore`, `Agent.resume`, `RunBuilder` persistence) | **Done** — see `docs/core/19-cluster-deployment.md` §3 |
+| **RunStore + resume** (`AgentRuntime` + **`runStore`**, `InMemoryRunStore`, **`RedisRunStore`** / `UpstashRunStore`, `Agent.resume`, `RunBuilder` persistence) | **Done** — see `docs/core/19-cluster-deployment.md` §3 |
 | **Worker / direct engine API** (`buildEngineDeps`, `createRun`, `executeRun`, `effectiveToolAllowlist`, `getAgentDefinition`, `resolveToolRegistry`, `securityContextForAgent`) | **Done** — same loop as `RunBuilder`; integration tests in `packages/core/tests/engine.test.ts` |
 | **`RunBuilder.onWait`** (in-process continuation after `wait` when callback returns text) | **Done** |
-| **Per-tool timeout** (`configureRuntime({ toolTimeoutMs })`, `ToolTimeoutError` / `TOOL_TIMEOUT`) | **Done** — [`ToolRunner`](../packages/core/src/tools/ToolRunner.ts) |
+| **Per-tool timeout** (`toolTimeoutMs` on **`AgentRuntime`**, `ToolTimeoutError` / `TOOL_TIMEOUT`) | **Done** — [`ToolRunner`](../packages/core/src/tools/ToolRunner.ts) |
 | **Phases 6–8** (RAG pipeline, multi-agent `MessageBus` + `send_message`, CLI + scaffold) | **Done** |
 | **Phase 5** (**BullMQ priority**) | **`@agent-runtime/adapters-bullmq` shipped** — typed `createEngineQueue` / `createEngineWorker` + `dispatchEngineJob`; **QStash** still not in monorepo; delayed-job orchestration for `wait` remains app-specific on top of BullMQ |
 | **Phase 2** (`@agent-runtime/adapters-redis` — **preferred** for `REDIS_URL` / BullMQ-style stacks) | **Done** — TCP `ioredis`: memory, RunStore, MessageBus. Vector stays in **Phase 2a** / **`UpstashVectorAdapter`** unless you swap `VectorAdapter`. |
@@ -88,7 +88,7 @@ For package-level detail, see **`docs/scaffold.md` §0.8** and **§12**. Known g
 | 1.15 | Define API: `Tool.define`, `Skill.define`, `Agent.define`, `Session`, `Agent.load` | `src/define/*.ts` | Integration: define→load→run end-to-end with in-memory adapters |
 | 1.16 | `watchUsage` helper | `src/engine/watchUsage.ts` | Unit: totals + **wasted** tokens when parse fails (`onLLMAfterParse`) |
 | 1.17 | Barrel export | `src/index.ts` | Compile: all public types and classes importable |
-| 1.18 | `RunBuilder`, `RunStore` wiring, `Agent.resume` | `src/define/RunBuilder.ts`, `src/adapters/run/*`, `configureRuntime` | Integration: `wait` → persisted run → `resume` |
+| 1.18 | `RunBuilder`, `RunStore` wiring, `Agent.resume` | `src/define/RunBuilder.ts`, `src/adapters/run/*`, `AgentRuntime` | Integration: `wait` → persisted run → `resume` |
 | 1.19 | `buildEngineDeps`, `effectiveToolAllowlist`, registry exports for workers | `src/engine/buildEngineDeps.ts`, `src/define/effectiveToolAllowlist.ts` | Integration: `executeRun` with deps built like `RunBuilder` |
 | 1.20 | `RunBuilder.onWait` | `src/define/RunBuilder.ts` | Integration: in-process continuation after `wait` |
 

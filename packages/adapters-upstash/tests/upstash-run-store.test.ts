@@ -50,6 +50,29 @@ describe("UpstashRunStore", () => {
           const members = [...(sets.get(setKey) ?? [])];
           return new Response(JSON.stringify({ result: members }));
         }
+        if (cmd === "EVAL") {
+          const key = body[3] as string;
+          const expected = body[4] as string;
+          const newJson = body[5] as string;
+          const agentId = body[6] as string;
+          const runId = body[7] as string;
+          const raw = store.get(key);
+          if (!raw) {
+            return new Response(JSON.stringify({ result: 0 }));
+          }
+          const m = String(raw).match(/"status":"([^"]*)"/);
+          if (!m || m[1] !== expected) {
+            return new Response(JSON.stringify({ result: 0 }));
+          }
+          store.set(key, newJson);
+          let s = sets.get(`run:agent:${agentId}`);
+          if (!s) {
+            s = new Set();
+            sets.set(`run:agent:${agentId}`, s);
+          }
+          s.add(runId);
+          return new Response(JSON.stringify({ result: 1 }));
+        }
 
         return new Response(JSON.stringify({ result: null }));
       }),
@@ -85,5 +108,23 @@ describe("UpstashRunStore", () => {
     await rs.delete("r1");
     expect(await rs.load("r1")).toBeNull();
     expect(await rs.listByAgent("a1")).toHaveLength(0);
+  });
+
+  it("saveIfStatus updates only when stored status matches", async () => {
+    const rs = new UpstashRunStore("https://redis.example", "token");
+    const waiting: Run = {
+      runId: "r2",
+      agentId: "a1",
+      status: "waiting",
+      history: [],
+      state: { iteration: 0, pending: null },
+    };
+    await rs.save(waiting);
+    const completed = { ...waiting, status: "completed" as const };
+    expect(await rs.saveIfStatus(completed, "waiting")).toBe(true);
+    expect((await rs.load("r2"))!.status).toBe("completed");
+    expect(await rs.saveIfStatus({ ...waiting, status: "failed" }, "waiting")).toBe(
+      false,
+    );
   });
 });

@@ -4,7 +4,7 @@ Uses **`OpenAILLMAdapter`**, a **custom tool** (`roll_dice`), and a **skill** (`
 
 **Production:** memory is **`InMemoryMemoryAdapter`** here for a minimal demo. Use **`RedisMemoryAdapter`** / **`UpstashRedisMemoryAdapter`** when you need shared or persistent memory — [`examples/README.md`](../README.md#memory-in-production).
 
-The engine expects each model turn as **JSON in `message.content`** (`thought` | `action` | `result` | …). OpenAI sometimes returns **`tool_calls`** instead; this example includes **`OpenAiProtocolBridgeLlm`** to map the first tool call into an `action` step when `content` is empty.
+The engine parses **JSON in `message.content`** (`thought` | `action` | `result` | …). When OpenAI returns **`tool_calls`** with an empty `content`, **`executeRun`** (in `@agent-runtime/core`) maps the first call into an **`action`** step — use **`OpenAILLMAdapter`** directly, no wrapper class.
 
 ## Setup
 

@@ -24,5 +24,9 @@
   "dependencies": {
     "@agent-runtime/core": "workspace:*",
     "bullmq": "^5.73.1"
+  },
+  "devDependencies": {
+    "@agent-runtime/adapters-redis": "workspace:*",
+    "ioredis-mock": "^8.9.0"
   }
 }

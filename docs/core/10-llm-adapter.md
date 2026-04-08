@@ -2,7 +2,7 @@
 
 Layer that **unifies** calls to the model. The **engine** only talks to this interface; providers (OpenAI, Anthropic, etc.) swap without touching the loop.
 
-Related: prompt assembly in [11-context-builder.md](./11-context-builder.md); failures and retries in [13-errors-parsing-and-recovery.md](./13-errors-parsing-and-recovery.md).
+Related: [02-architecture.md](./02-architecture.md); **`llmAdapter` / `llmAdaptersByProvider`** on **`AgentRuntime`** — [19-cluster-deployment.md §2](./19-cluster-deployment.md); agent **`llm`** field vs defaults — [07-definition-syntax.md](./07-definition-syntax.md) §1; prompt assembly — [11-context-builder.md](./11-context-builder.md); failures and retries — [13-errors-parsing-and-recovery.md](./13-errors-parsing-and-recovery.md).
 
 ---
 
@@ -46,7 +46,16 @@ interface LLMResponse {
 }
 ```
 
-The engine may **ignore** `toolCalls` if the agreed protocol is “JSON only in `content`”; or **normalize** provider tool_calls to an internal `Step` (implementation policy).
+After each `generate` call, **`executeRun`** runs **`normalizeLlmStepContent`**: if `content` is empty or whitespace-only and **`toolCalls[0]`** is present, the engine synthesizes JSON `{ type: "action", tool, input }` from that call so **`parseStep`** and **`ToolRunner`** behave like a protocol `action` step. Hooks **`onLLMResponse`** still receive the **raw** adapter response.
+
+### Per-provider adapters
+
+**`AgentRuntime`** (via **`EngineConfig`**) accepts:
+
+- **`llmAdapter`** — default when `agent.llm.provider` has no dedicated entry.
+- **`llmAdaptersByProvider`** — `Record<string, LLMAdapter>`; the engine picks `llmAdaptersByProvider[agent.llm.provider]` when that key exists (trimmed provider string; empty/missing provider uses `"default"`).
+
+You must set **`llmAdapter`** and/or a **non-empty** provider map. Helpers can call **`resolveLlmAdapterForProvider`** (exported from `@agent-runtime/core`) with the same config shape.
 
 ---
 

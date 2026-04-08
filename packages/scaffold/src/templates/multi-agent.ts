@@ -2,7 +2,7 @@ import { buildRuntimeTs } from "../runtime-snippet.js";
 import type { InitProjectOptions } from "../types.js";
 import { defaultTemplateFiles } from "./default.js";
 
-const coordinator = `import { Agent, Session, type SessionOptions } from "@agent-runtime/core";
+const coordinator = `import { Agent, Session, type AgentRuntime, type SessionOptions } from "@agent-runtime/core";
 
 const SYSTEM = "You coordinate work across agents. Emit JSON Step objects only.";
 
@@ -18,13 +18,13 @@ export async function registerCoordinatorAgent(): Promise<void> {
   });
 }
 
-export async function loadCoordinator(sessionOpts: SessionOptions) {
+export async function loadCoordinator(runtime: AgentRuntime, sessionOpts: SessionOptions) {
   const session = new Session(sessionOpts);
-  return Agent.load("coordinator", { session });
+  return Agent.load("coordinator", runtime, { session });
 }
 `;
 
-const worker = `import { Agent, Session, type SessionOptions } from "@agent-runtime/core";
+const worker = `import { Agent, Session, type AgentRuntime, type SessionOptions } from "@agent-runtime/core";
 
 const SYSTEM = "You execute delegated tasks. Emit JSON Step objects only.";
 
@@ -39,9 +39,9 @@ export async function registerWorkerAgent(): Promise<void> {
   });
 }
 
-export async function loadWorker(sessionOpts: SessionOptions) {
+export async function loadWorker(runtime: AgentRuntime, sessionOpts: SessionOptions) {
   const session = new Session(sessionOpts);
-  return Agent.load("worker", { session });
+  return Agent.load("worker", runtime, { session });
 }
 `;
 

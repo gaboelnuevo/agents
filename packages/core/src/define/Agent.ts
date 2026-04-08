@@ -2,6 +2,8 @@ import type { AgentDefinitionPersisted } from "./types.js";
 import { Session } from "./Session.js";
 import { getAgentDefinition, registerAgentDefinition } from "./registry.js";
 import { RunBuilder } from "./RunBuilder.js";
+import type { AgentRuntime } from "../runtime/AgentRuntime.js";
+
 export interface AgentInstance {
   id: string;
   run(input: string): RunBuilder;
@@ -15,6 +17,7 @@ class AgentInstanceImpl implements AgentInstance {
   readonly id: string;
 
   constructor(
+    private readonly runtime: AgentRuntime,
     private readonly def: AgentDefinitionPersisted,
     private readonly session: Session,
   ) {
@@ -22,14 +25,14 @@ class AgentInstanceImpl implements AgentInstance {
   }
 
   run(input: string): RunBuilder {
-    return new RunBuilder(this.def, this.session, input);
+    return new RunBuilder(this.runtime, this.def, this.session, input);
   }
 
   resume(
     runId: string,
     input: { type: string; content: string },
   ): RunBuilder {
-    return new RunBuilder(this.def, this.session, { runId, resumeInput: input });
+    return new RunBuilder(this.runtime, this.def, this.session, { runId, resumeInput: input });
   }
 }
 
@@ -40,6 +43,7 @@ export class Agent {
 
   static async load(
     agentId: string,
+    runtime: AgentRuntime,
     opts: { session: Session },
   ): Promise<AgentInstance> {
     const def = getAgentDefinition(opts.session.projectId, agentId);
@@ -49,6 +53,6 @@ export class Agent {
     if (!def.llm?.provider || !def.llm?.model) {
       throw new Error(`Agent ${agentId} is missing llm.provider / llm.model`);
     }
-    return new AgentInstanceImpl(def, opts.session);
+    return new AgentInstanceImpl(runtime, def, opts.session);
   }
 }

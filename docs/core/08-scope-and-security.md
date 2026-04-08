@@ -2,7 +2,7 @@
 
 How the core **isolates** data and definitions (multi-tenant) and **authorizes** each operation before the engine runs the loop.
 
-Full multi-tenancy model (organizations, teams, end-users): [15-multi-tenancy.md](./15-multi-tenancy.md).
+Related: [02-architecture.md](./02-architecture.md) (SecurityLayer before Engine), [07-definition-syntax.md](./07-definition-syntax.md) (definitions + registry), [14-consumers.md](./14-consumers.md) (where auth attaches), [19-cluster-deployment.md](./19-cluster-deployment.md) (per-worker bootstrap). Full multi-tenancy (organizations, teams, end-users): [15-multi-tenancy.md](./15-multi-tenancy.md).
 
 ---
 
@@ -167,7 +167,23 @@ See also [06-mvp.md](./06-mvp.md) (shared Redis risks) and [07-definition-syntax
 
 ---
 
-## 7. Summary
+## 7. Production deployment checklist
+
+The **SecurityLayer** and **tenant rules** in this doc are **contracts** for your **API / BFF / workers**. The core library does **not** terminate TLS, issue JWTs, or enforce RBAC on every tool unless you add that glue.
+
+| Area | What to enforce in production |
+|------|------------------------------|
+| **Entry** | Authenticate every **`run`** / **`resume`**; map the principal to **`projectId`** (and **`endUserId`** when the agent serves end-users). Do not expose **`Agent.load`** without this step. |
+| **Runs** | Treat **`runId`** as sensitive; bind **resume** to the same **session/tenant** as create (see [`technical-debt.md` §7](../../technical-debt.md)). Use **`RunStore`** + queue **idempotency** in clusters ([`technical-debt.md` §8](../../technical-debt.md)). |
+| **Tools** | Treat **`save_memory`**, **`vector_*`**, **`send_message`**, and any file/HTTP tool as **privileged**; allowlist per product; cap **LLM** and **embedding** cost (**`topK`**, timeouts). |
+| **Errors & logs** | Do not stream raw **tool** stack traces or internal **`e.message`** back to the model or client; log server-side with **`runId`**. |
+| **Infra** | Redis/vector **TLS**, **ACL**, key **prefixes** per environment; identical **bootstrap** (**`AgentRuntime`** wiring + definitions) on every worker ([19-cluster-deployment.md](./19-cluster-deployment.md)). |
+
+Full gap list: [`technical-debt.md` §7–§9](../../technical-debt.md).
+
+---
+
+## 8. Summary
 
 - **Scope** (global → project → session → run) defines **namespaces** for data and definitions.
 - **`projectId` is the only hard isolation boundary** the engine enforces.

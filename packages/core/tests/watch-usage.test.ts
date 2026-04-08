@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
   watchUsage,
   StepSchemaError,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -31,7 +30,6 @@ class UsageQueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("watchUsage (Phase 9.3)", () => {
@@ -47,7 +45,7 @@ describe("watchUsage (Phase 9.3)", () => {
         usage: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
       },
     ]);
-    configureRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
+    const rt = new AgentRuntime({ llmAdapter: llm, memoryAdapter: mem, maxIterations: 10 });
 
     await Agent.define({
       id: "usage-agent",
@@ -58,7 +56,7 @@ describe("watchUsage (Phase 9.3)", () => {
     });
 
     const session = new Session({ id: "s-u", projectId: "p-usage" });
-    const agent = await Agent.load("usage-agent", { session });
+    const agent = await Agent.load("usage-agent", rt, { session });
     const runBuilder = agent.run("hello");
     const { builder, getUsage } = watchUsage(runBuilder, {
       projectId: "p-usage",
@@ -98,7 +96,7 @@ describe("watchUsage (Phase 9.3)", () => {
         usage: { promptTokens: 2, completionTokens: 1, totalTokens: 3 },
       },
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       maxIterations: 10,
@@ -114,7 +112,7 @@ describe("watchUsage (Phase 9.3)", () => {
     });
 
     const session = new Session({ id: "s-w", projectId: "p-usage" });
-    const agent = await Agent.load("usage-waste", { session });
+    const agent = await Agent.load("usage-waste", rt, { session });
     const { builder, getUsage } = watchUsage(agent.run("hi"), {
       projectId: "p-usage",
       organizationId: "org-9",
@@ -144,7 +142,7 @@ describe("watchUsage (Phase 9.3)", () => {
         usage: { promptTokens: 30, completionTokens: 8, totalTokens: 38 },
       },
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       maxIterations: 10,
@@ -160,7 +158,7 @@ describe("watchUsage (Phase 9.3)", () => {
     });
 
     const session = new Session({ id: "s-f", projectId: "p-usage" });
-    const agent = await Agent.load("usage-fatal", { session });
+    const agent = await Agent.load("usage-fatal", rt, { session });
     const { builder, getUsage } = watchUsage(agent.run("hi"), {
       projectId: "p-usage",
       organizationId: "org-9",

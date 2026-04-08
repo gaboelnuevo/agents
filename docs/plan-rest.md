@@ -2,7 +2,7 @@
 
 > Roadmap for an **HTTP/JSON** layer that exposes **`run` / `resume` / memory / logs / inter-agent send** with the same semantics as the SDK. There is **no reference server** in this monorepo today — this document is the product/implementation guide when you add one. Sources: [`brainstorm/07-multi-agente-rest-sesiones.md`](./brainstorm/07-multi-agente-rest-sesiones.md) §REST, [`core/14-consumers.md`](./core/14-consumers.md) §REST API.
 
-**Non-goals:** Putting business auth, rate limits, or multi-region deployment **inside** `packages/core` — those stay in the API service. The service calls **`configureRuntime`**, **`Agent.load`**, **`RunBuilder`** (or worker pattern from [`19-cluster-deployment.md`](./core/19-cluster-deployment.md)).
+**Non-goals:** Putting business auth, rate limits, or multi-region deployment **inside** `packages/core` — those stay in the API service. The service constructs **`AgentRuntime`**, then **`Agent.load`**, **`RunBuilder`** (or worker pattern from [`19-cluster-deployment.md`](./core/19-cluster-deployment.md)).
 
 ---
 

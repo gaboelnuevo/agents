@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Agent,
+  AgentRuntime,
   Session,
-  configureRuntime,
   InMemoryMemoryAdapter,
   InProcessMessageBus,
   clearAllRegistriesForTests,
-  __resetRuntimeConfigForTests,
 } from "../src/index.js";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "../src/adapters/llm/LLMAdapter.js";
 
@@ -23,7 +22,6 @@ class QueueLLM implements LLMAdapter {
 
 beforeEach(() => {
   clearAllRegistriesForTests();
-  __resetRuntimeConfigForTests();
 });
 
 describe("multi-agent (InProcessMessageBus + send_message)", () => {
@@ -42,7 +40,7 @@ describe("multi-agent (InProcessMessageBus + send_message)", () => {
       }),
       JSON.stringify({ type: "result", content: "done" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       messageBus: bus,
@@ -59,7 +57,7 @@ describe("multi-agent (InProcessMessageBus + send_message)", () => {
 
     const incoming = bus.waitFor("agent-b", { fromAgentId: "agent-a" });
     const session = new Session({ id: "s-ma", projectId: "p-ma" });
-    const agentA = await Agent.load("agent-a", { session });
+    const agentA = await Agent.load("agent-a", rt, { session });
     const run = await agentA.run("ping");
 
     const msg = await incoming;
@@ -86,7 +84,7 @@ describe("multi-agent (InProcessMessageBus + send_message)", () => {
       }),
       JSON.stringify({ type: "result", content: "ok" }),
     ]);
-    configureRuntime({
+    const rt = new AgentRuntime({
       llmAdapter: llm,
       memoryAdapter: mem,
       messageBus: bus,
@@ -106,7 +104,7 @@ describe("multi-agent (InProcessMessageBus + send_message)", () => {
       correlationId: "corr-req-1",
     });
     const session = new Session({ id: "s-ma2", projectId: "p-ma" });
-    const agentA = await Agent.load("agent-a", { session });
+    const agentA = await Agent.load("agent-a", rt, { session });
     await agentA.run("go");
 
     const msg = await incoming;
