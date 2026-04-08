@@ -30,6 +30,7 @@ export {
   LLMClientError,
   RunCancelledError,
   SecurityError,
+  SessionExpiredError,
 } from "./errors/index.js";
 
 export { configureRuntime } from "./runtime/configure.js";

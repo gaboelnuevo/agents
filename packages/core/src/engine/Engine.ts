@@ -148,19 +148,22 @@ export async function executeRun(run: Run, deps: EngineDeps): Promise<Run> {
     });
 
     const hooks = deps.hooks as EngineHooks | undefined;
-    hooks?.onLLMResponse?.(llmResponse, {
+    const llmMeta = {
       agentId: deps.agent.id,
       runId: run.runId,
-    });
+    };
+    hooks?.onLLMResponse?.(llmResponse, llmMeta);
 
     let step: Step;
     try {
       step = parseStep(llmResponse.content);
       run.state.parseAttempts = 0;
+      hooks?.onLLMAfterParse?.(llmResponse, llmMeta, "parsed");
     } catch {
       const pa = (run.state.parseAttempts ?? 0) + 1;
       run.state.parseAttempts = pa;
       if (pa <= limits.maxParseRecovery) {
+        hooks?.onLLMAfterParse?.(llmResponse, llmMeta, "parse_failed_recoverable");
         run.state.parseRecovery = [
           {
             role: "assistant",
@@ -174,6 +177,7 @@ export async function executeRun(run: Run, deps: EngineDeps): Promise<Run> {
         ];
         continue;
       }
+      hooks?.onLLMAfterParse?.(llmResponse, llmMeta, "parse_failed_fatal");
       run.status = "failed";
       throw new StepSchemaError("Exceeded parse recovery attempts");
     }

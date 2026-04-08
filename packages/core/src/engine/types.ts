@@ -46,12 +46,28 @@ export interface LLMResponseMeta {
   runId: string;
 }
 
+/** Set after each `generate` + `parseStep` attempt — use for billing / wasted-token metrics. */
+export type LLMParseOutcome =
+  | "parsed"
+  | "parse_failed_recoverable"
+  | "parse_failed_fatal";
+
 export interface EngineHooks {
   onThought?: (step: Step) => void;
   onAction?: (step: Step) => void;
   onObservation?: (observation: unknown) => void;
   onWait?: (step: Step) => void;
+  /** Fires immediately after each LLM `generate`, before validation. */
   onLLMResponse?: (response: LLMResponse, meta: LLMResponseMeta) => void;
+  /**
+   * Fires after `parseStep` for that response. **`parse_failed_*`** means the model output did not
+   * yield a valid step (tokens often counted as **wasted** for billing). See {@link watchUsage}.
+   */
+  onLLMAfterParse?: (
+    response: LLMResponse,
+    meta: LLMResponseMeta,
+    outcome: LLMParseOutcome,
+  ) => void;
 }
 
 export type { LLMRequest, LLMResponse };

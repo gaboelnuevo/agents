@@ -225,7 +225,7 @@ Nine packages under `packages/`. Edges match §0.7; **status** reflects this rep
 
 | Package | Role | `workspace:*` deps | Status (typical) |
 |---------|------|--------------------|------------------|
-| `@agent-runtime/core` | Engine loop, `Tool`/`Skill`/`Agent`/`Session`, registries, built-in memory tools, vector tools, `send_message`, `InProcessMessageBus`, `RunStore`, **`buildEngineDeps`** / **`createRun`** / **`executeRun`**, **`RunBuilder.onWait`**, **`effectiveToolAllowlist`**, optional **`toolTimeoutMs`**, adapters as interfaces | — | **Implemented** (Phases 1–4, 4b, 6–7; worker API + cluster docs — see `docs/plan.md` **Progress snapshot**) |
+| `@agent-runtime/core` | Engine loop, `Tool`/`Skill`/`Agent`/`Session` (optional **`expiresAtMs`** / **`SessionExpiredError`**), registries, built-in memory tools, vector tools, `send_message`, `InProcessMessageBus`, `RunStore`, **`buildEngineDeps`** / **`createRun`** / **`executeRun`**, **`RunBuilder.onWait`**, **`effectiveToolAllowlist`**, optional **`toolTimeoutMs`**, adapters as interfaces | — | **Implemented** (Phases 1–4, 4b, 6–7; worker API + cluster docs — see `docs/plan.md` **Progress snapshot**) |
 | `@agent-runtime/utils` | Parsers, chunking, file-resolver ([`16-utils.md`](./core/16-utils.md)) | — | **Implemented** (parsers: txt/md/json/csv/html; chunking: fixed_size/sentence/paragraph/recursive; file-resolver: local/http) |
 | `@agent-runtime/adapters-redis` | `RedisMemoryAdapter`, `RedisRunStore`, `RedisMessageBus` (`ioredis`, Redis Streams) | `core` | **Implemented** — **default** for `REDIS_URL` / cluster memory + runs + bus (no vector here) |
 | `@agent-runtime/adapters-upstash` | `UpstashRedisMemoryAdapter`, `UpstashVectorAdapter`, `UpstashRunStore`, `UpstashRedisMessageBus` (HTTP) | `core` | **Implemented** — REST + vector; optional vs TCP Redis |
@@ -513,6 +513,8 @@ interface SessionOptions {
   id: string;
   projectId: string;
   endUserId?: string;
+  /** When set, `run` / `resume` / `onWait` continuations fail after this instant (Unix ms). */
+  expiresAtMs?: number;
 }
 
 interface SecurityContext {
@@ -1138,7 +1140,9 @@ class Session {
   id: string;
   projectId: string;
   endUserId?: string;
+  expiresAtMs?: number;
   constructor(opts: SessionOptions);
+  isExpired(atMs?: number): boolean;
 }
 ```
 
@@ -1157,6 +1161,13 @@ interface RunBuilder {
   onObservation(cb: (obs: unknown) => void): RunBuilder;
   onWait(cb: (step: Step) => Promise<string | undefined>): RunBuilder;
   onLLMResponse(cb: (response: LLMResponse, meta: LLMResponseMeta) => void): RunBuilder;
+  onLLMAfterParse(
+    cb: (
+      response: LLMResponse,
+      meta: LLMResponseMeta,
+      outcome: "parsed" | "parse_failed_recoverable" | "parse_failed_fatal",
+    ) => void,
+  ): RunBuilder;
   then(cb: (result: unknown) => void): Promise<void>;
   catch(cb: (err: Error) => void): RunBuilder;
 }
@@ -1164,15 +1175,10 @@ interface RunBuilder {
 
 ### 7.2 `watchUsage` — token tracking with billing context
 
-`watchUsage` wires `onLLMResponse` to accumulate token counts across iterations, scoped to a `projectId` and `organizationId` so the snapshot can be persisted directly to a billing or quota system.
+`watchUsage` wires **`onLLMAfterParse`** (see `EngineHooks` in `packages/core`) so each LLM call is counted **after** `parseStep`. Totals include every call; **`wastedPromptTokens`**, **`wastedCompletionTokens`**, and **`wastedTotalTokens`** add the same usage rows when the outcome is **`parse_failed_recoverable`** or **`parse_failed_fatal`** (output was not valid JSON for a step). Effective spend is roughly **totals minus wasted** (or use wasted for anomaly / quality metrics). Scoped to `projectId` and `organizationId` for billing.
 
 ```typescript
-// packages/core/src/engine/watchUsage.ts
-
-interface UsageContext {
-  projectId: string;
-  organizationId: string;
-}
+// packages/core/src/engine/watchUsage.ts — shape only; see source for implementation
 
 interface UsageSnapshot {
   projectId: string;
@@ -1182,43 +1188,14 @@ interface UsageSnapshot {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  wastedPromptTokens: number;
+  wastedCompletionTokens: number;
+  wastedTotalTokens: number;
   llmCalls: number;
-}
-
-function watchUsage(
-  builder: RunBuilder,
-  context: UsageContext,
-): {
-  builder: RunBuilder;
-  getUsage: () => UsageSnapshot;
-} {
-  const usage: UsageSnapshot = {
-    projectId: context.projectId,
-    organizationId: context.organizationId,
-    agentId: "",
-    runId: "",
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    llmCalls: 0,
-  };
-
-  const wrapped = builder.onLLMResponse((res, meta) => {
-    usage.agentId = meta.agentId;
-    usage.runId = meta.runId;
-    if (res.usage) {
-      usage.promptTokens += res.usage.promptTokens ?? 0;
-      usage.completionTokens += res.usage.completionTokens ?? 0;
-      usage.totalTokens += res.usage.totalTokens ?? 0;
-    }
-    usage.llmCalls++;
-  });
-
-  return { builder: wrapped, getUsage: () => ({ ...usage }) };
 }
 ```
 
-The `meta` argument in `onLLMResponse` carries `agentId` and `runId` from the engine so the watcher doesn't need to track them externally.
+The engine still exposes **`onLLMResponse`** (before parse) for streaming or logging raw model text; **`watchUsage`** uses **`onLLMAfterParse`** so waste aligns with failed parses.
 
 **Usage:**
 
@@ -1259,11 +1236,23 @@ interface LLMResponseMeta {
 interface EngineHooks {
   // ...
   onLLMResponse?: (response: LLMResponse, meta: LLMResponseMeta) => void;
+  onLLMAfterParse?: (
+    response: LLMResponse,
+    meta: LLMResponseMeta,
+    outcome: "parsed" | "parse_failed_recoverable" | "parse_failed_fatal",
+  ) => void;
 }
 
 interface RunBuilder {
   // ... existing methods ...
   onLLMResponse(cb: (response: LLMResponse, meta: LLMResponseMeta) => void): RunBuilder;
+  onLLMAfterParse(
+    cb: (
+      response: LLMResponse,
+      meta: LLMResponseMeta,
+      outcome: "parsed" | "parse_failed_recoverable" | "parse_failed_fatal",
+    ) => void,
+  ): RunBuilder;
 }
 ```
 

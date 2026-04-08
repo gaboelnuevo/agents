@@ -3,11 +3,17 @@ import type { AgentDefinitionPersisted } from "./types.js";
 import type { Session } from "./Session.js";
 import type { Run } from "../protocol/types.js";
 import type { Step } from "../protocol/types.js";
-import type { EngineHooks, LLMResponseMeta } from "../engine/types.js";
+import type { EngineHooks, LLMResponseMeta, LLMParseOutcome } from "../engine/types.js";
 import { createRun, executeRun } from "../engine/Engine.js";
 import { buildEngineDeps } from "../engine/buildEngineDeps.js";
 import { getEngineConfig } from "../runtime/configure.js";
-import { RunInvalidStateError } from "../errors/index.js";
+import { RunInvalidStateError, SessionExpiredError } from "../errors/index.js";
+
+function throwIfSessionExpired(session: Session): void {
+  if (session.isExpired()) {
+    throw new SessionExpiredError("Session has expired");
+  }
+}
 
 function lastWaitStepFromRun(run: Run): Extract<Step, { type: "wait" }> | undefined {
   for (let i = run.history.length - 1; i >= 0; i--) {
@@ -68,6 +74,21 @@ export class RunBuilder implements PromiseLike<Run> {
     return this;
   }
 
+  onLLMAfterParse(
+    cb: (
+      response: LLMResponse,
+      meta: LLMResponseMeta,
+      outcome: LLMParseOutcome,
+    ) => void,
+  ): this {
+    const prev = this.hooks.onLLMAfterParse;
+    this.hooks.onLLMAfterParse = (r, m, o) => {
+      prev?.(r, m, o);
+      cb(r, m, o);
+    };
+    return this;
+  }
+
   then<TResult1 = Run, TResult2 = never>(
     onfulfilled?: ((value: Run) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
@@ -82,6 +103,7 @@ export class RunBuilder implements PromiseLike<Run> {
   }
 
   private async execute(): Promise<Run> {
+    throwIfSessionExpired(this.session);
     const cfg = getEngineConfig();
 
     let run: Run;
@@ -141,6 +163,7 @@ export class RunBuilder implements PromiseLike<Run> {
       isFreshRun &&
       this.waitContinuation
     ) {
+      throwIfSessionExpired(this.session);
       const waitStep = lastWaitStepFromRun(result);
       if (!waitStep) break;
       const reply = await this.waitContinuation(waitStep);

@@ -18,7 +18,8 @@
 | **Phase 2** (`@agent-runtime/adapters-redis` — **preferred** for `REDIS_URL` / BullMQ-style stacks) | **Done** — TCP `ioredis`: memory, RunStore, MessageBus. Vector stays in **Phase 2a** / **`UpstashVectorAdapter`** unless you swap `VectorAdapter`. |
 | **Phase 2a** (`@agent-runtime/adapters-upstash` — REST + vector) | **Done** — `UpstashRedisMemoryAdapter`, `UpstashRunStore`, `UpstashRedisMessageBus`, `UpstashVectorAdapter` for serverless/edge or when you want HTTP-only Redis. |
 | **CI** (GitHub Actions) | **Done** — [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): `pnpm install --frozen-lockfile` → `pnpm turbo run build test lint`; **Redis** service + `REDIS_INTEGRATION=1` runs **`adapters-bullmq`** [`redis-queue.integration.test.ts`](../packages/adapters-bullmq/tests/redis-queue.integration.test.ts) (enqueue → worker → `dispatchEngineJob`) |
-| **Phase 9** (full-stack integration hardening) | **Partial** — **BullMQ + TCP Redis** exercised in CI; optional **E2E with real API keys** (OpenAI / Upstash) and deeper Phase 9 steps (9.2–9.6) remain manual or future work |
+| **Phase 9** (full-stack integration hardening) | **Partial** — CI: **BullMQ + Redis**. Core: **`memory-scope`** (9.2 **`InMemory`**), **`parse-recovery`**, **`runtime-limits`**, **`watch-usage`**, **`hooks`**, **`multi-agent`**. **E2E with real API keys**, **9.1**, **9.2** on TCP Redis, **9.4** still optional / manual |
+| **Session expiry** | **Done** — optional **`SessionOptions.expiresAtMs`** / **`Session.isExpired()`**; **`RunBuilder`** rejects expired sessions on **`run`**, **`resume`**, and **`onWait`** continuations; **`SessionExpiredError`** (`SESSION_EXPIRED`) — tests: `packages/core/tests/session-expiry.test.ts` |
 
 For package-level detail, see **`docs/scaffold.md` §0.8** and **§12**. Known gaps and deferrals: [**`docs/technical-debt.md`**](./technical-debt.md).
 
@@ -61,7 +62,7 @@ For package-level detail, see **`docs/scaffold.md` §0.8** and **§12**. Known g
 | Step | Module | File(s) | Test |
 |------|--------|---------|------|
 | 1.1 | Protocol types (`RunStatus`, `Step`, `ProtocolMessage`, `Run`, `RunEnvelope`) | `src/protocol/types.ts` | Type-only — compile check |
-| 1.2 | Error classes (`EngineError` + 11 subclasses) | `src/errors/index.ts` | Unit: instantiate each, verify `code` |
+| 1.2 | Error classes (`EngineError` + concrete subclasses, incl. `SessionExpiredError`) | `src/errors/index.ts` | Unit: instantiate each, verify `code` |
 | 1.3 | `LLMAdapter`, `LLMRequest`, `LLMResponse` interfaces | `src/adapters/llm/LLMAdapter.ts` | Type-only |
 | 1.4 | `MemoryAdapter`, `MemoryScope` interfaces | `src/adapters/memory/MemoryAdapter.ts` | Type-only |
 | 1.5 | `InMemoryMemoryAdapter` | `src/adapters/memory/InMemoryMemoryAdapter.ts` | Unit: save/query/delete/getState with scope |
@@ -75,7 +76,7 @@ For package-level detail, see **`docs/scaffold.md` §0.8** and **§12**. Known g
 | 1.13 | `ContextBuilder` | `src/context/ContextBuilder.ts` | Unit: deterministic output from same inputs; memory scope resolution (endUserId vs sessionId); security filtering |
 | 1.14 | `executeRun` — main loop (+ `createRun`) | `src/engine/Engine.ts` | Integration: thought→action→result cycle; wait→resume; max iterations; parse recovery (1 re-prompt then fail) |
 | 1.15 | Define API: `Tool.define`, `Skill.define`, `Agent.define`, `Session`, `Agent.load` | `src/define/*.ts` | Integration: define→load→run end-to-end with in-memory adapters |
-| 1.16 | `watchUsage` helper | `src/engine/watchUsage.ts` | Unit: accumulates tokens across multiple LLM calls |
+| 1.16 | `watchUsage` helper | `src/engine/watchUsage.ts` | Unit: totals + **wasted** tokens when parse fails (`onLLMAfterParse`) |
 | 1.17 | Barrel export | `src/index.ts` | Compile: all public types and classes importable |
 | 1.18 | `RunBuilder`, `RunStore` wiring, `Agent.resume` | `src/define/RunBuilder.ts`, `src/adapters/run/*`, `configureRuntime` | Integration: `wait` → persisted run → `resume` |
 | 1.19 | `buildEngineDeps`, `effectiveToolAllowlist`, registry exports for workers | `src/engine/buildEngineDeps.ts`, `src/define/effectiveToolAllowlist.ts` | Integration: `executeRun` with deps built like `RunBuilder` |
@@ -228,9 +229,9 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 | 7.1 | `AgentMessage`, `MessageBus` interfaces | `src/bus/MessageBus.ts` | Type-only |
 | 7.2 | In-process `MessageBus` (EventEmitter + Map) | `src/bus/InProcessMessageBus.ts` | Unit: send/waitFor with correlationId, timeout |
 | 7.3 | `send_message` tool | `src/tools/send_message.ts` | Unit: enqueues via bus, returns `{ success, messageId }` |
-| 7.4 | Request–reply integration: Agent A → send → wait → Agent B → reply → A resumes | `Engine.ts` | Integration: full request–reply cycle with two mock agents |
+| 7.4 | Request–reply integration: Agent A → send → wait → Agent B → reply → A resumes | `Engine.ts` | **`tests/multi-agent.test.ts`** — `send_message` + `InProcessMessageBus` (event + **`correlationId`** request). Full **two-agent run** with **`wait`/`resume`** across processes is orchestration outside `core`. |
 
-**Gate:** Integration test: Agent A sends a request to Agent B with `correlationId`, enters `waiting`, Agent B processes and replies, Agent A resumes and reaches `completed`.
+**Gate:** **`multi-agent.test.ts`** passes (delivery + correlation). Optional follow-up: scripted two-agent **`wait`/`resume`** loop in tests or sample app — not required for the Phase 7 **MessageBus** + tool contract.
 
 ---
 
@@ -256,11 +257,11 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 | Step | What | Verify |
 |------|------|--------|
 | 9.1 | End-to-end: define tools + skills + agent → load → run with **TCP Redis** (`adapters-redis`) or Upstash REST + OpenAI | Full cycle completes, memory persists across runs |
-| 9.2 | End-user session: `endUserId` scoping — `longTerm` keyed by user, `shortTerm` by session | Two sessions for same endUser share longTerm |
-| 9.3 | `watchUsage` in production-like run — verify token accumulation, `organizationId`/`projectId` present | Usage snapshot is complete and correct |
+| 9.2 | End-user session: `endUserId` scoping — `longTerm` keyed by user, `shortTerm` by session | **`tests/memory-scope.test.ts`** — **`InMemoryMemoryAdapter`**; **TCP/Upstash** adapters still use one key prefix per scope (see `technical-debt`) |
+| 9.3 | `watchUsage` in production-like run — verify token accumulation, `organizationId`/`projectId` present | **`tests/watch-usage.test.ts`** — totals, **wasted** (recoverable + **fatal** **`StepSchemaError`**), **`getUsage()`** after run/reject |
 | 9.4 | Security: define with `end_user` principal fails; run with wrong `projectId` fails | `SecurityError` thrown |
-| 9.5 | Error resilience: LLM returns garbage → 1 re-prompt → valid step OR `StepSchemaError` | Both paths tested |
-| 9.6 | Timeout: global run timeout triggers `RunTimeoutError`, abort triggers `RunCancelledError` | Clean failure, run marked `failed` |
+| 9.5 | Error resilience: LLM returns garbage → 1 re-prompt → valid step OR `StepSchemaError` | **`tests/parse-recovery.test.ts`** — recovery success + **`StepSchemaError`** when recovery exhausted |
+| 9.6 | Timeout: global run timeout triggers `RunTimeoutError`, abort triggers `RunCancelledError` | **`tests/runtime-limits.test.ts`** — `startedAtMs` in the past vs **`runTimeoutMs`**; **`AbortSignal`** already aborted |
 
 **Gate:** All integration tests green in CI. No `core` package depends on any adapter package (`workspace:*` deps only flow outward).
 

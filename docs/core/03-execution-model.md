@@ -41,6 +41,12 @@ while iterations < maxIterations:
 mark failed if max exceeded or parse error
 ```
 
+## Iteration counter (`run.state.iteration`) and `maxIterations`
+
+- **`maxIterations`** limits **main-loop turns** that complete after a **successful parse**, for steps of type **`thought`** or **`action`**. At the end of each such turn, the engine increments **`run.state.iteration`** (see [`Engine.ts`](../../packages/core/src/engine/Engine.ts)). It is **not** “number of LLM calls” by itself: a single turn can include one `generate` call, but parse recovery (below) may add **extra** LLM calls without incrementing **`iteration`**.
+- **`wait`** and **`result`** end the loop for that run **without** incrementing **`iteration`** (the run stops or moves to **`waiting`** / **`completed`** in that same turn).
+- **Parse recovery**: if **`parseStep`** fails and **`parseAttempts`** is still within **`maxParseRecovery`**, the engine **`continue`s** the `while` loop with recovery messages and **does not** increment **`iteration`**. Treat **`maxIterations`** as a cap on **successful** parsed steps of type **`thought`** / **`action`**, not on failed parses. Details: [13-errors-parsing-and-recovery.md](./13-errors-parsing-and-recovery.md).
+
 ## Wait and resume
 
 When the model returns `wait`:
@@ -74,3 +80,5 @@ The engine may add `sessionId` or other scopes **by policy** without changing th
 ## Hooks (engine boundary)
 
 The engine emits events to the SDK or server: `onThought`, `onAction`, `onObservation`, and a synchronous **`onWait`** on `EngineHooks` (notification). **`RunBuilder.onWait`** additionally accepts an async callback whose **returned string** continues the run in-process without a separate `resume` call.
+
+**LLM hooks:** **`onLLMResponse`** runs immediately after each model **`generate`**, before **`parseStep`**. **`onLLMAfterParse`** runs after parsing, with an outcome: **`parsed`**, **`parse_failed_recoverable`**, or **`parse_failed_fatal`** (see `LLMParseOutcome` in `@agent-runtime/core`). Use **`watchUsage(runBuilder, { projectId, organizationId })`** to accumulate **`promptTokens` / `completionTokens` / `totalTokens`** and **`wasted*`** fields — wasted counts usage for calls that did not yield a valid step (failed parse, including the final fatal attempt). Effective spend is **totals minus wasted** if you bill only successful parses, or track **wasted** separately for quality metrics.

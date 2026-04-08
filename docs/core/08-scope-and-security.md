@@ -12,7 +12,7 @@ Full multi-tenancy model (organizations, teams, end-users): [15-multi-tenancy.md
 |-------|------------|------------------|
 | **Global** | No `projectId` or `scope: "global"` | Not per-customer: resources shared across the deployment (e.g. `LLMAdapter`, shared utilities). |
 | **Project** | `projectId` | A tenant's definitions and data: private agents, tools, skills; Redis/vector prefixes; MessageBus routes. This is the **only hard isolation boundary** the engine enforces. |
-| **Session** | `sessionId` (within a project) | Working memory, conversation history, or business cycle without mixing users or parallel runs of the same agent. |
+| **Session** | `sessionId` (within a project) | Working memory, conversation history, or business cycle without mixing users or parallel runs of the same agent. Optional **`expiresAtMs`** on `Session` lets the host reject further **`run`** / **`resume`** / **`onWait`** work after that instant (`SessionExpiredError`). |
 | **Run** | `runId` | One execution: append-only history, `waiting` state, snapshots for `resume`. |
 
 Typical logical key order in stores:

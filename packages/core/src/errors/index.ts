@@ -45,3 +45,6 @@ export class RunCancelledError extends EngineError {
 export class SecurityError extends EngineError {
   readonly code = "SECURITY_DENIED";
 }
+export class SessionExpiredError extends EngineError {
+  readonly code = "SESSION_EXPIRED";
+}

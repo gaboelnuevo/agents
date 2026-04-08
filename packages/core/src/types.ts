@@ -52,6 +52,7 @@ export type {
   EngineDeps,
   EngineHooks,
   LLMResponseMeta,
+  LLMParseOutcome,
 } from "./engine/types.js";
 
 export type { UsageContext, UsageSnapshot } from "./engine/watchUsage.js";
