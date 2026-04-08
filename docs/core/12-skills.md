@@ -46,7 +46,7 @@ Core recommendation: **skills shape context and the tool allowlist**; the LLM st
 1. Load `AgentDefinition` with `skills: ["id1", "id2"]`.
 2. Resolve each id against store **project → global** ([08-scope-and-security.md](./08-scope-and-security.md)).
 3. Union tools referenced by all resolved skills + direct agent tools → candidate set.
-4. Apply **SecurityContext** filter → final set exposed to Context Builder ([11-context-builder.md](./11-context-builder.md)).
+4. Intersect with the **tool registry** and optional **`AgentRuntime.allowedToolIds`** → set exposed to **Context Builder** ([11-context-builder.md](./11-context-builder.md)); **`SecurityContext` does not further narrow tools in core today** ([08-scope-and-security.md](./08-scope-and-security.md) §2).
 5. If a skill has `execute`, the engine only calls it on **documented hooks** (e.g. pre-run, post-observation) if the product specifies; by default **not** in MVP.
 
 ---

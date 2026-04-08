@@ -2,7 +2,7 @@
 
 > Roadmap for the **command-line** surface: what exists today vs the **library-parity** CLI sketched in [`brainstorm/06-libreria-adapters-cli.md`](./brainstorm/06-libreria-adapters-cli.md). Complements [`plan.md`](./plan.md) (monorepo/engine) and [`core/14-consumers.md`](./core/14-consumers.md) §CLI.
 
-**Non-goals:** Reimplementing the engine loop in the CLI — all execution stays in **`packages/core`** via **`AgentRuntime`**, `Agent.load`, `RunBuilder`, hooks.
+**Non-goals:** Reimplementing the engine loop in the CLI — all execution stays in **`packages/core`** via **`AgentRuntime`**, **`Agent.load(agentId, runtime, { session })`**, **`RunBuilder`**, hooks.
 
 ---
 
@@ -43,7 +43,7 @@ Implementation notes:
 | Phase | Goal | Gate |
 |-------|------|------|
 | **C1 — Design** | Choose scope for v1 (which commands; how **`AgentRuntime`** + env are loaded in a generated project). Document in [`scaffold.md`](./scaffold.md) or a short `docs/core/` CLI subsection. | Written contract; no engine API changes required for C2. |
-| **C2 — `run` + `resume`** | Thin wrapper: resolve agent definition + adapters from cwd, `Agent.load` + `run` / `resume`, hooks → stdout/stderr, exit codes on **`EngineError.code`**. | Integration test with **`InMemoryRunStore`** or test Redis; CI runs without API keys if LLM is mocked. |
+| **C2 — `run` + `resume`** | Thin wrapper: resolve agent definition + adapters from cwd, **`new AgentRuntime({…})`** → **`Agent.load(agentId, runtime, { session })`** → **`run` / `resume`**, hooks → stdout/stderr, exit codes on **`EngineError.code`**. | Integration test with **`InMemoryRunStore`** or test Redis; CI runs without API keys if LLM is mocked. |
 | **C3 — `memory` / `logs`** | Read path: query **`MemoryAdapter`** scopes / print **`Run`** history for a `runId` (format TBD: JSON lines vs human). | Tests + docs for flags. |
 | **C4 — `list` / `send`** | `list`: discover agents from project layout or registry. `send`: requires **`MessageBus`** + routing config — likely **after** C2 stable. | E2E optional; document cluster vs in-process bus. |
 

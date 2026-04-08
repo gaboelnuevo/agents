@@ -32,7 +32,7 @@ Recommended default for a **platform**: **A** or **A + C** (MCP tool list is a c
 | Phase | Goal | Gate |
 |-------|------|------|
 | **M1 — Scope** | List which user actions MCP exposes: e.g. “start run”, “resume with text”, “query memory”, **not** raw arbitrary tool execution unless allowlisted. | Written threat model (prompt injection, tool exfiltration). |
-| **M2 — Protocol skeleton** | Minimal MCP server package (or example repo) implementing handshake + one **tool** calling **`POST /agents/:id/run`** or local `Agent.load().run()`. | Manual test with one host (e.g. Cursor). |
+| **M2 — Protocol skeleton** | Minimal MCP server package (or example repo) implementing handshake + one **tool** calling **`POST /agents/:id/run`** or local **`new AgentRuntime({…})`** → **`Agent.load(agentId, runtime, { session }).run(...)`**. | Manual test with one host (e.g. Cursor). |
 | **M3 — Parity** | Tool definitions stay in sync with **`Tool.define`** / project registry — generation or shared manifest to avoid drift. | CI check or codegen from definitions. |
 | **M4 — Multi-agent** | If hosts need “message agent B”, expose a single MCP tool that maps to **`send_message`** + bus semantics ([`09-communication-multiagent.md`](./core/09-communication-multiagent.md)). | Document correlation / `wait` expectations. |
 

@@ -2,6 +2,8 @@
 
 > Actionable step-by-step guide to build the `@agent-runtime` monorepo from zero. Each phase has a **gate** — criteria that must pass before moving on. Derived from `docs/scaffold.md` and `docs/core/`.
 
+**Canonical contracts:** [`docs/core/README.md`](./core/README.md) (engine, adapters, cluster). **Monorepo package map / file tree:** [`docs/scaffold.md`](./scaffold.md) §0–§1.
+
 **Related planning (consumer surfaces, not part of the core monorepo phases above):**
 
 | Doc | Topic |
@@ -27,8 +29,9 @@
 | **Phase 5** (**BullMQ priority**) | **`@agent-runtime/adapters-bullmq` shipped** — typed `createEngineQueue` / `createEngineWorker` + `dispatchEngineJob`; **QStash** still not in monorepo; delayed-job orchestration for `wait` remains app-specific on top of BullMQ |
 | **Phase 2** (`@agent-runtime/adapters-redis` — **preferred** for `REDIS_URL` / BullMQ-style stacks) | **Done** — TCP `ioredis`: memory, RunStore, MessageBus. Vector stays in **Phase 2a** / **`UpstashVectorAdapter`** unless you swap `VectorAdapter`. |
 | **Phase 2a** (`@agent-runtime/adapters-upstash` — REST + vector) | **Done** — `UpstashRedisMemoryAdapter`, `UpstashRunStore`, `UpstashRedisMessageBus`, `UpstashVectorAdapter` for serverless/edge or when you want HTTP-only Redis. |
-| **CI** (GitHub Actions) | **Done** — [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): `pnpm install --frozen-lockfile` → `pnpm turbo run build test lint`; **Redis** service + `REDIS_INTEGRATION=1` runs **`adapters-bullmq`** [`redis-queue.integration.test.ts`](../packages/adapters-bullmq/tests/redis-queue.integration.test.ts) (enqueue → worker → `dispatchEngineJob`) |
-| **Phase 9** (full-stack integration hardening) | **Partial** — CI: **BullMQ + Redis**. Core: **`memory-scope`** (9.2 **`InMemory`**), **`parse-recovery`**, **`runtime-limits`**, **`watch-usage`**, **`hooks`**, **`multi-agent`**. **E2E with real API keys**, **9.1**, **9.2** on TCP Redis, **9.4** still optional / manual |
+| **CI** (GitHub Actions) | **Done** — [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): `pnpm install --frozen-lockfile` → `pnpm turbo run build test lint`; **Redis** service + `REDIS_INTEGRATION=1` runs **`adapters-bullmq`** [`redis-queue.integration.test.ts`](../packages/adapters-bullmq/tests/redis-queue.integration.test.ts) (enqueue → worker → **`dispatchEngineJob(runtime, payload)`**) |
+| **Phase 9** (full-stack integration hardening) | **Partial** — CI: **BullMQ + Redis**. Core: **`memory-scope`** (9.2 **`InMemory`**), **`parse-recovery`**, **`runtime-limits`**, **`watch-usage`**, **`hooks`**, **`multi-agent`**, plus **`rag-file-catalog`**, **`vector-limits`**, **`send-message-validation`**, **`tool-failure-observation`**, **`run-store`**. **E2E with real API keys**, **9.1**, **9.2** on TCP Redis, **9.4** still optional / manual |
+| **Core Vitest suite** (`packages/core/tests`) | **Green in CI** — includes **`engine`**, **`run-store`**, **`session-expiry`**, **`rag-file-catalog`**, **`runtime-tool-allowlist`**, **`send-message-validation`**, **`vector-limits`**, **`tool-failure-observation`**, **`memory-scope`**, **`parse-recovery`**, **`runtime-limits`**, **`watch-usage`**, **`hooks`**, **`multi-agent`**, plus **`skill-define`**, **`tool-runner`**, **`resolve-llm-adapter`** |
 | **Session expiry** | **Done** — optional **`SessionOptions.expiresAtMs`** / **`Session.isExpired()`**; **`RunBuilder`** rejects expired sessions on **`run`**, **`resume`**, and **`onWait`** continuations; **`SessionExpiredError`** (`SESSION_EXPIRED`) — tests: `packages/core/tests/session-expiry.test.ts` |
 
 For package-level detail, see **`docs/scaffold.md` §0.8** and **§12**. Known gaps and deferrals: [**`docs/technical-debt.md`**](./technical-debt.md).
@@ -81,14 +84,14 @@ For package-level detail, see **`docs/scaffold.md` §0.8** and **§12**. Known g
 | 1.8 | `SecurityContext` + `SessionOptions`; embedded context via **`securityContextForAgent`** (`buildEngineDeps`) | `src/security/types.ts`, `src/engine/buildEngineDeps.ts` | No in-core HTTP **`SecurityLayer`** module — hosts authenticate **before** **`Agent.load`**; see [`08-scope-and-security.md`](./core/08-scope-and-security.md) |
 | 1.9 | `parseStep` — JSON parse + fence stripping + schema validation | `src/engine/parseStep.ts` | Unit: valid JSON (all 4 step types), invalid JSON, fenced JSON, missing fields |
 | 1.10 | `ToolRunner` — registry, allowlist check, validate, execute | `src/tools/ToolRunner.ts` | Unit: register, resolve, allowlist deny, validate fail, execute success/error |
-| 1.11 | Built-in tools: `save_memory`, `get_memory`, `update_state` | `src/tools/builtins/*.ts` | Unit: each tool with mock `MemoryAdapter` |
+| 1.11 | Built-in tools: `save_memory`, `get_memory` | `src/tools/builtins.ts` | Unit: each tool with mock `MemoryAdapter` |
 | 1.12 | `EngineDeps`, `EngineHooks`, `LLMResponseMeta` types | `src/engine/types.ts` | Type-only |
 | 1.13 | `ContextBuilder` | `src/context/ContextBuilder.ts` | Unit: deterministic output; tool catalog from agent + skills (+ registry). **`SecurityContext` on input type is unused in `build()`** — see [`technical-debt.md`](./technical-debt.md) §7 |
 | 1.14 | `executeRun` — main loop (+ `createRun`) | `src/engine/Engine.ts` | Integration: thought→action→result cycle; wait→resume; max iterations; parse recovery (1 re-prompt then fail) |
 | 1.15 | Define API: `Tool.define`, `Skill.define`, `Agent.define`, `Session`, **`Agent.load(agentId, runtime, { session })`** | `src/define/*.ts`, `src/runtime/AgentRuntime.ts` | Integration: **`new AgentRuntime({ … })`** → define→load→run with in-memory adapters |
 | 1.16 | `watchUsage` helper | `src/engine/watchUsage.ts` | Unit: totals + **wasted** tokens when parse fails (`onLLMAfterParse`) |
 | 1.17 | Barrel export | `src/index.ts` | Compile: all public types and classes importable |
-| 1.18 | **`AgentRuntime`** (`EngineConfig`, merged **`runtime.config`**, per-project **`registerRagCatalog`**, optional **`fileReadRoot`**, **`allowedToolIds`**, **`sendMessageTargetPolicy`**) | `src/runtime/AgentRuntime.ts`, `src/runtime/engineConfig.ts` | Integration: explicit runtime per worker; public API has no global singleton |
+| 1.18 | **`AgentRuntime`** (`EngineConfig`, merged **`runtime.config`**, **`registerRagCatalog(projectId, …)`** / **`ragCatalogForProject`**, optional **`fileReadRoot`**, **`allowedToolIds`**, **`sendMessageTargetPolicy`**) — **`registerRagCatalog(runtime, projectId, …)`** from **`@agent-runtime/rag`** delegates here | `src/runtime/AgentRuntime.ts`, `src/runtime/engineConfig.ts`, `src/ragCatalogTypes.ts` | Integration: explicit runtime per worker; public API has no global singleton |
 | 1.19 | `RunBuilder`, `RunStore` wiring, `Agent.resume` | `src/define/RunBuilder.ts`, `src/adapters/run/*` | Integration: `wait` → persisted run → `resume` |
 | 1.20 | `buildEngineDeps`, `effectiveToolAllowlist`, registry exports for workers | `src/engine/buildEngineDeps.ts`, `src/define/effectiveToolAllowlist.ts` | Integration: `executeRun` with deps built like `RunBuilder` |
 | 1.21 | `RunBuilder.onWait` | `src/define/RunBuilder.ts` | Integration: in-process continuation after `wait` |
@@ -134,11 +137,13 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 
 | Step | Module | File(s) | Test |
 |------|--------|---------|------|
-| 2a.1 | Key builder: `{projectId}:{agentId}:{sessionId}:shortTerm:…` etc. | `src/keys.ts` | Unit: all 4 memory types, with/without `endUserId` |
-| 2a.2 | `UpstashRedisMemoryAdapter` implementing `MemoryAdapter` | `src/UpstashRedisMemoryAdapter.ts` | Unit (mocked `@upstash/redis`): save/query/delete/getState. Integration (real Upstash, CI-only): round-trip |
-| 2a.3 | Barrel export | `src/index.ts` | — |
+| 2a.1 | Memory key prefix matches TCP Redis: `m:{projectId}:{agentId}:{sessionId}:eu:{endUserId}:…` when `endUserId` is set, else `…:sess:…` ([`adapters-redis` `memoryKeyPrefix`](../packages/adapters-redis/src/keys.ts)) | `src/index.ts` (`UpstashRedisMemoryAdapter`) | Same contract as **`adapters-redis`** |
+| 2a.2 | `UpstashRedisMemoryAdapter` implementing `MemoryAdapter` (LIST-backed append + legacy STRING migration) | `src/index.ts` | Unit: mocked `fetch` / REST command array. Integration (real Upstash, optional): round-trip |
+| 2a.3 | `UpstashRunStore`, `UpstashRedisMessageBus`, `UpstashVectorAdapter` | `src/UpstashRunStore.ts`, `src/UpstashRedisMessageBus.ts`, `src/index.ts` (vector) | Unit: mocked `fetch` — see `packages/adapters-upstash/tests/` |
+| 2a.4 | Shared REST helper for memory lists | `src/upstashMemoryList.ts` | Used by memory adapter |
+| 2a.5 | Barrel export | `src/index.ts` | — |
 
-**Deps:** `@upstash/redis`
+**Deps:** none beyond `core` (adapters use **`fetch`** to Upstash REST — no `@upstash/redis` package in this workspace).
 
 **Gate:** `pnpm turbo build && pnpm turbo test --filter=@agent-runtime/adapters-upstash` — builds after `core` (via `^build`), all tests green.
 
@@ -152,7 +157,7 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 
 | Step | Module | File(s) | Test |
 |------|--------|---------|------|
-| 3.1 | `OpenAILLMAdapter` implementing `LLMAdapter` — maps `LLMRequest` to OpenAI HTTP API (`fetch`) | `src/index.ts` | Unit (HTTP mocks): request mapping, response normalization, `usage` passthrough |
+| 3.1 | `OpenAILLMAdapter` + `OpenAIEmbeddingAdapter` — maps `LLMRequest` to OpenAI HTTP API (`fetch`); chat maps **`finish_reason`** → **`LLMResponse.finishReason`**; embeddings: optional **`signal`**, **`fetchTimeoutMs`**, **`dimensions`**, or string `baseUrl` as third ctor arg | `src/index.ts` | Unit (HTTP mocks): request mapping, **`finish_reason`**, **`usage`**, embedding timeouts / dimensions |
 | 3.2 | Error mapping: 429 → `LLMRateLimitError`, 5xx → `LLMTransportError`, 4xx → `LLMClientError` | `src/errors.ts` (chat + embeddings) | Unit: status → correct error class |
 | 3.3 | Barrel export | `src/index.ts` | — |
 
@@ -191,7 +196,7 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 | 5.2 | Delayed jobs for `wait` with `reason: scheduled` | App enqueues **`addResume`** with `delay` / separate queue — not wrapped in-package | Documented pattern |
 | 5.3 | QStash alternative (HTTP callback to `POST /runs/:id/resume`) | Optional | Not in monorepo |
 
-**Gate:** **`pnpm turbo test --filter=@agent-runtime/adapters-bullmq`** passes. A worker using **`createEngineWorker`** + **`dispatchEngineJob(runtime, job.data)`** (after **`AgentRuntime`** + **`Agent.define`**) can process `run` jobs end-to-end in a real deployment (your Redis + bootstrap).
+**Gate:** **`pnpm turbo test --filter=@agent-runtime/adapters-bullmq`** passes. A worker using **`createEngineWorker`** + **`dispatchEngineJob(runtime, job.data)`** (payload must satisfy **`EngineJobPayload`**, same shape you enqueue) after **`AgentRuntime`** + **`Agent.define`** can process `run` jobs end-to-end in a real deployment (your Redis + bootstrap).
 
 ---
 
@@ -241,7 +246,7 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 |------|--------|---------|------|
 | 7.1 | `AgentMessage`, `MessageBus` interfaces | `src/bus/MessageBus.ts` | Type-only |
 | 7.2 | In-process `MessageBus` (EventEmitter + Map) | `src/bus/InProcessMessageBus.ts` | Unit: send/waitFor with correlationId, timeout |
-| 7.3 | `send_message` tool | `src/tools/send_message.ts` | Unit: enqueues via bus, returns `{ success, messageId }` |
+| 7.3 | `send_message` tool | `src/tools/sendMessage.ts` (+ `sendMessagePolicy.ts`) | Unit: enqueues via bus, returns `{ success, messageId }`; policy tests in **`send-message-validation.test.ts`** |
 | 7.4 | Request–reply integration: Agent A → send → wait → Agent B → reply → A resumes | `Engine.ts` | **`tests/multi-agent.test.ts`** — `send_message` + `InProcessMessageBus` (event + **`correlationId`** request). Full **two-agent run** with **`wait`/`resume`** across processes is orchestration outside `core`. |
 
 **Gate:** **`multi-agent.test.ts`** passes (delivery + correlation). Optional follow-up: scripted two-agent **`wait`/`resume`** loop in tests or sample app — not required for the Phase 7 **MessageBus** + tool contract.
@@ -255,7 +260,7 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 | Step | Module | Package | Test |
 |------|--------|---------|------|
 | 8.1 | Programmatic scaffold API: `initProject`, `generateAgent`, `generateTool`, `generateSkill` | `packages/scaffold` | Unit: returns file manifest with correct paths |
-| 8.2 | Handlebars templates: `default/`, `minimal/`, `multi-agent/` | `packages/cli/templates/` | — |
+| 8.2 | Programmatic templates: `default`, `minimal`, `multi-agent` | `packages/scaffold/src/templates/*.ts` | — |
 | 8.3 | CLI commands: `init`, `generate agent`, `generate tool`, `generate skill` | `packages/cli/src/commands/` | Integration (temp dirs): generated files exist, compile, contain expected content |
 | 8.4 | Post-scaffold checklist output | `packages/cli/` | Snapshot test |
 
@@ -269,12 +274,17 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 
 | Step | What | Verify |
 |------|------|--------|
-| 9.1 | End-to-end: define tools + skills + agent → load → run with **TCP Redis** (`adapters-redis`) or Upstash REST + OpenAI | Full cycle completes, memory persists across runs |
+| 9.1 | End-to-end: define tools + skills + agent → **`new AgentRuntime({ memoryAdapter, llmAdapter, … })`** → **`Agent.load(..., runtime, { session })`** → run with **TCP Redis** (`adapters-redis`) or Upstash REST + OpenAI | Full cycle completes, memory persists across runs |
 | 9.2 | End-user session: `endUserId` scoping — `longTerm` keyed by user, `shortTerm` by session | **`tests/memory-scope.test.ts`** — **`InMemoryMemoryAdapter`**; **TCP/Upstash** adapters still use one key prefix per scope (see `technical-debt`) |
 | 9.3 | `watchUsage` in production-like run — verify token accumulation, `organizationId`/`projectId` present | **`tests/watch-usage.test.ts`** — totals, **wasted** (recoverable + **fatal** **`StepSchemaError`**), **`getUsage()`** after run/reject |
 | 9.4 | Security: define with `end_user` principal fails; run with wrong `projectId` fails | **`SecurityError`** exists but is **not thrown** in core yet — enforce in host layer; see [`technical-debt.md`](./technical-debt.md) §7 |
 | 9.5 | Error resilience: LLM returns garbage → 1 re-prompt → valid step OR `StepSchemaError` | **`tests/parse-recovery.test.ts`** — recovery success + **`StepSchemaError`** when recovery exhausted |
 | 9.6 | Timeout: global run timeout triggers `RunTimeoutError`, abort triggers `RunCancelledError` | **`tests/runtime-limits.test.ts`** — `startedAtMs` in the past vs **`runTimeoutMs`**; **`AbortSignal`** already aborted |
+| 9.7 | RAG catalog: **`validateRagFileCatalog`**, **`AgentRuntime.registerRagCatalog`**, **`ragCatalogForProject`** → **`buildEngineDeps`** | **`tests/rag-file-catalog.test.ts`** |
+| 9.8 | Vector tools: request size / batch caps (`vectorLimits`) | **`tests/vector-limits.test.ts`** |
+| 9.9 | `send_message`: target allowlist / policy (`sendMessageTargetPolicy` on **`AgentRuntime`**) | **`tests/send-message-validation.test.ts`** |
+| 9.10 | Tool failure → observation (engine does not stall on bad tool output) | **`tests/tool-failure-observation.test.ts`** |
+| 9.11 | **`RunStore`** persistence contract (in-memory reference + integration expectations) | **`tests/run-store.test.ts`** |
 
 **Gate:** All integration tests green in CI. No `core` package depends on any adapter package (`workspace:*` deps only flow outward).
 
@@ -307,13 +317,13 @@ Use **`@agent-runtime/adapters-upstash`** when you want **HTTP-only** Redis (ser
 | Phase | I know it works when… |
 |-------|----------------------|
 | 0 | `pnpm turbo build` compiles all **nine** workspace packages (`adapters-redis`, **`adapters-bullmq`**, …) |
-| 1 | Mock agent completes thought→action→result with in-memory everything |
+| 1 | **`AgentRuntime`** + mock LLM: thought→action→result with in-memory adapters |
 | 2 | `RedisMemoryAdapter` / `RedisRunStore` / `RedisMessageBus` + `ioredis` — data and runs survive restart on TCP Redis |
 | 2a | Same persistence story with `UpstashRedisMemoryAdapter` (REST) when you choose Upstash instead of TCP |
 | 3 | Same test passes with real OpenAI, `watchUsage` reports tokens |
 | 4 | Global `runTimeoutMs` + optional per-tool `toolTimeoutMs` (`ToolTimeoutError`); `AbortSignal` cancels run cleanly |
-| 5 | **`@agent-runtime/adapters-bullmq`**: `createEngineQueue` / `createEngineWorker` + `dispatchEngineJob` — jobs complete asynchronously on workers |
+| 5 | **`@agent-runtime/adapters-bullmq`**: `createEngineQueue` / `createEngineWorker` + **`dispatchEngineJob(runtime, payload)`** — jobs complete asynchronously on workers |
 | 6 | `file_ingest` / **`ingest_rag_source`** → **`vector_search`** returns chunks; optional declarative catalog via **`registerRagCatalog(runtime, …)`** |
 | 7 | Agent A asks Agent B a question, gets an answer back |
 | 8 | `npx @agent-runtime/cli init` produces a buildable project |
-| 9 | Full stack runs with real adapters, security, and usage tracking |
+| 9 | Full stack + **`AgentRuntime`** on workers; host-layer security (**§9.4** gaps in core); usage tracking via **`watchUsage`** / hooks; **§9.7–9.11** tests (**`rag-file-catalog`**, **`vector-limits`**, **`send-message-validation`**, **`tool-failure-observation`**, **`run-store`**) |

@@ -16,6 +16,7 @@ describe("OpenAILLMAdapter", () => {
           JSON.stringify({
             choices: [
               {
+                finish_reason: "stop",
                 message: {
                   content: '{"type":"result","content":"done"}',
                 },
@@ -47,6 +48,7 @@ describe("OpenAILLMAdapter", () => {
     });
 
     expect(out.content).toBe('{"type":"result","content":"done"}');
+    expect(out.finishReason).toBe("stop");
     expect(out.usage?.totalTokens).toBe(30);
     expect(out.usage?.promptTokens).toBe(10);
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
@@ -109,6 +111,47 @@ describe("OpenAILLMAdapter", () => {
     ).rejects.toThrow(LLMTransportError);
   });
 
+  it("maps API finish_reason to LLMResponse.finishReason", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              finish_reason: "length",
+              message: { content: '{"type":"thought","content":"…"}' },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new OpenAILLMAdapter("sk-test");
+    const out = await adapter.generate({
+      provider: "openai",
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "x" }],
+    });
+    expect(out.finishReason).toBe("length");
+  });
+
+  it("defaults finishReason to stop when API omits it", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "hi" } }],
+        }),
+        { status: 200 },
+      ),
+    );
+    const adapter = new OpenAILLMAdapter("sk-test");
+    const out = await adapter.generate({
+      provider: "openai",
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "x" }],
+    });
+    expect(out.finishReason).toBe("stop");
+  });
+
   it("maps fetch AbortError to RunCancelledError", async () => {
     const aborted = new Error("The operation was aborted");
     aborted.name = "AbortError";
@@ -127,6 +170,41 @@ describe("OpenAILLMAdapter", () => {
 describe("OpenAIEmbeddingAdapter", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("updates dimensions from embedding vector length after success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: [{ embedding: [0.1, 0.2, 0.3, 0.4] }],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const adapter = new OpenAIEmbeddingAdapter("sk-test", "text-embedding-ada-002");
+    expect(adapter.dimensions).toBe(3072);
+    await adapter.embedBatch(["a"]);
+    expect(adapter.dimensions).toBe(4);
+  });
+
+  it("respects explicit dimensions option over heuristic", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ data: [{ embedding: [0.1, 0.2] }] }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const adapter = new OpenAIEmbeddingAdapter("sk-test", "text-embedding-3-small", {
+      dimensions: 99,
+    });
+    await adapter.embedBatch(["a"]);
+    expect(adapter.dimensions).toBe(99);
   });
 
   it("embedBatch POSTs embeddings and returns vectors", async () => {
@@ -178,5 +256,63 @@ describe("OpenAIEmbeddingAdapter", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
     const adapter = new OpenAIEmbeddingAdapter("sk-test", "text-embedding-3-small");
     await expect(adapter.embedBatch(["x"])).rejects.toThrow(LLMTransportError);
+  });
+
+  it("maps AbortError from fetchTimeoutMs to RunCancelledError", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        return new Promise<Response>((resolve, reject) => {
+          const sig = init?.signal;
+          if (sig?.aborted) {
+            const e = new Error("The operation was aborted");
+            e.name = "AbortError";
+            reject(e);
+            return;
+          }
+          const late = setTimeout(() => {
+            resolve(
+              new Response(JSON.stringify({ data: [{ embedding: [0.1] }] }), { status: 200 }),
+            );
+          }, 500);
+          sig?.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(late);
+              const e = new Error("The operation was aborted");
+              e.name = "AbortError";
+              reject(e);
+            },
+            { once: true },
+          );
+        });
+      }),
+    );
+    const adapter = new OpenAIEmbeddingAdapter("sk-test", "text-embedding-3-small", {
+      fetchTimeoutMs: 25,
+    });
+    await expect(adapter.embedBatch(["x"])).rejects.toThrow(RunCancelledError);
+  });
+
+  it("maps aborted signal on embeddings to RunCancelledError", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        if (init?.signal?.aborted) {
+          const e = new Error("The operation was aborted");
+          e.name = "AbortError";
+          return Promise.reject(e);
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: [{ embedding: [0.1] }] }), { status: 200 }),
+        );
+      }),
+    );
+    const adapter = new OpenAIEmbeddingAdapter("sk-test", "text-embedding-3-small", {
+      signal: ac.signal,
+    });
+    await expect(adapter.embedBatch(["x"])).rejects.toThrow(RunCancelledError);
   });
 });

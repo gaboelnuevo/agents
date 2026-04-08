@@ -264,7 +264,7 @@ agent-runtime/                    → repo root (Turborepo)
 │   │   │   │   ├── vectorTools.ts    → vector_search, vector_upsert, vector_delete
 │   │   │   │   └── sendMessage.ts    → send_message (multi-agent)
 │   │   │   ├── protocol/             → Step, ProtocolMessage, RunEnvelope types
-│   │   │   ├── security/             → SecurityLayer + SecurityContext
+│   │   │   ├── security/             → types (SecurityContext, principal kinds); host SecurityLayer is app-side
 │   │   │   ├── bus/                  → MessageBus interface + InProcessMessageBus
 │   │   │   ├── errors/               → Error classes and codes
 │   │   │   ├── config/               → RuntimeConfig type
@@ -1273,7 +1273,7 @@ interface RunBuilder {
 ### 7.3 Resolution order
 
 ```
-Tool.define  →  Skill.define  →  Agent.define  →  Agent.load + run
+Tool.define  →  Skill.define  →  Agent.define  →  Agent.load(agentId, runtime, { session }) + run
 ```
 
 Scope resolution: **project first**, then **global**. Project definition wins on collision.
@@ -1284,7 +1284,7 @@ Scope resolution: **project first**, then **global**. Project definition wins on
 
 1. Load `AgentDefinition.skills` → resolve each id: project → global.
 2. Union tools from all resolved skills + direct `agent.tools` → candidate set.
-3. Apply `SecurityContext` filter → final tool set for Context Builder.
+3. Intersect with the **tool registry** and optional **`AgentRuntime.allowedToolIds`** → effective allowlist for **`ContextBuilder`** (today **`SecurityContext` does not further hide tools** in core — see [`08-scope-and-security.md`](./core/08-scope-and-security.md) §2).
 4. Inject skill descriptions/instructions into context if skill is "active".
 5. `execute` hook: deferred past MVP (declarative + template only).
 
@@ -1297,7 +1297,7 @@ Scope resolution: **project first**, then **global**. Project definition wins on
 | Operation | Minimum control |
 |-----------|-----------------|
 | `Agent.define` / `Tool.define` / `Skill.define` | Admin scope; `projectId` bound to org. `end_user` NEVER gets define perms. |
-| `Agent.load` | Principal authorized on project; agent exists in namespace. |
+| `Agent.load(agentId, runtime, { session })` | Principal authorized on project; agent exists in namespace; **`AgentRuntime`** matches deployment ([`19-cluster-deployment.md`](./core/19-cluster-deployment.md)). |
 | `run` / `resume` | Same project + agent; optional concurrent run quota. Validate `endUserId`. |
 | Tool execution | Agent allowlist + scope for sensitive tools. |
 | MessageBus | Same `projectId` only (default). |
@@ -1440,7 +1440,7 @@ After Phases 2 / 2a / 5: `pnpm turbo build` builds core first (via `^build`), th
 
 | # | Module | Files |
 |---|--------|-------|
-| 21 | Hook system (onThought, onAction, etc.) | `src/engine/hooks.ts` |
+| 21 | Hook system (onThought, onAction, etc.) | `src/engine/Engine.ts` |
 | 22 | Timeouts (global, per-iteration, per-tool) | `src/engine/Engine.ts` |
 | 23 | AbortSignal propagation | `src/engine/Engine.ts`, `src/adapters/llm` |
 
@@ -1634,8 +1634,8 @@ export default defineWorkspace(["packages/*/vitest.config.ts"]);
 | `core` | Context Builder | Deterministic output from same inputs | Unit, mock memory/security |
 | `core` | Engine loop | Full cycles: thought→action→result, wait→resume, max iterations, parse recovery | Integration with in-memory adapters |
 | `core` | ToolRunner | Allowlist enforcement, validate, execute, error observation | Unit with mock tools |
-| `core` | Security | Role intersection, scope filtering, projectId isolation | Unit |
-| `core` | Define API | Tool.define→Agent.define→Agent.load→run end-to-end | Integration |
+| `core` | Security | **`projectId`** isolation in keys/adapters; prompt tool set = agent allowlist ∩ registry (+ optional **`AgentRuntime.allowedToolIds`**) — **`SecurityContext` is not applied in `ContextBuilder` yet** ([`08-scope-and-security.md`](./core/08-scope-and-security.md) §2, [`technical-debt.md`](./technical-debt.md) §7); principal auth stays in the host **`SecurityLayer`** | Unit for allowlist/prefixes; host integration for HTTP |
+| `core` | Define API | `Tool.define`→`Agent.define`→`new AgentRuntime({…})`→`Agent.load`→`run` end-to-end | Integration |
 | `adapters-upstash` | Memory Adapter | Key pattern correctness, save/query/delete, endUserId scoping | Unit (mocked Redis), integration (real Upstash, CI-only) |
 | `adapters-openai` | LLM Adapter | Request mapping, error classification, retry behavior | Unit with HTTP mocks |
 | `utils` | Parsers | Format detection, text extraction per mime type | Unit, fixture files |

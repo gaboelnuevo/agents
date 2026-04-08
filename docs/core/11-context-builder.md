@@ -1,8 +1,8 @@
 # Context Builder
 
-Component that **assembles** LLM input on each loop iteration: block order, truncation, security filtering, and exposing tools/skills to the model.
+Component that **assembles** LLM input on each loop iteration: block order, truncation, **effective tool allowlist** for the prompt, and exposing tools/skills to the model.
 
-Related: [02-architecture.md](./02-architecture.md); [07-definition-syntax.md](./07-definition-syntax.md) (**Step** / JSON rule); [08-scope-and-security.md](./08-scope-and-security.md) (**SecurityContext** filtering); [10-llm-adapter.md](./10-llm-adapter.md); [12-skills.md](./12-skills.md); [15-multi-tenancy.md](./15-multi-tenancy.md) (memory scope).
+Related: [02-architecture.md](./02-architecture.md); [07-definition-syntax.md](./07-definition-syntax.md) (**Step** / JSON rule); [08-scope-and-security.md](./08-scope-and-security.md) (host **SecurityLayer** vs **SecurityContext** on **`ToolContext`**); [10-llm-adapter.md](./10-llm-adapter.md); [12-skills.md](./12-skills.md); [15-multi-tenancy.md](./15-multi-tenancy.md) (memory scope).
 
 ---
 
@@ -14,8 +14,8 @@ Related: [02-architecture.md](./02-architecture.md); [07-definition-syntax.md](.
 | **Run** | Initial `input`, `history` (protocol messages that already occurred). |
 | **Session** | `sessionId`, `projectId`, optional `endUserId` — determines memory scope. |
 | **MemoryAdapter** | `shortTerm`, `longTerm`, `working`, `vectorMemory` snapshots per policy. |
-| **SecurityContext** | Filter tools/skills allowed for this principal + project. |
-| **ToolRegistry** | Schemas and descriptions exposed to the model (post-filter). |
+| **SecurityContext** | Carried on **`ToolContext`** for tools that need principal info; **does not filter** which tools appear in the prompt **yet** ([08-scope-and-security.md](./08-scope-and-security.md) §2). |
+| **ToolRegistry** | Schemas and descriptions for tools that survive **effectiveToolAllowlist** (agent ∪ skills ∩ registry ∩ optional **`AgentRuntime.allowedToolIds`**). |
 
 ---
 
@@ -27,7 +27,7 @@ Logical order (everything may go in one `system` or split across messages per ad
 2. **Working memory** (compact): volatile run/session state. Scoped by `sessionId`.
 3. **Long-term** (retrieved chunks): RAG or persisted facts; **bounded** in size. Scoped by `endUserId` when present, otherwise by `sessionId` (see §2.1).
 4. **Short-term**: last user/assistant turns for the **same run** or session (avoid duplicating protocol `history` if injected separately). Scoped by `sessionId`.
-5. **Visible tool catalog**: names, descriptions, `inputSchema` (only those passing SecurityLayer + agent allowlist).
+5. **Visible tool catalog**: names, descriptions, `inputSchema` — only tools in **`effectiveToolAllowlist`** (see §3). Host **SecurityLayer** should run **before** `Agent.load` if you need principal-based hiding ([08-scope-and-security.md](./08-scope-and-security.md) §3).
 6. **Skills** (optional): if the design has "modes" or per-skill instructions, short text or active ids ([12-skills.md](./12-skills.md)).
 7. **Protocol history** in a model-readable form (thought/action/observation/wait/summary) **or** mapped to `user`/`assistant` messages under a fixed convention.
 
@@ -48,14 +48,15 @@ This allows an end-user facing agent to recall facts about a returning customer 
 
 ---
 
-## 3. Security filtering
+## 3. Tool visibility and security
 
-Before serializing tools into the prompt:
+**Implemented today:** The prompt’s tool list is **`effectiveToolAllowlist`**: tools from the agent definition (**explicit `tools` + tools from resolved `skills`**) intersected with the **tool registry** and optional **`AgentRuntime.allowedToolIds`**. **`SecurityContext` is not applied inside `ContextBuilder` to hide tools** — see [08-scope-and-security.md](./08-scope-and-security.md) §2 and [technical-debt.md](../technical-debt.md) §7.
 
-1. Intersection: `agent.tools` ∩ tools in registry ∩ tools allowed by **scopes** in `SecurityContext`.
-2. Deny sensitive tools (`http_request`, `send_message`, etc.) by default if the principal lacks scope.
-3. Do not include **other projects' data** in memory blocks even if the adapter returned the wrong key: validate `projectId` in the read layer.
-4. Do not include **other end-users' data** in memory blocks: validate `endUserId` matches when loading `longTerm` / `vectorMemory`.
+**Memory blocks:** Do not surface **other projects'** or **other end-users'** data: **`MemoryAdapter`** / keying must respect **`projectId`** and **`endUserId`** ([15-multi-tenancy.md](./15-multi-tenancy.md), [05-adapters.md](./05-adapters.md)).
+
+**Host responsibility:** Authenticate and authorize **before** **`Agent.load(agentId, runtime, { session })`**; optionally narrow **`allowedToolIds`** or omit definitions so the model never sees forbidden tools.
+
+**Target (core, not shipped):** Intersect the catalog with **`SecurityContext.scopes`** and default-deny sensitive tools (e.g. `send_message`) without explicit scope — same gap as [technical-debt.md](../technical-debt.md) §7.
 
 ---
 

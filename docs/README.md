@@ -172,7 +172,7 @@ await Agent.define({
   security: { roles: ["operator", "admin"] },
 });
 // ✓ Persisted to store. No redeployment needed.
-// ✓ Any process that has access to the same store can now Agent.load("ops-analyst").
+// ✓ Any process with the same definition store + shared AgentRuntime wiring can Agent.load("ops-analyst", runtime, { session }).
 ```
 
 ### 4. Load and run
@@ -507,7 +507,7 @@ src/
 | [`core/08-scope-and-security.md`](./core/08-scope-and-security.md) | Multi-tenant scopes and SecurityLayer |
 | [`core/09-communication-multiagent.md`](./core/09-communication-multiagent.md) | MessageBus, `send_message`, request-reply patterns |
 | [`core/10-llm-adapter.md`](./core/10-llm-adapter.md) | LLMAdapter contract — multi-provider, streaming, errors |
-| [`core/11-context-builder.md`](./core/11-context-builder.md) | Prompt assembly, truncation, SecurityContext filtering |
+| [`core/11-context-builder.md`](./core/11-context-builder.md) | Prompt assembly, truncation, **effectiveToolAllowlist**; **SecurityContext** not used to filter prompt tools yet ([`08-scope-and-security.md`](./core/08-scope-and-security.md) §2) |
 | [`core/12-skills.md`](./core/12-skills.md) | Skills vs tools — resolution, model visibility, imperative execute |
 | [`core/13-errors-parsing-and-recovery.md`](./core/13-errors-parsing-and-recovery.md) | Failures, timeouts, bounded re-prompt |
 | [`core/14-consumers.md`](./core/14-consumers.md) | SDK, CLI, REST, MCP, webhooks, cron |
