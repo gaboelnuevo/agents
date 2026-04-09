@@ -203,7 +203,7 @@ Flush = one **`NormalizedInboundMessage`** with `text` built from merged lines (
 
 ## 10. Illustrative code sketch (TypeScript)
 
-Not shipped code — shows how pieces wire together. Adjust imports and `findWaitingRunId` to your `RunStore` / DB.
+**Implementation:** [`packages/conversation-gateway`](../../packages/conversation-gateway/README.md) (`@agent-runtime/conversation-gateway`) — same shape as below; adjust `findWaitingRunId` to your `RunStore` / DB.
 
 ```typescript
 import { Agent, AgentRuntime, Session, type Run } from "@agent-runtime/core";

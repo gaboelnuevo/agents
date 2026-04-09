@@ -118,6 +118,7 @@ Swap **`DemoLlm`** for **`OpenAILLMAdapter`** from **`@agent-runtime/adapters-op
 
 ## Docs
 
+- **Getting started** (tutorial, architecture summary, further reading): [`docs/getting-started.md`](docs/getting-started.md)
 - **Product / overview:** [`docs/README.md`](docs/README.md)
 - **Engine reference:** [`docs/core/README.md`](docs/core/README.md)
 - **Implementation plan:** [`docs/plan.md`](docs/plan.md)

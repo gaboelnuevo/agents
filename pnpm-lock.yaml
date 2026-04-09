@@ -154,6 +154,22 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  examples/telegram-example-mocked:
+    dependencies:
+      '@agent-runtime/conversation-gateway':
+        specifier: workspace:*
+        version: link:../../packages/conversation-gateway
+      '@agent-runtime/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      tsx:
+        specifier: ^4.19.3
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/adapters-anthropic:
     dependencies:
       '@agent-runtime/core':
@@ -206,6 +222,12 @@ importers:
       '@agent-runtime/scaffold':
         specifier: workspace:*
         version: link:../scaffold
+
+  packages/conversation-gateway:
+    dependencies:
+      '@agent-runtime/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/core: {}
 

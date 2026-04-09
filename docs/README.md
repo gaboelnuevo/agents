@@ -4,6 +4,8 @@ A **stateful agent runtime** for Node.js.
 
 Developer **monorepo** entry (packages, `pnpm` commands): [README](../README.md) at the repository root.
 
+**Getting started** (hands-on walkthrough, trade-offs, and links to the rest of the docs): [getting-started.md](./getting-started.md).
+
 > **Name TBD.** There is no final product, org, or npm scope name yet. The repository folder is a working codename only — it is **not** the intended public brand.
 
 Not a chat wrapper. Not a prompt chain. Not a graph orchestrator.

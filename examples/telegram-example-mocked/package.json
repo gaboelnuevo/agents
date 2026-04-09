@@ -1,0 +1,19 @@
+{
+  "name": "@agent-runtime/example-telegram-mocked",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Mock Telegram Bot API + webhook-shaped updates → ConversationGateway → mock sendMessage (no Telegram network).",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agent-runtime/conversation-gateway": "workspace:*",
+    "@agent-runtime/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

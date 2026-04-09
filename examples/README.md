@@ -21,6 +21,7 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | Combine **RAG** with a **custom tool**, **`Session.sessionContext`** (e.g. email), **`contact_support`**, and **`Agent.resume`** after **`wait`** (**`InMemoryRunStore`**) | [`rag-contact-support/`](./rag-contact-support/) |
 | Wire **multi-agent** messaging: **`InProcessMessageBus`**, **`system_send_message`**, request/reply | [`multi-agent/`](./multi-agent/) |
 | **Express** BFF + **browser UI** (`public/`): **`POST /v1/chat`**, **`POST /v1/chat/stream`** (SSE hooks), **`GET /status`**, run + session status, **`wait`** + **`resume`** (optional **`OPENAI_API_KEY`** / **`ANTHROPIC_API_KEY`**) | [`real-world-with-express/`](./real-world-with-express/) |
+| **Telegram-shaped** webhook updates + **`ConversationGateway`**, **mock** outbound (no `api.telegram.org`) | [`telegram-example-mocked/`](./telegram-example-mocked/) |
 
 **Notes**
 
@@ -41,6 +42,7 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | `@agent-runtime/example-multi-agent` | [`multi-agent/`](./multi-agent/) | **`InProcessMessageBus`** + **`system_send_message`**: fire-and-forget **event**, then **request** / **reply** with **`correlationId`** (mock LLM; no keys). |
 | `@agent-runtime/example-rag-contact-support` | [`rag-contact-support/`](./rag-contact-support/) | **RAG** + **`contact_support`**, **`Session.sessionContext`**, two CLI turns (KB vs ticket), **`wait`** + **`Agent.resume`** with **`InMemoryRunStore`** (scripted LLM; no keys). |
 | `@agent-runtime/example-real-world-with-express` | [`real-world-with-express/`](./real-world-with-express/) | **Express** BFF + **`public/`** HTML/JS UI: JSON chat + **SSE**, **`GET /status`**, run + session status, wait/resume; **`API_KEY`**, CORS, **`X-Request-Id`**, SIGTERM shutdown; **`InMemoryRunStore`**; mock or **OpenAI** / **Anthropic**. |
+| `@agent-runtime/example-telegram-mocked` | [`telegram-example-mocked/`](./telegram-example-mocked/) | **Mock** Telegram **`Update`** / **`Message`** → **`NormalizedInboundMessage`** → **`ConversationGateway`** → **`MockTelegramClient`** outbox (no Telegram network or bot token). |
 
 ### `minimal-run` — `@agent-runtime/example-minimal-run`
 
@@ -115,6 +117,16 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | **UI** | Static **`public/`** (`GET /`) — same-origin demo for **`/v1/*`** |
 | **Endpoints (v1)** | `POST /chat`, `POST /chat/stream`, `GET /runs/:runId`, `GET /sessions/:sessionId/status`, `POST /runs/wait-demo`, `POST /runs/:runId/resume` |
 | **Docs** | [real-world-with-express/README.md](./real-world-with-express/README.md), [real-world-with-express/.env.example](./real-world-with-express/.env.example) |
+
+### `telegram-example-mocked` — `@agent-runtime/example-telegram-mocked`
+
+| | |
+|--|--|
+| **Workspace deps** | `@agent-runtime/core`, `@agent-runtime/conversation-gateway` |
+| **Scripts** | `pnpm start` → `tsx src/main.ts`; `pnpm typecheck` |
+| **Build first** | `pnpm turbo run build --filter=@agent-runtime/core --filter=@agent-runtime/conversation-gateway` |
+| **Run** | `pnpm --filter @agent-runtime/example-telegram-mocked start` |
+| **Docs** | [telegram-example-mocked/README.md](./telegram-example-mocked/README.md) |
 
 ---
 
