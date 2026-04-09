@@ -63,6 +63,27 @@ const run = await agent.run("Say hello.");
 console.log(run.status, run.history);
 ```
 
+**Promise-style run with per-step hooks** — `agent.run(input)` returns a **`RunBuilder`**: chain observers, then resolve to a **`Run`** (inspect **`run.history`** for the final **`result`** message).
+
+```typescript
+// `agent` = await Agent.load(..., runtime, { session }) as above
+await agent
+  .run("Ticket #4412: refund still pending after 5 business days — what should we do next?")
+  .onThought((t) => console.debug("[thought]", t.content))
+  .onAction((a) => console.debug("[action]", a.tool, a.input))
+  .onObservation((o) => console.debug("[observation]", o))
+  .onWait(async (w) => {
+    // Agent paused — return a string to continue in-process, or `undefined` to stay `waiting`
+    if (w.reason === "user_input") {
+      return prompt((w.details as { question?: string })?.question ?? "");
+    }
+  })
+  .then((run) => {
+    const ended = run.history.find((h) => h.type === "result");
+    console.log("[result]", ended?.content);
+  });
+```
+
 Swap **`DemoLlm`** for **`OpenAILLMAdapter`** from **`@agent-runtime/adapters-openai`**, add **`@agent-runtime/adapters-redis`** for shared memory and **`@agent-runtime/adapters-bullmq`** for background jobs when you move past the demo.
 
 ---
