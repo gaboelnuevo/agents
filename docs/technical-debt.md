@@ -2,7 +2,7 @@
 
 English-language register of **intentional deferrals**, **plan vs implementation gaps**, and **follow-up work** for the `@agent-runtime` monorepo. It complements [`plan.md`](./plan.md) (roadmap) and [`core/19-cluster-deployment.md`](./core/19-cluster-deployment.md) (cluster patterns).
 
-**Snapshot:** Automated **CI** (`build` / `test` / `lint` on every push/PR) with a **Redis** service and **`REDIS_INTEGRATION=1`** for BullMQ integration — see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). **Per-tool timeout** (`toolTimeoutMs` on **`AgentRuntime`**, `ToolTimeoutError`), **session expiry** (`SessionOptions.expiresAtMs`, `SessionExpiredError` on **`run` / `resume` / `onWait`**), and **per-project RAG catalog** (`AgentRuntime.registerRagCatalog` / `@agent-runtime/rag`) are **implemented**. Runtime wiring is explicit: **`new AgentRuntime({ … })`** + **`Agent.load(agentId, runtime, { session })`** / **`dispatchEngineJob(runtime, payload)`** (no global runtime singleton). **Phase 9** has **broad automated coverage** in **`packages/core/tests`** (memory scope, parse recovery, runtime limits, hooks, multi-agent, rag catalog, vector caps, system_send_message policy, tool-failure observations, run-store, runtime allowlist, etc.) — see [`plan.md` — Progress snapshot](./plan.md); **still manual / optional:** full-stack **9.1** with **real OpenAI + TCP Redis** in CI, and **host-layer** checks for **§9.4**-style security stories. **Docs:** prompt tool visibility = **`effectiveToolAllowlist`**; **`SecurityContext` is not used inside `ContextBuilder.build()`** to hide tools yet ([`08-scope-and-security.md`](./core/08-scope-and-security.md) §2, [`11-context-builder.md`](./core/11-context-builder.md) §3). This file focuses on what remains. **Multi-worker races**: **§8**; **security / integrity gaps**: **§7**; **RAG example + OpenAI adapter** (durable vector, embedding timeouts/retries, `finish_reason`): **§1**, **§3**, **§6**, **§9**.
+**Snapshot:** Automated **CI** (`build` / `test` / `lint` on every push/PR) with a **Redis** service and **`REDIS_INTEGRATION=1`** for BullMQ integration — see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). **Per-tool timeout** (`toolTimeoutMs` on **`AgentRuntime`**, `ToolTimeoutError`), **session expiry** (`SessionOptions.expiresAtMs`, `SessionExpiredError` on **`run` / `resume` / `onWait`**), and **per-project RAG catalog** (`AgentRuntime.registerRagCatalog` / `@agent-runtime/rag`) are **implemented**. Runtime wiring is explicit: **`new AgentRuntime({ … })`** + **`Agent.load(agentId, runtime, { session })`** / **`dispatchEngineJob(runtime, payload)`** (no global runtime singleton). **Phase 9** has **broad automated coverage** in **`packages/core/tests`** (memory scope, parse recovery, runtime limits, hooks, multi-agent, rag catalog, vector caps, system_send_message policy, tool-failure observations, run-store, runtime allowlist, etc.) — see [`plan.md` — Progress snapshot](./plan.md); **still manual / optional:** full-stack **9.1** with **real OpenAI + TCP Redis** in CI, and **host-layer** checks for **§9.4**-style security stories. **Docs:** prompt tool visibility = **`effectiveToolAllowlist`**; **`SecurityContext` is not used inside `ContextBuilder.build()`** to hide tools yet ([`08-scope-and-security.md`](./core/08-scope-and-security.md) §2, [`11-context-builder.md`](./core/11-context-builder.md) §3). This file focuses on what remains. **Multi-worker races**: **§8**; **security / integrity gaps**: **§7**; **RAG example + OpenAI adapter** (durable vector, embedding timeouts/retries, `finish_reason`): **§1**, **§3**, **§6**, **§9**; **open source / community** (license, contributing, security policy): **§10**.
 
 ---
 
@@ -135,9 +135,25 @@ Canonical narrative: [08-scope-and-security.md §7](./core/08-scope-and-security
 
 ---
 
+## 10. Open source and community
+
+Items expected for a **public** OSS project (adoption, legal clarity, responsible disclosure). **CI** is already in place ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)); the rest is **not** a substitute for **§7** / **§9** (runtime security stays in the host).
+
+| Item | Notes |
+|------|--------|
+| **Root `LICENSE`** | No canonical license file at repo root yet — add one (e.g. MIT, Apache-2.0) before publishing as OSS; match **SPDX** id in published packages. |
+| **`license` in `package.json`** | Workspace packages should declare **`"license"`** (and keep **private** vs **publish** flags consistent) for anything shipped to **npm** or other registries. |
+| **`CONTRIBUTING.md`** | How to clone, **`pnpm install`**, **`build` / `test` / `lint`**, branch/PR expectations, scope of the monorepo — lowers friction for external contributors. |
+| **`SECURITY.md`** | Vulnerability reporting path (e.g. GitHub **Security** → **Advisories**, or a dedicated security contact); separate from [`08-scope-and-security.md`](./core/08-scope-and-security.md) (engine semantics). |
+| **`CODE_OF_CONDUCT.md`** | Optional but standard for community-run repos (e.g. Contributor Covenant). |
+| **Releases and semver** | **`CHANGELOG.md`** and/or GitHub **Releases** when publishing versioned packages; align with **§1** adapter/API stability expectations. |
+| **Issue / PR templates** | Optional: bug vs feature, Node/pnpm versions — reduces incomplete reports. |
+
+---
+
 ## How to use this document
 
 - **Triaging:** Prefer turning items into tracked issues with owners.
 - **Closing entries:** Remove or move to “Done” only when the codebase or tests actually reflect the fix (not when docs alone change).
 
-Last updated **2026-04-08** — **`@agent-runtime/adapters-openai`:** **`finish_reason`** mapping, embedding **`fetchTimeoutMs`** / **`signal`**, and response-derived **`dimensions`** (see **§3**). Repository roadmap: [`plan.md` — Progress snapshot](./plan.md).
+Last updated **2026-04-08** — **`@agent-runtime/adapters-openai`:** **`finish_reason`** mapping, embedding **`fetchTimeoutMs`** / **`signal`**, and response-derived **`dimensions`** (see **§3**); **§10** open-source checklist (LICENSE, CONTRIBUTING, SECURITY, CoC, releases). Repository roadmap: [`plan.md` — Progress snapshot](./plan.md).
