@@ -10,6 +10,24 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 
 ---
 
+## Choosing an example (usage cases)
+
+| If you want to… | Start here |
+|-----------------|------------|
+| See the **smallest** **`Agent.run()`** loop with a **mock LLM**, no network or keys | [`minimal-run/`](./minimal-run/) |
+| Use **OpenAI** with **tools + skills** and **`Tool.define`** in a real provider setup | [`openai-tools-skill/`](./openai-tools-skill/) (needs **`OPENAI_API_KEY`**) |
+| Learn **`wait`** and **continue in the same process** via **`RunBuilder.onWait`** (e.g. CLI) | [`console-wait/`](./console-wait/) |
+| Learn **RAG only**: **catalog**, **`system_ingest_rag_source`**, **`system_vector_search`**, demo embeddings | [`rag/`](./rag/) |
+| Combine **RAG** with a **custom tool**, **`Session.sessionContext`** (e.g. email), **`contact_support`**, and **`Agent.resume`** after **`wait`** (**`InMemoryRunStore`**) | [`rag-contact-support/`](./rag-contact-support/) |
+| Wire **multi-agent** messaging: **`InProcessMessageBus`**, **`system_send_message`**, request/reply | [`multi-agent/`](./multi-agent/) |
+
+**Notes**
+
+- **`rag-contact-support`** runs **two** user turns (warranty-style KB question, then a refund/ticket scenario), uses a **scripted LLM** (no API keys), and is best run **interactively** in a terminal (see [rag-contact-support/README.md](./rag-contact-support/README.md)).
+- For **`wait` + `resume`** across separate workers or processes, pair a **`RunStore`** (Redis, etc.) with the same **`Agent.resume(runId, …)`** pattern shown in that example; see [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md).
+
+---
+
 ## Inventory (all examples)
 
 | Package | Directory | Summary |
@@ -19,7 +37,7 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | `@agent-runtime/example-console-wait` | [`console-wait/`](./console-wait/) | Interactive **terminal**: mock LLM emits **`wait`**, **`RunBuilder.onWait`** reads stdin (`readline`), then continues in-process. No API keys. |
 | `@agent-runtime/example-rag` | [`rag/`](./rag/) | **`registerRagCatalog(runtime, …)`** (per project) + **`system_ingest_rag_source`** / **`system_vector_search`**; in-memory vector + hash embeddings (no API keys); optional OpenAI script. |
 | `@agent-runtime/example-multi-agent` | [`multi-agent/`](./multi-agent/) | **`InProcessMessageBus`** + **`system_send_message`**: fire-and-forget **event**, then **request** / **reply** with **`correlationId`** (mock LLM; no keys). |
-| `@agent-runtime/example-rag-contact-support` | [`rag-contact-support/`](./rag-contact-support/) | **RAG** + custom **`contact_support`** tool: ingest handbook, **`system_vector_search`**, demo ticket (scripted LLM; no keys). |
+| `@agent-runtime/example-rag-contact-support` | [`rag-contact-support/`](./rag-contact-support/) | **RAG** + **`contact_support`**, **`Session.sessionContext`**, two CLI turns (KB vs ticket), **`wait`** + **`Agent.resume`** with **`InMemoryRunStore`** (scripted LLM; no keys). |
 
 ### `minimal-run` — `@agent-runtime/example-minimal-run`
 
@@ -79,7 +97,7 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@agent-
 | **Workspace deps** | `@agent-runtime/core`, `@agent-runtime/rag` |
 | **Scripts** | `pnpm start` → `tsx src/main.ts`; `pnpm typecheck` |
 | **Build first** | `pnpm turbo run build --filter=@agent-runtime/core --filter=@agent-runtime/rag` |
-| **Run** | `pnpm --filter @agent-runtime/example-rag-contact-support start` |
+| **Run** | `pnpm --filter @agent-runtime/example-rag-contact-support start` (**interactive** terminal recommended) |
 | **Docs** | [rag-contact-support/README.md](./rag-contact-support/README.md) |
 
 ---
@@ -90,8 +108,8 @@ Prioritize by what you want to teach (operators vs integrators). None of these e
 
 ### Engine loop & lifecycle
 
-- [ ] **`wait` + `resume`** — `Run` pauses with `wait`; **`AgentRuntime`** with **`runStore`** (`InMemoryRunStore` or **`RedisRunStore`**); second process or same script calls `Agent.resume` (see [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md)).
-- [x] **`RunBuilder.onWait`** (in-process) — covered by [`console-wait/`](./console-wait/) (stdin). **`runStore` + `resume`** across workers remains in the item above.
+- [x] **`wait` + `resume` (same process)** — [`rag-contact-support/`](./rag-contact-support/) uses **`InMemoryRunStore`** and **`Agent.resume(runId, { type: "text", content })`** after **`wait`**. A **second worker or HTTP handler** resuming the same run ID with a shared **`RedisRunStore`** (or similar) is still a good dedicated example; see [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md).
+- [x] **`RunBuilder.onWait`** (in-process) — covered by [`console-wait/`](./console-wait/) (stdin).
 - [ ] **Session expiry** — `Session({ expiresAtMs })` + **`SessionExpiredError`** on `run` / `resume` after expiry.
 - [ ] **Hooks + `watchUsage`** — `onThought` / `onAction` logging; token totals and “wasted” tokens after failed parses.
 
