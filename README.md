@@ -4,6 +4,8 @@ TypeScript **monorepo**: **`@opencoreagents/*`** in **`packages/`**, consumed vi
 
 **Production-shaped agent backends in TypeScript**—so you ship **APIs and workers** your team can own, not a demo script that dies on the first timeout.
 
+**Using Cursor, Claude Code, Codex, or similar?** Point them at **[`@opencoreagents/code-skills`](packages/code-skills/README.md)** (`SKILL.md` packs for this repo’s engine, REST/RAG, and layout)—see [Coding assistant skill packs](#coding-assistant-skill-packs) and the [table below](#assistant-skills-cursor--claude--codex).
+
 Stop hand-rolling the same glue: a **typed agent loop** (`thought` → `action` → `observation` → `result`, plus **`wait` / `resume`**), **tools and RAG**, **shared memory and run state**, and **BullMQ** execution.
 
 There is also an optional path where **prompts and tool configs live in Redis** and update **without redeploying workers**. Plug in OpenAI, Anthropic, Redis, Upstash, Express—**no global singleton** hiding who runs what.
@@ -21,7 +23,7 @@ There is also an optional path where **prompts and tool configs live in Redis** 
 - [How it works](#how-it-works)
 - [Packages](#packages)
 - [Examples](#examples)
-- [Docs](#docs) (includes [Planning](#planning))
+- [Docs](#docs) (includes [Planning](#planning) and [coding assistant skill packs](#coding-assistant-skill-packs))
 - [Develop](#develop)
 - [License](#license)
 
@@ -255,7 +257,7 @@ Your **HTTP control plane** (Express or any framework) typically **writes defini
 
 | Package | Role |
 |---------|------|
-| [`@opencoreagents/code-skills`](packages/code-skills/README.md) | **`SKILL.md`** packs so coding assistants know how to use this monorepo’s libraries and docs (not engine `Skill.define`) |
+| [`@opencoreagents/code-skills`](packages/code-skills/README.md) | **`SKILL.md`** skill trees under `packages/code-skills/skills/<id>/` (after `pnpm build --filter=@opencoreagents/code-skills`, or `dist/skills/<id>/` when published) — workspace map, engine, REST/workers, RAG. **Not** runtime `Skill.define`; see [Coding assistant skill packs](#coding-assistant-skill-packs). |
 
 ---
 
@@ -299,6 +301,10 @@ Your **HTTP control plane** (Express or any framework) typically **writes defini
 
 - [`docs/core/README.md`](docs/core/README.md) — engine reference
 - [`docs/planning/scaffold.md`](docs/planning/scaffold.md) — monorepo layout
+
+### Coding assistant skill packs
+
+[`packages/code-skills/README.md`](packages/code-skills/README.md) (**[`@opencoreagents/code-skills`](packages/code-skills/README.md)**) ships **agent-oriented** markdown for IDEs: each `skills/<id>/SKILL.md` bundles focused instructions and a subset of `docs/` (and package README stubs) so assistants stay aligned with **`@opencoreagents/*`**. Skill ids include **`opencoreagents-workspace`**, **`opencoreagents-engine`**, **`opencoreagents-rest-workers`**, and **`opencoreagents-rag-dynamic`**. From a clone, run **`pnpm build --filter=@opencoreagents/code-skills`** so generated `docs/` / `packages/` folders exist next to each skill; from a registry install, use paths under **`node_modules/.../dist/skills/<id>/`**.
 
 **APIs and dynamic config**
 
