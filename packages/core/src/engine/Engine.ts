@@ -89,8 +89,9 @@ export function createRun(
   agentId: string,
   sessionId: string | undefined,
   userInput: string,
+  projectId?: string,
 ): Run {
-  return {
+  const run: Run = {
     runId: randomUUID(),
     agentId,
     sessionId,
@@ -103,6 +104,10 @@ export function createRun(
       userInput,
     },
   };
+  if (projectId !== undefined && projectId !== "") {
+    run.projectId = projectId;
+  }
+  return run;
 }
 
 /**

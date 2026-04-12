@@ -9,7 +9,7 @@
 | Doc | Topic |
 |-----|--------|
 | [`plan-cli.md`](./plan-cli.md) | **`@opencoreagents/cli`**: scaffold (done) vs future **`run` / `resume` / memory / logs**. |
-| [`plan-rest.md`](./plan-rest.md) | **HTTP/JSON API** — endpoints, async jobs, tenancy. |
+| [`plan-rest.md`](./plan-rest.md) | **HTTP/JSON** — vision + **`@opencoreagents/rest-api`** (`createRuntimeRestRouter`), async **`dispatch`**, tenancy, gaps. |
 | [`plan-mcp.md`](./plan-mcp.md) | **Model Context Protocol** — MCP server as channel over SDK or REST. |
 
 **Runnable examples:** [`examples/minimal-run`](../examples/minimal-run/) (mock LLM, **`AgentRuntime`**, no keys); [`examples/openai-tools-skill`](../examples/openai-tools-skill/) (`OpenAILLMAdapter` + tool + skill, **`OPENAI_API_KEY`**); [`examples/console-wait`](../examples/console-wait/) (**`onWait`** + stdin); [`examples/rag`](../examples/rag/) (**`registerRagToolsAndSkills`**, **`registerRagCatalog(runtime, …)`**, **`system_ingest_rag_source`** / **`system_vector_search`**; optional **`start:openai`**); [`examples/rag-contact-support`](../examples/rag-contact-support/) (same RAG stack + custom **`contact_support`** tool, scripted LLM).

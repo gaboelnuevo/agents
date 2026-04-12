@@ -1,10 +1,39 @@
 /**
  * Express **host** in front of **AgentRuntime**: one process-global runtime, JSON API, optional OpenAI or Anthropic.
  *
- * “Real” touches here (not in the engine): **CORS**, **security headers**, **`public/`** static UI, **X-Request-Id**, optional
- * **`API_KEY`** bearer auth on **`/v1/*`**, **SSE** (`POST /v1/chat/stream`), **`GET /status`**, **`GET /v1/runs/:runId`**, **`GET /v1/sessions/:sessionId/status`** (per-run **`userInput`**, **`historyStepCount`**, optional **`?detail=1`**), **404**, **graceful shutdown**.
- * Still not multi-tenant authZ —
- * see docs/core/08-scope-and-security.md.
+ * ## Routes in *this* example (shape is **not** `docs/plan-rest.md`)
+ *
+ * Use **`@opencoreagents/rest-api`** + **`createRuntimeRestRouter`** when you want the documented contract
+ * (`GET /agents`, `POST /agents/:id/run`, `GET /runs/:id/history`, `POST /agents/:from/send`, …). This file is a
+ * **custom BFF**: chat-first URLs, SSE, and session-scoped dashboards.
+ *
+ * | Area | Method | Path | Role |
+ * |------|--------|------|------|
+ * | Public | GET | `/health` | LLM env + whether `/v1` needs `API_KEY` |
+ * | Public | GET | `/status` | Uptime, PID, Node version (probe-friendly) |
+ * | Public | GET | `/` | Static UI (`public/`) |
+ * | `/v1` | POST | `/v1/chat` | Body `{ message, sessionId? }` → `Agent.run` (blocking JSON) |
+ * | `/v1` | POST | `/v1/chat/stream` | Same body → **SSE** (`step`, `observation`, `done`) via run hooks |
+ * | `/v1` | GET | `/v1/runs/:runId?sessionId=` | Load run; **`history`** = display timeline (see below) |
+ * | `/v1` | GET | `/v1/sessions/:sessionId/status` | All runs for session (both agents); **`?light=1`** drops per-run **`history`** |
+ * | `/v1` | POST | `/v1/runs/wait-demo` | Starts wait/resume demo run; **202** + `resumeWith` when `waiting` |
+ * | `/v1` | POST | `/v1/runs/:runId/resume` | Body `{ sessionId, text }` → `Agent.resume` (not `resumeInput: { type, content }` like plan-rest) |
+ *
+ * Optional **`Authorization: Bearer <API_KEY>`** on **`/v1/*`** only. Fixed **`PROJECT_ID`** (no `X-Project-Id` flow).
+ *
+ * ## `history` vs **`Run.history`** vs plan-rest
+ *
+ * - **Persisted store:** `RunStore` holds the engine’s **`Run.history`** (`ProtocolMessage[]`) — same as core.
+ * - **Resume text** lives in **`run.state.resumeInputs`**, *not* as normal history rows; the UI would miss it if we
+ *   only echoed raw `history`.
+ * - **`historyWithResumeTimeline()`** here builds a **client-facing** timeline: after each **`wait`** step it inserts a
+ *   synthetic **`observation`** (`{ kind: "resume_input", text }`) so chat UIs show user follow-ups between wait and result.
+ *   That merged array is **not** written back to the store.
+ * - **plan-rest** instead exposes raw steps on **`GET /runs/:runId/history`** (library router) and a compact snapshot on
+ *   **`GET /runs/:runId`** (`historyStepCount`, no inlined resume timeline). This example does **not** mount that router.
+ *
+ * “Real” host touches (not in the engine): **CORS**, **security headers**, **`public/`**, **X-Request-Id**, **404** JSON,
+ * **graceful shutdown**. Still not multi-tenant authZ — see `docs/core/08-scope-and-security.md`.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";

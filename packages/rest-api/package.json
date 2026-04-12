@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Express router: plan-rest-shaped JSON API — inline Agent.run or optional BullMQ dispatch (like dynamic-runtime-rest)",
+  "description": "Express router: JSON API for Agent.run/resume and optional BullMQ dispatch (like dynamic-runtime-rest)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

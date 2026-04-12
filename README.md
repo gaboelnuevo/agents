@@ -102,7 +102,7 @@ Swap **`DemoLlm`** for **`OpenAILLMAdapter`** from **`@opencoreagents/adapters-o
 | `@opencoreagents/utils` | Parsers, chunking, file resolver |
 | `@opencoreagents/rag` | File/RAG tools + skills |
 | `@opencoreagents/conversation-gateway` | Normalized inbound messages + gateway helpers for webhooks |
-| `@opencoreagents/rest-api` | Express **`createPlanRestRouter`** — plan-rest-shaped JSON API after **`Agent.define`** ([`docs/plan-rest.md`](docs/plan-rest.md)) |
+| `@opencoreagents/rest-api` | Express **`createRuntimeRestRouter`** — JSON routes per [`docs/plan-rest.md`](docs/plan-rest.md) after **`Agent.define`** |
 | `@opencoreagents/scaffold` | Programmatic project generation |
 | `@opencoreagents/cli` | `runtime` CLI (`init`, `generate`, …) |
 

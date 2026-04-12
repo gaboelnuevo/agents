@@ -1,16 +1,22 @@
 /**
- * OpenAPI 3.0 document for **plan-rest** routes (for Swagger UI / codegen).
+ * OpenAPI 3.0 document for **`createRuntimeRestRouter`** routes (Swagger UI / codegen).
  */
-export interface PlanRestOpenApiInput {
+import { RUNTIME_REST_ENGINE_ERROR_CODES } from "./engineErrorHttp.js";
+
+export interface RuntimeRestOpenApiInput {
   /** **`POST` run/resume** enqueue to BullMQ when true. */
   hasDispatch: boolean;
+  /** **`GET /agents/{agentId}/memory`** when **`runtime`** is set on the router (default **false**). */
+  hasMemoryRead?: boolean;
+  /** **`POST /agents/{fromAgentId}/send`** when **`runtime`** is set (**501** if **`AgentRuntime`** has no **`messageBus`**). */
+  hasInterAgentSend?: boolean;
   /** **`GET /runs`** and inline **`resume`** available. */
   hasRunStore: boolean;
   /** Clients must send tenant via header/query/body (no fixed **`projectId`** in router options). */
   multiProject: boolean;
   /** **`apiKey`** option is set on the router. */
   hasApiKey: boolean;
-  /** `info.title` (default **Plan REST API**). */
+  /** `info.title` (default **Runtime REST API**). */
   title?: string;
   /** `info.version` (default **0.0.0**). */
   version?: string;
@@ -26,13 +32,14 @@ function securitySchemes(
     bearerAuth: {
       type: "http",
       scheme: "bearer",
-      description: "Same value as router `apiKey` — `Authorization: Bearer <key>`",
+      description:
+        "Same secret the router expects (`apiKey` or `resolveApiKey`) — `Authorization: Bearer <key>`",
     },
     ApiKeyAuth: {
       type: "apiKey",
       in: "header",
       name: "X-Api-Key",
-      description: "Alternative to Bearer — same secret as `apiKey` option",
+      description: "Alternative to Bearer — same secret as `apiKey` / `resolveApiKey`",
     },
   };
 }
@@ -51,14 +58,43 @@ function compactResponses(responses: Record<string, unknown>): Record<string, un
   return responses;
 }
 
+function runtimeRestJsonErrorSchema(): Record<string, unknown> {
+  const known = [...RUNTIME_REST_ENGINE_ERROR_CODES].join(", ");
+  return {
+    type: "object",
+    required: ["error"],
+    properties: {
+      error: { type: "string" },
+      code: {
+        type: "string",
+        description: `When present, failure came from an EngineError via mapEngineErrorToHttp. Known mapped codes: ${known}. Other values may appear (e.g. new engine types default to HTTP 500).`,
+      },
+    },
+  };
+}
+
+/** Standard JSON error body: \`{ error }\` from the router; optional \`code\` for mapped engine failures. */
+function jsonErr(description: string): Record<string, unknown> {
+  return {
+    description,
+    content: {
+      "application/json": {
+        schema: { $ref: "#/components/schemas/RuntimeRestJsonError" },
+      },
+    },
+  };
+}
+
 /** Build a plain JSON-serializable OpenAPI 3.0 object. */
-export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<string, unknown> {
+export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Record<string, unknown> {
   const {
     hasDispatch,
+    hasMemoryRead = false,
+    hasInterAgentSend = false,
     hasRunStore,
     multiProject,
     hasApiKey,
-    title = "Plan REST API",
+    title = "Runtime REST API",
     version = "0.0.0",
     description = "",
   } = input;
@@ -79,10 +115,26 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
   }
 
   const runPostResponses: Record<string, unknown> = {
-    "400": { description: "Bad request (e.g. missing message)" },
-    "401": hasApiKey ? { description: "Missing or invalid API key" } : undefined,
-    "403": { description: "Unknown project (allowlist)" },
-    "404": { description: "Unknown agent" },
+    "400": jsonErr(
+      hasDispatch
+        ? "Bad request (e.g. missing message)"
+        : "Bad request (e.g. missing message) or engine STEP_SCHEMA_ERROR / TOOL_VALIDATION_ERROR",
+    ),
+    "401": hasApiKey
+      ? jsonErr(
+          hasDispatch
+            ? "Missing or invalid API key"
+            : "Missing or invalid API key or engine SESSION_EXPIRED",
+        )
+      : hasDispatch
+        ? undefined
+        : jsonErr("Engine SESSION_EXPIRED"),
+    "403": jsonErr(
+      hasDispatch
+        ? "Unknown project (allowlist)"
+        : "Unknown project (allowlist) or engine SECURITY_DENIED / TOOL_NOT_ALLOWED",
+    ),
+    "404": jsonErr("Unknown agent"),
     "501": hasDispatch
       ? { description: "wait=1 without queueEvents on router" }
       : undefined,
@@ -103,6 +155,7 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
               properties: {
                 jobId: { type: "string" },
                 sessionId: { type: "string" },
+                projectId: { type: "string" },
                 runId: { type: "string" },
                 status: { type: "string" },
                 reply: { type: "string" },
@@ -117,10 +170,11 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
           "application/json": {
             schema: {
               type: "object",
-              required: ["jobId", "sessionId", "statusUrl"],
+              required: ["jobId", "sessionId", "projectId", "statusUrl"],
               properties: {
                 jobId: { type: "string" },
                 sessionId: { type: "string" },
+                projectId: { type: "string" },
                 statusUrl: { type: "string" },
                 pollUrl: { type: "string" },
               },
@@ -140,6 +194,7 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
               properties: {
                 sessionId: { type: "string" },
                 runId: { type: "string" },
+                projectId: { type: "string" },
                 status: { type: "string" },
                 reply: { type: "string" },
                 resumeHint: { type: "object" },
@@ -148,7 +203,12 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
           },
         },
       },
-      "500": { description: "Engine error" },
+      "409": jsonErr("RUN_INVALID_STATE / RUN_CANCELLED"),
+      "410": jsonErr("ENGINE_JOB_EXPIRED"),
+      "429": jsonErr("LLM_RATE_LIMIT"),
+      "502": jsonErr("LLM_TRANSPORT_ERROR / LLM_CLIENT_ERROR / TOOL_EXECUTION_ERROR"),
+      "504": jsonErr("RUN_TIMEOUT / TOOL_TIMEOUT"),
+      "500": jsonErr("MAX_ITERATIONS_EXCEEDED, other EngineError, or non-engine failure"),
     });
   }
 
@@ -176,11 +236,148 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
               },
             },
           },
-          "400": { description: "Missing projectId (multi-tenant mode)" },
-          "401": hasApiKey ? { description: "Unauthorized" } : undefined,
+          "400": jsonErr("Missing projectId (multi-tenant mode)"),
+          "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
         }),
       },
     },
+    ...(hasMemoryRead
+      ? {
+          "/agents/{agentId}/memory": {
+            get: {
+              summary: "Query stored memory by type",
+              description:
+                "Calls `MemoryAdapter.query` with `MemoryScope` — same partition as `system_save_memory` / `system_get_memory`. **Only when the router has `runtime`.**",
+              tags: ["Memory"],
+              parameters: [
+                { name: "agentId", in: "path", required: true, schema: { type: "string" } },
+                {
+                  name: "sessionId",
+                  in: "query",
+                  required: true,
+                  schema: { type: "string" },
+                },
+                {
+                  name: "memoryType",
+                  in: "query",
+                  required: true,
+                  schema: { type: "string" },
+                  description: "e.g. `working`, `shortTerm`, `longTerm` — adapter-defined",
+                },
+                {
+                  name: "endUserId",
+                  in: "query",
+                  required: false,
+                  schema: { type: "string" },
+                  description: "Optional `MemoryScope.endUserId` for partitioned long-term memory",
+                },
+                ...tenantParams,
+              ],
+              responses: compactResponses({
+                "200": {
+                  description: "OK",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "object",
+                        required: ["projectId", "agentId", "sessionId", "memoryType", "items"],
+                        properties: {
+                          projectId: { type: "string" },
+                          agentId: { type: "string" },
+                          sessionId: { type: "string" },
+                          memoryType: { type: "string" },
+                          endUserId: { type: "string" },
+                          items: { type: "array", items: {} },
+                        },
+                      },
+                    },
+                  },
+                },
+                "400": jsonErr("Missing sessionId or memoryType"),
+                "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
+                "404": jsonErr("Unknown agent"),
+                "500": jsonErr("Adapter or internal error"),
+              }),
+            },
+          },
+        }
+      : {}),
+    ...(hasInterAgentSend
+      ? {
+          "/agents/{fromAgentId}/send": {
+            post: {
+              summary: "Send MessageBus message (system_send_message semantics)",
+              description:
+                "Delivers to **`MessageBus.send`** — same shape as tool **`system_send_message`**. **501** when the router’s **`AgentRuntime`** has no **`config.messageBus`**. Optional **`sendMessageTargetPolicy`** on the runtime can deny targets (**403**).",
+              tags: ["Messaging"],
+              parameters: [
+                { name: "fromAgentId", in: "path", required: true, schema: { type: "string" } },
+                ...tenantParams,
+              ],
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["toAgentId", "payload"],
+                      properties: {
+                        toAgentId: { type: "string" },
+                        payload: { description: "Any JSON value" },
+                        type: { type: "string", enum: ["event", "request", "reply"], default: "event" },
+                        correlationId: {
+                          type: "string",
+                          description: "Required when `type` is `request` or `reply`",
+                        },
+                        sessionId: { type: "string", description: "Optional `AgentMessage.sessionId`" },
+                        endUserId: {
+                          type: "string",
+                          description: "Optional — forwarded to `sendMessageTargetPolicy` only",
+                        },
+                        ...(multiProject
+                          ? {
+                              projectId: {
+                                type: "string",
+                                description: "Ignored for tenancy — use header / query; effective tenant is from router",
+                              },
+                            }
+                          : {}),
+                      },
+                    },
+                  },
+                },
+              },
+              responses: compactResponses({
+                "200": {
+                  description: "Accepted for delivery",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "object",
+                        required: ["projectId", "fromAgentId", "toAgentId", "type", "success"],
+                        properties: {
+                          projectId: { type: "string" },
+                          fromAgentId: { type: "string" },
+                          toAgentId: { type: "string" },
+                          type: { type: "string" },
+                          correlationId: { type: "string" },
+                          success: { type: "boolean" },
+                        },
+                      },
+                    },
+                  },
+                },
+                "400": jsonErr("Invalid body (e.g. self-send, missing correlationId for request/reply)"),
+                "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
+                "403": jsonErr("sendMessageTargetPolicy denied the destination"),
+                "404": jsonErr("Unknown sending agent (path)"),
+                "501": jsonErr("messageBus missing on AgentRuntime"),
+                "500": jsonErr("MessageBus or internal error"),
+              }),
+            },
+          },
+        }
+      : {}),
     "/agents/{agentId}/run": {
       post: {
         summary: hasDispatch ? "Run agent (enqueue or wait)" : "Run agent (inline)",
@@ -229,25 +426,98 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
     },
   };
 
-  const resumeResponses: Record<string, unknown> = compactResponses({
-    "400": { description: "Bad request" },
-    "401": hasApiKey ? { description: "Unauthorized" } : undefined,
-    "404": { description: "Unknown agent" },
+  const resumeResponses: Record<string, unknown> = {
     "501": { description: "runStore (inline) or queueEvents (wait)" },
-  });
+    "404": jsonErr("Unknown agent"),
+  };
   if (hasDispatch) {
+    Object.assign(
+      resumeResponses,
+      compactResponses({
+        "400": jsonErr("Bad request"),
+        "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
+      }),
+    );
     Object.assign(resumeResponses, {
-      "200": { description: "wait=1 completed" },
-      "202": { description: "Resume job enqueued" },
+      "200": {
+        description: "wait=1 completed",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                jobId: { type: "string" },
+                sessionId: { type: "string" },
+                projectId: { type: "string" },
+                runId: { type: "string" },
+                status: { type: "string" },
+                reply: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      "202": {
+        description: "Resume job enqueued",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["jobId", "sessionId", "runId", "projectId", "statusUrl"],
+              properties: {
+                jobId: { type: "string" },
+                sessionId: { type: "string" },
+                runId: { type: "string" },
+                projectId: { type: "string" },
+                statusUrl: { type: "string" },
+                pollUrl: { type: "string" },
+              },
+            },
+          },
+        },
+      },
       "502": { description: "Job failed" },
       "503": { description: "Enqueue error" },
       "504": { description: "Wait timeout" },
     });
   } else {
+    Object.assign(
+      resumeResponses,
+      compactResponses({
+        "400": jsonErr("Invalid body or non-engine resume failure"),
+        "401": hasApiKey
+          ? jsonErr("Missing or invalid API key or engine SESSION_EXPIRED")
+          : jsonErr("Engine SESSION_EXPIRED"),
+      }),
+    );
     Object.assign(resumeResponses, {
-      "200": { description: "OK" },
+      "200": {
+        description: "OK",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                sessionId: { type: "string" },
+                runId: { type: "string" },
+                projectId: { type: "string" },
+                status: { type: "string" },
+                reply: { type: "string" },
+                resumeHint: { type: "object" },
+              },
+            },
+          },
+        },
+      },
+      "409": jsonErr("RUN_INVALID_STATE / RUN_CANCELLED"),
+      "410": jsonErr("ENGINE_JOB_EXPIRED"),
+      "429": jsonErr("LLM_RATE_LIMIT"),
+      "502": jsonErr("LLM_TRANSPORT_ERROR / LLM_CLIENT_ERROR / TOOL_EXECUTION_ERROR"),
+      "504": jsonErr("RUN_TIMEOUT / TOOL_TIMEOUT"),
+      "500": jsonErr("MAX_ITERATIONS_EXCEEDED, other EngineError, or non-engine failure"),
     });
   }
+  compactResponses(resumeResponses);
 
   paths["/agents/{agentId}/resume"] = {
     post: {
@@ -297,6 +567,76 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
   };
 
   if (hasRunStore) {
+    paths["/agents/{agentId}/runs"] = {
+      get: {
+        summary: "List runs for an agent (RunStore.listByAgent)",
+        description:
+          "Dashboard-style summaries (`historyStepCount`, optional `reply`) — not a full step log. Rows with **`run.projectId`** set are omitted when it disagrees with the effective tenant. **`RunStore`** indexes by **`agentId`** only (e.g. Redis **`run:agent:{id}`**) — shared stores need globally unique agent ids or per-tenant backends.",
+        tags: ["Runs"],
+        parameters: [
+          { name: "agentId", in: "path", required: true, schema: { type: "string" } },
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["running", "waiting", "completed", "failed"] },
+          },
+          {
+            name: "sessionId",
+            in: "query",
+            required: false,
+            schema: { type: "string" },
+            description: "If set, only runs with this `sessionId`",
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+          },
+          ...tenantParams,
+        ],
+        responses: compactResponses({
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["projectId", "agentId", "limit", "runs"],
+                  properties: {
+                    projectId: { type: "string" },
+                    agentId: { type: "string" },
+                    limit: { type: "integer" },
+                    runs: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          runId: { type: "string" },
+                          agentId: { type: "string" },
+                          sessionId: { type: "string" },
+                          projectId: { type: "string" },
+                          status: { type: "string" },
+                          iteration: { type: "number" },
+                          historyStepCount: { type: "number" },
+                          userInput: { type: "string" },
+                          reply: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": jsonErr("Invalid status filter"),
+          "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
+          "404": jsonErr("Unknown agent"),
+          "500": jsonErr("RunStore or internal error"),
+        }),
+      },
+    };
     paths["/runs/{runId}"] = {
       get: {
         summary: "Get run snapshot from RunStore",
@@ -312,11 +652,96 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
           ...tenantParams,
         ],
         responses: compactResponses({
-          "200": { description: "OK" },
-          "400": { description: "Missing sessionId" },
-          "401": hasApiKey ? { description: "Unauthorized" } : undefined,
-          "403": { description: "sessionId mismatch" },
-          "404": { description: "Run not found" },
+          "200": {
+            description: "Run snapshot (`projectId` when stored on the run — see `@opencoreagents/core` Run)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    runId: { type: "string" },
+                    agentId: { type: "string" },
+                    sessionId: { type: "string" },
+                    projectId: { type: "string" },
+                    status: { type: "string" },
+                    userInput: { type: "string" },
+                    reply: { type: "string" },
+                    iteration: { type: "number" },
+                    historyStepCount: { type: "number" },
+                  },
+                },
+              },
+            },
+          },
+          "400": jsonErr("Missing sessionId"),
+          "401": hasApiKey
+            ? jsonErr("Unauthorized or engine SESSION_EXPIRED")
+            : jsonErr("Engine SESSION_EXPIRED"),
+          "403": jsonErr(
+            "sessionId mismatch, effective projectId mismatch vs run.projectId, or engine SECURITY_DENIED / TOOL_NOT_ALLOWED",
+          ),
+          "404": jsonErr("Run not found"),
+          "409": jsonErr("RUN_INVALID_STATE / RUN_CANCELLED"),
+          "410": jsonErr("ENGINE_JOB_EXPIRED"),
+          "429": jsonErr("LLM_RATE_LIMIT"),
+          "502": jsonErr("LLM_TRANSPORT_ERROR / LLM_CLIENT_ERROR / TOOL_EXECUTION_ERROR"),
+          "504": jsonErr("RUN_TIMEOUT / TOOL_TIMEOUT"),
+          "500": jsonErr("MAX_ITERATIONS_EXCEEDED, other EngineError, or non-engine failure"),
+        }),
+      },
+    };
+    paths["/runs/{runId}/history"] = {
+      get: {
+        summary: "Get run history (Run.history ProtocolMessage[])",
+        description:
+          "Full step log from **`RunStore`** — same **`?sessionId=`** and **`run.projectId`** vs effective tenant rules as **`GET /runs/{runId}`**.",
+        tags: ["Runs"],
+        parameters: [
+          { name: "runId", in: "path", required: true, schema: { type: "string" } },
+          {
+            name: "sessionId",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+          },
+          ...tenantParams,
+        ],
+        responses: compactResponses({
+          "200": {
+            description: "OK — `history` is `ProtocolMessage[]` from `@opencoreagents/core`",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    runId: { type: "string" },
+                    agentId: { type: "string" },
+                    sessionId: { type: "string" },
+                    projectId: { type: "string" },
+                    status: { type: "string" },
+                    history: {
+                      type: "array",
+                      items: { type: "object", additionalProperties: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": jsonErr("Missing sessionId"),
+          "401": hasApiKey
+            ? jsonErr("Unauthorized or engine SESSION_EXPIRED")
+            : jsonErr("Engine SESSION_EXPIRED"),
+          "403": jsonErr(
+            "sessionId mismatch, effective projectId mismatch vs run.projectId, or engine SECURITY_DENIED / TOOL_NOT_ALLOWED",
+          ),
+          "404": jsonErr("Run not found"),
+          "409": jsonErr("RUN_INVALID_STATE / RUN_CANCELLED"),
+          "410": jsonErr("ENGINE_JOB_EXPIRED"),
+          "429": jsonErr("LLM_RATE_LIMIT"),
+          "502": jsonErr("LLM_TRANSPORT_ERROR / LLM_CLIENT_ERROR / TOOL_EXECUTION_ERROR"),
+          "504": jsonErr("RUN_TIMEOUT / TOOL_TIMEOUT"),
+          "500": jsonErr("MAX_ITERATIONS_EXCEEDED, other EngineError, or non-engine failure"),
         }),
       },
     };
@@ -330,8 +755,8 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
         parameters: [{ name: "jobId", in: "path", required: true, schema: { type: "string" } }],
         responses: compactResponses({
           "200": { description: "Job state + optional run summary" },
-          "401": hasApiKey ? { description: "Unauthorized" } : undefined,
-          "404": { description: "Job not found" },
+          "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
+          "404": jsonErr("Job not found"),
         }),
       },
     };
@@ -344,19 +769,31 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
       version,
       description:
         (description ? `${description}\n\n` : "") +
-        "Routes match `createPlanRestRouter` from `@opencoreagents/rest-api`. " +
+        "Routes match `createRuntimeRestRouter` from `@opencoreagents/rest-api`. " +
         "Mount the router under a prefix (e.g. `/api`) — paths here are **relative to that mount**.",
     },
     tags: [
       { name: "Agents", description: "Agent listing" },
+      ...(hasMemoryRead
+        ? [{ name: "Memory", description: "MemoryAdapter read (requires router `runtime`)" }]
+        : []),
+      ...(hasInterAgentSend
+        ? [{ name: "Messaging", description: "MessageBus (requires router `runtime`; 501 without `messageBus`)" }]
+        : []),
       { name: "Runs", description: "Run and resume" },
       ...(hasDispatch ? [{ name: "Jobs", description: "BullMQ job polling" }] : []),
     ],
     paths,
   };
 
-  if (schemes) {
-    doc.components = { securitySchemes: schemes };
+  doc.components = {
+    schemas: {
+      RuntimeRestJsonError: runtimeRestJsonErrorSchema(),
+    },
+    ...(schemes ? { securitySchemes: schemes } : {}),
+  };
+
+  if (security) {
     doc.security = security;
   }
 
@@ -367,7 +804,7 @@ export function buildPlanRestOpenApiSpec(input: PlanRestOpenApiInput): Record<st
  * Minimal Swagger UI page (loads Swagger UI from **unpkg** — no extra npm dependency).
  * `openApiPath` and `uiPath` are the **path segments** on the same router (e.g. `openapi.json`, `docs`).
  */
-export function planRestSwaggerUiHtml(openApiPath: string, uiPath: string): string {
+export function runtimeRestSwaggerUiHtml(openApiPath: string, uiPath: string): string {
   const openFile = JSON.stringify(openApiPath.replace(/^\/+/, ""));
   const uiSeg = JSON.stringify(`/${uiPath.replace(/^\/+/, "").replace(/\/$/, "")}`);
   return `<!DOCTYPE html>
@@ -375,7 +812,7 @@ export function planRestSwaggerUiHtml(openApiPath: string, uiPath: string): stri
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Plan REST API</title>
+  <title>Runtime REST API</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" crossorigin="anonymous" />
   <style>body { margin: 0; }</style>
 </head>
@@ -403,21 +840,21 @@ export function planRestSwaggerUiHtml(openApiPath: string, uiPath: string): stri
 </html>`;
 }
 
-export interface PlanRestSwaggerPaths {
+export interface RuntimeRestSwaggerPaths {
   openApiPath: string;
   uiPath: string;
 }
 
-export interface PlanRestSwaggerOptions {
+export interface RuntimeRestSwaggerOptions {
   openApiPath?: string;
   uiPath?: string;
   /** Overrides OpenAPI `info` */
   info?: { title?: string; version?: string; description?: string };
 }
 
-export function normalizePlanRestSwaggerPaths(
-  swagger: boolean | PlanRestSwaggerOptions | undefined,
-): PlanRestSwaggerPaths | null {
+export function normalizeRuntimeRestSwaggerPaths(
+  swagger: boolean | RuntimeRestSwaggerOptions | undefined,
+): RuntimeRestSwaggerPaths | null {
   if (!swagger) return null;
   if (swagger === true) {
     return { openApiPath: "openapi.json", uiPath: "docs" };
@@ -428,9 +865,9 @@ export function normalizePlanRestSwaggerPaths(
   };
 }
 
-export function planRestSwaggerInfo(
-  swagger: boolean | PlanRestSwaggerOptions | undefined,
-): PlanRestSwaggerOptions["info"] | undefined {
+export function runtimeRestSwaggerInfo(
+  swagger: boolean | RuntimeRestSwaggerOptions | undefined,
+): RuntimeRestSwaggerOptions["info"] | undefined {
   if (!swagger || swagger === true) return undefined;
   return swagger.info;
 }

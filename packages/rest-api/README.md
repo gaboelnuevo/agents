@@ -1,13 +1,13 @@
 # `@opencoreagents/rest-api`
 
-**Plugin-style** Express **`Router`**: after you **`Agent.define`** (and tools/skills), mount **`createPlanRestRouter({ … })`** to expose **plan-rest-shaped** JSON routes without copying handlers from scratch.
+**Plugin-style** Express **`Router`**: after you **`Agent.define`** (and tools/skills), mount **`createRuntimeRestRouter({ … })`** to expose JSON routes for agents/runs/jobs (URL contract: **`docs/plan-rest.md`**) without copying handlers from scratch. A minimal runnable host is [`examples/plan-rest-express`](../../examples/plan-rest-express/) (enables **`swagger`** → **`GET /openapi.json`**, **`GET /docs`**).
 
 **Execution modes**
 
 | Mode | Options | Behavior |
 |------|---------|----------|
-| **Inline** (default) | **`runtime`** | **`POST` run/resume** call **`Agent.run` / `resume`** in the HTTP process (same as before). |
-| **Queue** | **`dispatch: { engine, queueEvents?, jobWaitTimeoutMs? }`** | **`POST` run/resume** call **`engine.addRun` / `addResume`** — same job payload as **`examples/dynamic-runtime-rest`**. Default **202** + **`jobId`** + **`statusUrl`**; **`?wait=1`** or **`"wait": true`** blocks until the worker finishes (**needs `queueEvents`**). |
+| **Inline** (default) | **`runtime`** | **`POST` run/resume** call **`Agent.run` / `resume`** in the HTTP process (same as before). With **`runtime.config.messageBus`**, **`POST /agents/:fromAgentId/send`** calls **`MessageBus.send`** (**`system_send_message`** semantics). |
+| **Queue** | **`dispatch: { engine, queueEvents?, jobWaitTimeoutMs? }`** | **`POST` run/resume** call **`engine.addRun` / `addResume`** — same job payload as **`examples/dynamic-runtime-rest`**. Default **202** + **`jobId`** + **`projectId`** + **`statusUrl`**; **`?wait=1`** or **`"wait": true`** blocks until the worker finishes (**needs `queueEvents`**). **`504`** vs **502** on wait uses **`isBullmqJobWaitTimeoutError`** (BullMQ timeout message shape). |
 | **Both** | **`runtime` + `dispatch`** | **`dispatch`** wins for **`POST` run/resume**; **`runtime`** still used if you omit **`dispatch`** (not typical). |
 
 Install **`@opencoreagents/adapters-bullmq`** and **`bullmq`** when using **`dispatch`** (optional **peer** dependencies).
@@ -16,13 +16,17 @@ Install **`@opencoreagents/adapters-bullmq`** and **`bullmq`** when using **`dis
 
 | Method | Path | Notes |
 |--------|------|-------|
-| **GET** | `/agents` | With **`agentIds`**: that allowlist. Without: every agent the registry can resolve for the effective **`projectId`** (same as **`Agent.load`**). |
-| **POST** | `/agents/:agentId/run` | Body: `{ "message": string, "sessionId"?: string, "projectId"?: string, "wait"?: boolean }`. **`wait`**: only with **`dispatch`** (+ **`queueEvents`**). |
-| **POST** | `/agents/:agentId/resume` | Body: `{ runId, sessionId, resumeInput, "projectId"?, "wait"? }`. **Inline** mode needs **`runStore`** on **`AgentRuntime`**. **Queue** mode does not need **`runStore`** on the API process (worker must persist runs). |
-| **GET** | `/runs/:runId?sessionId=` | Requires **`runStore`**. In **multi-project** mode, also send **`X-Project-Id`** or **`?projectId=`** (same resolution as below). |
+| **GET** | `/agents` | With **`agentIds`**: intersection of allowlist and registry for the effective **`projectId`**. Without: all agents **`Agent.load`** can resolve. |
+| **GET** | `/agents/:agentId/memory` | **When `runtime` is set:** **`?sessionId=`** and **`?memoryType=`** required; optional **`?endUserId=`**. Returns **`{ projectId, agentId, sessionId, memoryType, items }`** from **`MemoryAdapter.query`** (same scope as **`system_get_memory`**). Omitting **`runtime`** (enqueue-only API) leaves this route **unregistered**. |
+| **POST** | `/agents/:fromAgentId/send` | **When `runtime` is set:** body **`toAgentId`**, **`payload`** (required); optional **`type`** (**`event`** \| **`request`** \| **`reply`**), **`correlationId`** (required for **`request`**/**`reply`**), **`sessionId`**, **`endUserId`** (for **`sendMessageTargetPolicy`** only). **501** if **`AgentRuntime`** has no **`messageBus`**. **403** when policy denies the target. Unregistered without **`runtime`**. |
+| **POST** | `/agents/:agentId/run` | Body: `{ "message": string, "sessionId"?: string, "projectId"?: string, "wait"?: boolean }`. **`wait`**: only with **`dispatch`** (+ **`queueEvents`**). Success JSON includes **`projectId`** (effective tenant). |
+| **POST** | `/agents/:agentId/resume` | Body: `{ runId, sessionId, resumeInput, "projectId"?, "wait"? }`. **Inline** mode needs **`runStore`** on **`AgentRuntime`**. **Queue** mode does not need **`runStore`** on the API process (worker must persist runs). Success JSON includes **`projectId`**. |
+| **GET** | `/runs/:runId?sessionId=` | Requires **`runStore`**. **`sessionId`** must match the run when stored. If the run has **`projectId`** (set on new runs in **`@opencoreagents/core`**), the effective tenant must match or the handler returns **403**; the JSON body may include **`projectId`**. In **multi-project** mode, send **`X-Project-Id`** or **`?projectId=`** (same resolution as below). |
+| **GET** | `/runs/:runId/history?sessionId=` | Same auth as **`GET /runs/:runId`** — returns **`Run.history`** (**`ProtocolMessage[]`**) plus **`runId`**, **`agentId`**, **`status`**, optional **`sessionId`** / **`projectId`**. |
+| **GET** | `/agents/:agentId/runs` | Requires **`runStore`**. Optional **`?status=`** (**`running` \| `waiting` \| `completed` \| `failed`**), **`?sessionId=`**, **`?limit=`** (default **50**, max **100**). **`RunStore.listByAgent`** — same **`run.projectId`** vs tenant rule as **`GET /runs`** when **`projectId`** is set on rows. |
 | **GET** | `/jobs/:jobId` | Only when **`dispatch`** is set — poll BullMQ job (**`state`**, **`run`** summary when completed), same idea as **`GET /v1/jobs/:id`** in **`dynamic-runtime-rest`**. |
 
-Optional **`apiKey`**: if set, clients must send **`Authorization: Bearer …`** or **`X-Api-Key`**.
+Optional auth: **`resolveApiKey(req, res)`** (recommended — lazy env, **per-`projectId` secrets** via **`getRuntimeRestRouterProjectId(res)`**) and/or static **`apiKey`**. Tenant middleware runs **before** API-key checks. When the effective secret is non-empty, clients must send **`Authorization: Bearer …`** or **`X-Api-Key`**.
 
 ### One fixed project
 
@@ -33,12 +37,26 @@ Pass **`projectId`** in options. Clients do not need a tenant header; **`X-Proje
 Omit **`projectId`** from options. Each request resolves the tenant in order:
 
 1. Header **`X-Project-Id`**
-2. Query **`?projectId=`** (works for **GET** and **GET /runs**)
-3. JSON **`body.projectId`** (works for **POST** run/resume)
+2. Query **`?projectId=`** (works for **GET** routes that read **`runStore`**, e.g. **`GET /runs`**, **`GET /runs/:runId/history`**, **`GET /agents/:agentId/runs`**)
+3. JSON **`body.projectId`** (works for **POST** run/resume; **GET** tenant uses header/query only — same examples as above)
 
-Optional **`allowedProjectIds`**: if set (and not wildcard-only), any other **`projectId`** gets **403**. Use **`["*"]`** to accept **any** resolved tenant (still require header/query/body **`projectId`** in multi mode; use **`apiKey`** in production).
+Optional **`allowedProjectIds`**: if set (and not wildcard-only), any other **`projectId`** gets **403**. Use **`["*"]`** to accept **any** resolved tenant (still require header/query/body **`projectId`** in multi mode; use **`resolveApiKey`** / **`apiKey`** in production).
 
-When **`agentIds` is omitted**, every agent registered for that tenant (plus globals) is invocable — use **`agentIds`** to restrict agent names.
+When **`agentIds` is omitted**, every agent registered for that tenant (plus globals) is invocable — use **`agentIds`** to restrict names (undefined ids never appear in the list and yield **404** on run/resume).
+
+### Engine errors (inline routes)
+
+For **`EngineError`** subclasses from **`@opencoreagents/core`**, inline **`POST …/run`**, **`POST …/resume`**, **`GET /runs/:runId`**, and **`GET /runs/:runId/history`** return a stable **`code`** (e.g. **`SESSION_EXPIRED`** → **401**, **`RUN_INVALID_STATE`** → **409**, **`LLM_RATE_LIMIT`** → **429**) plus **`error`** text. You can reuse **`mapEngineErrorToHttp(err)`** in your own middleware. Non-engine failures keep generic status bodies. The OpenAPI spec includes **`components.schemas.RuntimeRestJsonError`** (`error` required, `code` optional); **`RUNTIME_REST_ENGINE_ERROR_CODES`** lists codes with explicit HTTP mapping in **`mapEngineErrorToHttp`**.
+
+## Phased plan ([`docs/plan-rest.md`](../../docs/plan-rest.md))
+
+| Phase | In this package |
+|-------|-----------------|
+| **R0 — Contract** | OpenAPI **3.0** (`swagger: true`) + **`RuntimeRestJsonError`**; **`mapEngineErrorToHttp`** for **`EngineError` → HTTP** on inline routes. |
+| **R1 — Minimal server** | **`GET /agents`**, **`GET …/memory`**, **`POST …/send`** (with **`runtime`** + optional **`messageBus`**), **`POST` run/resume**, **`GET /runs`** / **`GET …/history`** + **`runStore`**. |
+| **R2 — Async** | **`dispatch`** + **`GET /jobs/:jobId`**, **`wait=1`**, **`isBullmqJobWaitTimeoutError`**. |
+| **R3 — Multi-tenant** | **`projectId`** / **`resolveProjectId`**, **`allowedProjectIds`**, **`resolveApiKey`**. |
+| **R4 — Streaming** | Not here — use **`examples/real-world-with-express`** or custom SSE. |
 
 ## Usage
 
@@ -46,7 +64,7 @@ When **`agentIds` is omitted**, every agent registered for that tenant (plus glo
 
 ```typescript
 import express from "express";
-import { createPlanRestRouter } from "@opencoreagents/rest-api";
+import { createRuntimeRestRouter } from "@opencoreagents/rest-api";
 import { Agent, AgentRuntime, InMemoryMemoryAdapter, InMemoryRunStore } from "@opencoreagents/core";
 
 const runStore = new InMemoryRunStore();
@@ -64,11 +82,11 @@ await Agent.define({
 
 const app = express();
 app.use(
-  createPlanRestRouter({
+  createRuntimeRestRouter({
     runtime,
     projectId: "my-project",
     runStore,
-    apiKey: process.env.REST_API_KEY,
+    resolveApiKey: () => process.env.REST_API_KEY?.trim(),
   }),
 );
 
@@ -82,7 +100,7 @@ await Agent.define({ id: "assistant", projectId: "acme", /* … */ });
 await Agent.define({ id: "assistant", projectId: "contoso", /* … */ });
 
 app.use(
-  createPlanRestRouter({
+  createRuntimeRestRouter({
     runtime,
     allowedProjectIds: ["acme", "contoso"],
     runStore,
@@ -92,15 +110,41 @@ app.use(
 // or POST …/run with { "projectId": "acme", "message": "hi" }
 ```
 
+**Per-project API keys** (after **`allowedProjectIds`** / **`resolveProjectId`** have determined the tenant):
+
+```typescript
+import {
+  createRuntimeRestRouter,
+  getRuntimeRestRouterProjectId,
+} from "@opencoreagents/rest-api";
+
+const keys: Record<string, string> = {
+  acme: process.env.REST_API_KEY_ACME!,
+  contoso: process.env.REST_API_KEY_CONTOSO!,
+};
+
+app.use(
+  createRuntimeRestRouter({
+    runtime,
+    allowedProjectIds: ["acme", "contoso"],
+    runStore,
+    resolveApiKey: (_req, res) => {
+      const projectId = getRuntimeRestRouterProjectId(res);
+      return projectId ? keys[projectId]?.trim() : undefined;
+    },
+  }),
+);
+```
+
 Open multi-tenant (any project id the client sends, after resolution):
 
 ```typescript
 app.use(
-  createPlanRestRouter({
+  createRuntimeRestRouter({
     runtime,
     allowedProjectIds: ["*"],
     runStore,
-    apiKey: process.env.REST_API_KEY, // recommended
+    resolveApiKey: () => process.env.REST_API_KEY?.trim(),
   }),
 );
 ```
@@ -118,7 +162,7 @@ const queueEvents = new QueueEvents("engine", { connection });
 await queueEvents.waitUntilReady();
 
 app.use(
-  createPlanRestRouter({
+  createRuntimeRestRouter({
     dispatch: {
       engine,
       queueEvents,
@@ -131,23 +175,23 @@ app.use(
 // POST …/run → 202 { jobId, statusUrl } or ?wait=1 → 200 { runId, status, reply? }
 ```
 
-Override resolution with **`resolveProjectId(req)`** if you use JWT claims or a path prefix. **`defaultPlanRestResolveProjectId`** is exported if you want to extend the default chain.
+Override resolution with **`resolveProjectId(req)`** if you use JWT claims or a path prefix. **`defaultRuntimeRestResolveProjectId`** is exported if you want to extend the default chain.
 
-Mount under a prefix: **`app.use("/api", createPlanRestRouter({ … }))`** → **`GET /api/agents`**, etc.
+Mount under a prefix: **`app.use("/api", createRuntimeRestRouter({ … }))`** → **`GET /api/agents`**, etc.
 
 ### OpenAPI / Swagger UI
 
-Set **`swagger: true`** (or an object) on **`createPlanRestRouter`** to add:
+Set **`swagger: true`** (or an object) on **`createRuntimeRestRouter`** to add:
 
 - **`GET …/openapi.json`** — OpenAPI **3.0** document (paths match this router).
 - **`GET …/docs`** — Swagger UI (loads **Swagger UI** from [unpkg](https://unpkg.com/); allow that CDN in **`Content-Security-Policy`** if you use one).
 
 Defaults: **`openapi.json`** + **`docs`**. Customize with **`swagger: { openApiPath, uiPath, info?: { title, version, description } }`**.
 
-These routes are registered **before** **`apiKey`** and tenant middleware, so they do not require **`Authorization`** or **`X-Project-Id`**. Put **`app.use`** in front of the router if you need to protect them.
+These routes are registered **before** API-key and tenant middleware, so they do not require **`Authorization`** or **`X-Project-Id`**. Put **`app.use`** in front of the router if you need to protect them. Production notes (CSP, public spec): [`docs/technical-debt.md`](../../docs/technical-debt.md) §7 (*OpenAPI / Swagger UI*).
 
-You can also call **`buildPlanRestOpenApiSpec({ … })`** and **`planRestSwaggerUiHtml(openApiPath, uiPath)`** from **`@opencoreagents/rest-api`** to serve the spec or UI yourself.
+You can also call **`buildRuntimeRestOpenApiSpec({ … })`** and **`runtimeRestSwaggerUiHtml(openApiPath, uiPath)`** from **`@opencoreagents/rest-api`** to serve the spec or UI yourself.
 
 ## Docs
 
-[`docs/plan-rest.md`](../../docs/plan-rest.md) (full roadmap). This package implements a **minimal** subset aligned with the target shape; async **202 + BullMQ** remains app-specific (see [`examples/dynamic-runtime-rest/`](../../examples/dynamic-runtime-rest/)).
+[`docs/plan-rest.md`](../../docs/plan-rest.md) (roadmap + contract table). This package implements the **Implemented today** surface (inline **`runtime`**, optional **`dispatch`**, **`runStore`**, **`swagger`**). Worker wiring for BullMQ matches [`examples/dynamic-runtime-rest/`](../../examples/dynamic-runtime-rest/).

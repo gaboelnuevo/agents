@@ -1,5 +1,5 @@
 /**
- * After `Agent.define`, mount **`createPlanRestRouter`** — same routes as **`docs/plan-rest.md`** (minimal subset).
+ * After `Agent.define`, mount **`createRuntimeRestRouter`** — routes match **`docs/plan-rest.md`** (fixed **`projectId`**; no **`messageBus`** here so **`POST …/send`** returns **501**).
  */
 import express from "express";
 import type { LLMAdapter, LLMRequest, LLMResponse } from "@opencoreagents/core";
@@ -9,7 +9,7 @@ import {
   InMemoryMemoryAdapter,
   InMemoryRunStore,
 } from "@opencoreagents/core";
-import { createPlanRestRouter } from "@opencoreagents/rest-api";
+import { createRuntimeRestRouter } from "@opencoreagents/rest-api";
 
 class DeterministicDemoLlm implements LLMAdapter {
   private i = 0;
@@ -51,19 +51,36 @@ app.get("/health", (_req, res) => {
 });
 
 app.use(
-  createPlanRestRouter({
+  createRuntimeRestRouter({
     runtime,
     projectId: PROJECT_ID,
     runStore,
-    apiKey: process.env.REST_API_KEY?.trim() || undefined,
+    resolveApiKey: () => process.env.REST_API_KEY?.trim() || undefined,
+    swagger: {
+      info: {
+        title: "plan-rest-express",
+        version: "0.0.0",
+        description: "OpenAPI for routes on this demo (see docs/plan-rest.md).",
+      },
+    },
   }),
 );
 
 app.listen(PORT, () => {
   console.log(`http://127.0.0.1:${PORT}  GET /agents  POST /agents/demo-greeter/run`);
   console.log(
+    `  GET /runs/:runId?sessionId=…  GET /runs/:runId/history?sessionId=…  GET /agents/demo-greeter/runs`,
+  );
+  console.log(
+    "  POST /agents/<from>/send  (needs AgentRuntime({ messageBus }) — not enabled in this demo)",
+  );
+  console.log(
+    `  GET /agents/demo-greeter/memory?sessionId=<id>&memoryType=working  (MemoryAdapter.query)`,
+  );
+  console.log(`  GET /openapi.json  GET /docs  (Swagger — no API key required)`);
+  console.log(
     process.env.REST_API_KEY
-      ? "REST_API_KEY set — send Authorization: Bearer … or X-Api-Key"
+      ? "REST_API_KEY set — send Authorization: Bearer … or X-Api-Key on API routes (not /docs or /openapi.json)"
       : "REST_API_KEY unset — /agents open",
   );
 });

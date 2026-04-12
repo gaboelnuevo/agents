@@ -1,16 +1,27 @@
 export {
-  buildPlanRestOpenApiSpec,
-  normalizePlanRestSwaggerPaths,
-  planRestSwaggerInfo,
-  planRestSwaggerUiHtml,
-  type PlanRestOpenApiInput,
-  type PlanRestSwaggerOptions,
-  type PlanRestSwaggerPaths,
+  buildRuntimeRestOpenApiSpec,
+  normalizeRuntimeRestSwaggerPaths,
+  runtimeRestSwaggerInfo,
+  runtimeRestSwaggerUiHtml,
+  type RuntimeRestOpenApiInput,
+  type RuntimeRestSwaggerOptions,
+  type RuntimeRestSwaggerPaths,
 } from "./openapi.js";
 export {
-  createPlanRestRouter,
-  defaultPlanRestResolveProjectId,
-  type PlanRestDispatchOptions,
-  type PlanRestPluginOptions,
-} from "./planRestRouter.js";
-export { summarizeEngineRun } from "./summarizeRun.js";
+  createRuntimeRestRouter,
+  defaultRuntimeRestResolveProjectId,
+  getRuntimeRestRouterProjectId,
+  type RuntimeRestDispatchOptions,
+  type RuntimeRestPluginOptions,
+} from "./runtimeRestRouter.js";
+export {
+  mapEngineErrorToHttp,
+  RUNTIME_REST_ENGINE_ERROR_CODES,
+  type RuntimeRestEngineErrorBody,
+} from "./engineErrorHttp.js";
+export { isBullmqJobWaitTimeoutError } from "./bullmqJobWaitTimeout.js";
+export {
+  summarizeEngineRun,
+  summarizeRunListEntry,
+  type RuntimeRestRunListItem,
+} from "./summarizeRun.js";

@@ -381,7 +381,7 @@ POST  /agents                 → Agent.define() over HTTP
 POST  /agents/:id/send        → send message to another agent
 ```
 
-**In this monorepo:** mount [**`@opencoreagents/rest-api`**](../packages/rest-api/) (**`createPlanRestRouter`**) on Express for that shape (`GET /agents`, `POST /agents/:id/run`, resume, `GET /runs/:id`) plus optional **BullMQ** **`dispatch`** (**202**, **`GET /jobs/:id`**, **`wait=1`**) aligned with [`examples/dynamic-runtime-rest/`](../examples/dynamic-runtime-rest/) — see [`plan-rest.md`](./plan-rest.md), [`examples/plan-rest-express/`](../examples/plan-rest-express/). Tenancy: fixed vs per-request **`projectId`**, **`allowedProjectIds`**, **`agentIds`**, **`apiKey`**: [package README](../packages/rest-api/README.md).
+**In this monorepo:** mount [**`@opencoreagents/rest-api`**](../packages/rest-api/) (**`createRuntimeRestRouter`**) on Express for that shape (`GET /agents`, `POST /agents/:id/run`, resume, `GET /runs/:id`) plus optional **BullMQ** **`dispatch`** (**202**, **`GET /jobs/:id`**, **`wait=1`**) aligned with [`examples/dynamic-runtime-rest/`](../examples/dynamic-runtime-rest/) — see [`plan-rest.md`](./plan-rest.md), [`examples/plan-rest-express/`](../examples/plan-rest-express/). Tenancy + auth: **`resolveProjectId`**, **`resolveApiKey`** / **`apiKey`**, **`allowedProjectIds`**, **`agentIds`**: [package README](../packages/rest-api/README.md).
 
 All REST routes pass through the SecurityLayer before reaching the engine. Auth, project isolation, and quota checks happen there — the engine loop never changes.
 

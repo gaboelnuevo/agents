@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Minimal Express server using @opencoreagents/rest-api after Agent.define (plan-rest-shaped JSON API).",
+  "description": "Minimal Express server: Agent.define + createRuntimeRestRouter (routes per docs/plan-rest.md).",
   "scripts": {
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

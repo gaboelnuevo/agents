@@ -20,6 +20,12 @@ export interface Run {
   runId: string;
   agentId: string;
   sessionId?: string;
+  /**
+   * Tenant that owns this run — set when created via {@link createRun} / {@link Agent.run}.
+   * Used by HTTP layers (e.g. `GET /runs`) to reject cross-tenant reads when present.
+   * Older persisted runs may omit this until the next resume.
+   */
+  projectId?: string;
   status: RunStatus;
   history: ProtocolMessage[];
   state: {

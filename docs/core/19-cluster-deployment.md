@@ -145,7 +145,7 @@ interface RunStore {
 ### 3.3 Integration points
 
 - `Agent.run()` / `Agent.resume()` → `RunBuilder` persists after every `executeRun` when `runStore` is configured (including `status: waiting` so another worker can resume): unconditional **`save`** for the first write of a new run; **`saveIfStatus(..., "waiting")`** when resuming or continuing in-process after a **`waiting`** persist (see §3.4).
-- **`buildEngineDeps` + `createRun` + `executeRun`** (no `RunBuilder`) → you must **`runStore.save(run)`** after each `executeRun` when `runStore` is set, same as `RunBuilder` (including `waiting`).
+- **`buildEngineDeps` + `createRun` + `executeRun`** (no `RunBuilder`) → pass **`session.projectId`** as the fourth argument to **`createRun`** so stored runs match tenant and **`Agent.resume`** validation; you must **`runStore.save(run)`** after each `executeRun` when `runStore` is set, same as `RunBuilder` (including `waiting`).
 - `Agent.resume(runId, input)` → `runStore.load(runId)` (must be `waiting`), injects a user `resumeMessages` turn, then `executeRun` continues the loop.
 - On `completed` / `failed` → same save applies; optionally delete or archive in your app if you do not want long-term retention.
 
@@ -176,7 +176,7 @@ The job queue is **not** inside `packages/core` — it is **infrastructure** tha
 
 - **Package**: `createEngineQueue`, `createEngineWorker`, `DEFAULT_ENGINE_QUEUE_NAME`; **re-exports** `dispatchEngineJob` and typed **`EngineJobPayload`** from **`@opencoreagents/core`** (`kind: "run" | "resume"`; optional **`expiresAtMs`**).
 - **Design**: one or more workers per queue, all running the same bootstrap (§2).
-- Worker **processor** typically **`await dispatchEngineJob(runtime, job.data)`** after constructing **`AgentRuntime`** + definitions — or (low-level) `getAgentDefinition` + `buildEngineDeps(agent, session, runtime)` + `createRun` / `executeRun` with `runStore.save` as in §3.3.
+- Worker **processor** typically **`await dispatchEngineJob(runtime, job.data)`** after constructing **`AgentRuntime`** + definitions — or (low-level) `getAgentDefinition` + `buildEngineDeps(agent, session, runtime)` + **`createRun(..., session.projectId)`** / `executeRun` with `runStore.save` as in §3.3.
 - Retries, backoff, dead-letter are BullMQ config — the engine sees a normal run.
 - `wait` → worker completes the job (run is persisted in `RunStore`). A **delayed `addResume`** or **separate scheduled job** later processes `resume`.
 - **Horizontal scaling**: add worker processes; BullMQ + Redis coordinate (see §7).

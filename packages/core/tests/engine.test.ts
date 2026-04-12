@@ -57,6 +57,12 @@ describe("engine", () => {
     expect(run.agentId).toBe("agent-x");
     expect(run.status).toBe("running");
     expect(run.state.userInput).toBe("hello");
+    expect(run.projectId).toBeUndefined();
+  });
+
+  it("createRun sets projectId when provided", () => {
+    const run = createRun("a", "s", "u", "p-tenant");
+    expect(run.projectId).toBe("p-tenant");
   });
 
   it("buildEngineDeps uses runtime fileReadRoot when session omits it", async () => {
@@ -446,5 +452,75 @@ describe("engine", () => {
     expect(run.history.some((h) => h.type === "result" && h.content === "after wait")).toBe(
       true,
     );
+  });
+
+  it("resume rejects run from a different projectId", async () => {
+    const store = new InMemoryRunStore();
+    const mem = new InMemoryMemoryAdapter();
+    await store.save({
+      runId: "cross-proj",
+      agentId: "a-proj",
+      sessionId: "s1",
+      projectId: "p-alpha",
+      status: "waiting",
+      history: [],
+      state: { iteration: 0, pending: null, parseAttempts: 0, userInput: "x" },
+    });
+    const rt = new AgentRuntime({
+      llmAdapter: new QueueLLM([JSON.stringify({ type: "result", content: "x" })]),
+      memoryAdapter: mem,
+      runStore: store,
+      maxIterations: 10,
+    });
+    await Agent.define({
+      id: "a-proj",
+      projectId: "p-alpha",
+      systemPrompt: "x",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+    await Agent.define({
+      id: "a-proj",
+      projectId: "p-beta",
+      systemPrompt: "x",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+    const session = new Session({ id: "s1", projectId: "p-beta" });
+    const agent = await Agent.load("a-proj", rt, { session });
+    await expect(
+      agent.resume("cross-proj", { type: "text", content: "go" }),
+    ).rejects.toMatchObject({ code: "RUN_INVALID_STATE" });
+  });
+
+  it("resume stamps projectId from session when stored run omits it", async () => {
+    const store = new InMemoryRunStore();
+    const mem = new InMemoryMemoryAdapter();
+    await store.save({
+      runId: "legacy-proj",
+      agentId: "a-leg",
+      sessionId: "s1",
+      status: "waiting",
+      history: [],
+      state: { iteration: 0, pending: null, parseAttempts: 0, userInput: "x" },
+    });
+    const rt = new AgentRuntime({
+      llmAdapter: new QueueLLM([JSON.stringify({ type: "result", content: "done" })]),
+      memoryAdapter: mem,
+      runStore: store,
+      maxIterations: 10,
+    });
+    await Agent.define({
+      id: "a-leg",
+      projectId: "p-stamp",
+      systemPrompt: "x",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+    const session = new Session({ id: "s1", projectId: "p-stamp" });
+    const agent = await Agent.load("a-leg", rt, { session });
+    await agent.resume("legacy-proj", { type: "text", content: "go" });
+    const after = await store.load("legacy-proj");
+    expect(after?.projectId).toBe("p-stamp");
   });
 });

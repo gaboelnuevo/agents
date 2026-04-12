@@ -136,7 +136,7 @@ export class RunBuilder implements PromiseLike<Run> {
       | undefined;
 
     if (typeof this.init === "string") {
-      run = createRun(this.agent.id, this.session.id, this.init);
+      run = createRun(this.agent.id, this.session.id, this.init, this.session.projectId);
     } else {
       if (!cfg.runStore) {
         throw new RunInvalidStateError(
@@ -164,6 +164,17 @@ export class RunBuilder implements PromiseLike<Run> {
         throw new RunInvalidStateError(
           `Run ${this.init.runId} belongs to a different session`,
         );
+      }
+      if (
+        loaded.projectId != null &&
+        loaded.projectId !== this.session.projectId
+      ) {
+        throw new RunInvalidStateError(
+          `Run ${this.init.runId} belongs to a different project`,
+        );
+      }
+      if (loaded.projectId == null) {
+        loaded.projectId = this.session.projectId;
       }
       run = loaded;
       run.status = "running";

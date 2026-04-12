@@ -116,7 +116,7 @@ See [08-scope-and-security.md](./08-scope-and-security.md) for hardening.
 
 ## 5. REST surface vs `plan-rest.md`
 
-[`plan-rest.md`](../plan-rest.md) describes a broader **product** API (`/agents/:id/run`, memory, logs). **`dynamic-definitions`** focuses on **definition CRUD** (**`store.Agent.define`** / **`store.Skill.define`** / **`store.HttpTool.define`** on the **`DynamicDefinitionsStore`** facade, with **`projectId` on each payload**) and **per-job hydration** (**`Agent.prepare`**, **`hydrateAgentDefinitionsFromStore`**, or **`AgentRuntime`** **`dynamicDefinitionsStore`**) (or optional full **`sync`**) so your BFF can match that plan while reusing the same engine primitives.
+[`plan-rest.md`](../plan-rest.md) lists a **full product** vision (memory routes, inter-agent HTTP, …). **`@opencoreagents/rest-api`** implements the **run / resume / runs / jobs** subset on Express — see *Implemented today* in that doc. **`dynamic-definitions`** focuses on **definition CRUD** (**`store.Agent.define`** / **`store.Skill.define`** / **`store.HttpTool.define`** on the **`DynamicDefinitionsStore`** facade, with **`projectId` on each payload**) and **per-job hydration** (**`Agent.prepare`**, **`hydrateAgentDefinitionsFromStore`**, or **`AgentRuntime`** **`dynamicDefinitionsStore`**) (or optional full **`sync`**) so your BFF can match the plan while reusing the same engine primitives.
 
 ---
 

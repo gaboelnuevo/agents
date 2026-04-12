@@ -317,13 +317,13 @@ Additional core docs: purpose and MVP scope ([core/01-purpose.md](./core/01-purp
 
 | Resource | What you get |
 |----------|----------------|
-| [examples/README.md](../examples/README.md) | Table of **`examples/*`** packages: minimal run, OpenAI + tools, **`wait`** in the console, RAG, multi-agent, Express BFF, **`plan-rest-express`** (`createPlanRestRouter`), dynamic-runtime REST, Telegram-shaped gateway mock, and how to run them. |
+| [examples/README.md](../examples/README.md) | Table of **`examples/*`** packages: minimal run, OpenAI + tools, **`wait`** in the console, RAG, multi-agent, Express BFF, **`plan-rest-express`** (`createRuntimeRestRouter`), dynamic-runtime REST, Telegram-shaped gateway mock, and how to run them. |
 
 ### Integration and product plans (drafts)
 
 | Resource | What you get |
 |----------|----------------|
-| [plan-rest.md](./plan-rest.md) | REST roadmap + **`@opencoreagents/rest-api`** (`createPlanRestRouter`: fixed or multi-**`projectId`**, optional allowlists, **`apiKey`**) + **`plan-rest-express`**; BFF alternativo: `real-world-with-express`; async: `dynamic-runtime-rest`. |
+| [plan-rest.md](./plan-rest.md) | REST roadmap + **`@opencoreagents/rest-api`** (`createRuntimeRestRouter`, **`resolveApiKey`**, tenancy) + **`plan-rest-express`**; BFF: `real-world-with-express`; async: `dynamic-runtime-rest`. |
 | [plan-cli.md](./plan-cli.md) | CLI direction. |
 | [plan-mcp.md](./plan-mcp.md) | MCP direction. |
 

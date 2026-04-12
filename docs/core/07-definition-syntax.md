@@ -459,7 +459,7 @@ const runtime = new AgentRuntime({
 });
 const agent = getAgentDefinition("acme-corp", "ops-analyst")!;
 const base = buildEngineDeps(agent, session, runtime);
-const run = createRun(agent.id, session.id, "user text");
+const run = createRun(agent.id, session.id, "user text", session.projectId);
 
 await executeRun(run, { ...base, startedAtMs: Date.now() });
 ```

@@ -213,7 +213,7 @@ Packages reference each other with `"workspace:*"` in `dependencies`:
 @opencoreagents/dynamic-definitions → depends on @opencoreagents/core + **adapters-http-tool** — definition store + **`hydrateAgentDefinitionsFromStore`** ([`21-dynamic-runtime-rest.md`](./core/21-dynamic-runtime-rest.md))
 @opencoreagents/adapters-anthropic → depends on @opencoreagents/core — Claude / Anthropic LLM adapter
 @opencoreagents/conversation-gateway → depends on @opencoreagents/core — inbound message normalization + gateway helpers
-@opencoreagents/rest-api → depends on @opencoreagents/core + **express** — **`createPlanRestRouter`** ([`plan-rest.md`](./plan-rest.md))
+@opencoreagents/rest-api → depends on @opencoreagents/core + **express** — **`createRuntimeRestRouter`**, **`resolveApiKey`** ([`plan-rest.md`](./plan-rest.md))
 @opencoreagents/adapters-openai   → depends on @opencoreagents/core (interfaces)
 @opencoreagents/rag               → depends on @opencoreagents/core, @opencoreagents/utils (RAG tools that need parsers/chunking)
 @opencoreagents/cli               → depends on @opencoreagents/core, @opencoreagents/scaffold
@@ -240,7 +240,7 @@ Turborepo `^build` in `dependsOn` ensures transitive builds run in correct order
 | `@opencoreagents/dynamic-definitions` | `DynamicDefinitionsStore` facade, `hydrateAgentDefinitionsFromStore`, upsert/sync ([`21-dynamic-runtime-rest.md`](./core/21-dynamic-runtime-rest.md)) | `core`, `adapters-http-tool` | **Implemented** |
 | `@opencoreagents/adapters-anthropic` | Anthropic / Claude **`LLMAdapter`** | `core` | **Implemented** |
 | `@opencoreagents/conversation-gateway` | Normalized inbound messages + run/reply helpers for webhooks | `core` | **Implemented** |
-| `@opencoreagents/rest-api` | **`createPlanRestRouter`** — plan-rest-shaped Express routes after **`Agent.define`**; tenancy + allowlists — [`plan-rest.md`](./plan-rest.md), [`packages/rest-api/README.md`](../packages/rest-api/README.md) | `core` + **`express`** (npm) | **Implemented** |
+| `@opencoreagents/rest-api` | **`createRuntimeRestRouter`** — Express routes per [`plan-rest.md`](./plan-rest.md) after **`Agent.define`**; tenancy, **`resolveApiKey`**, allowlists — [`packages/rest-api/README.md`](../packages/rest-api/README.md) | `core` + **`express`** (npm) | **Implemented** |
 | `@opencoreagents/rag` | File-based RAG tools + skills ([`17-rag-pipeline.md`](./core/17-rag-pipeline.md)) | `core`, `utils` | **Implemented** (system_file_read, system_file_ingest, system_file_list tools; rag, rag-reader skills) |
 | `@opencoreagents/scaffold` | Programmatic `scaffold.initProject` / `generate*` ([`18-scaffold.md`](./core/18-scaffold.md) API) | `core` | **Implemented** (TS templates, manifest) |
 | `@opencoreagents/cli` | `runtime` binary + `runCli()` (delegates to `scaffold`) | `scaffold` | **Implemented** (argv → scaffold API) |

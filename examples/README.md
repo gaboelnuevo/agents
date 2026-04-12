@@ -22,8 +22,8 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@openco
 | Wire **multi-agent** messaging: **`InProcessMessageBus`**, **`system_send_message`**, request/reply | [`multi-agent/`](./multi-agent/) |
 | **Express** BFF + **browser UI** (`public/`): **`POST /v1/chat`**, **`POST /v1/chat/stream`** (SSE hooks), **`GET /status`**, run + session status, **`wait`** + **`resume`** (optional **`OPENAI_API_KEY`** / **`ANTHROPIC_API_KEY`**) | [`real-world-with-express/`](./real-world-with-express/) |
 | **Redis** definitions + **BullMQ** worker + **per-job hydrate** (REST CRUD; API enqueues, worker runs engine) | [`dynamic-runtime-rest/`](./dynamic-runtime-rest/) |
-| **Plan-shaped REST** after **`Agent.define`**: **`@opencoreagents/rest-api`** **`createPlanRestRouter`** — `GET /agents`, `POST /agents/:id/run`, optional **`runStore`**, fixed or multi-**`projectId`**, optional **`apiKey`** ([`packages/rest-api/README.md`](../packages/rest-api/README.md)) | [`plan-rest-express/`](./plan-rest-express/) · [`docs/plan-rest.md`](../docs/plan-rest.md) |
-| **Custom BFF** (sync chat UI, SSE, your own routes): extend **`real-world-with-express`** or **`dynamic-runtime-rest`** (async BullMQ); see **`plan-rest.md` — Easiest HTTP server (today)** | [`real-world-with-express/`](./real-world-with-express/) · [`dynamic-runtime-rest/`](./dynamic-runtime-rest/) · [`docs/plan-rest.md`](../docs/plan-rest.md) |
+| **Plan-shaped REST** after **`Agent.define`**: **`@opencoreagents/rest-api`** **`createRuntimeRestRouter`** — contract in **`docs/plan-rest.md`** (runs, history, memory, …), optional **`runStore`**, OpenAPI **`/openapi.json`** + **`/docs`** in the sample, fixed or multi-**`projectId`**, optional **`apiKey`** ([`packages/rest-api/README.md`](../packages/rest-api/README.md)) | [`plan-rest-express/`](./plan-rest-express/) · [`docs/plan-rest.md`](../docs/plan-rest.md) |
+| **Custom BFF** (sync chat UI, SSE, your own routes): extend **`real-world-with-express`** or **`dynamic-runtime-rest`** (async BullMQ); see **`docs/plan-rest.md`** (*Pick a starting point*) | [`real-world-with-express/`](./real-world-with-express/) · [`dynamic-runtime-rest/`](./dynamic-runtime-rest/) · [`docs/plan-rest.md`](../docs/plan-rest.md) |
 | **Telegram-shaped** webhook updates + **`ConversationGateway`**, **mock** outbound (no `api.telegram.org`) | [`telegram-example-mocked/`](./telegram-example-mocked/) |
 
 **Notes**
@@ -46,7 +46,7 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@openco
 | `@opencoreagents/example-rag-contact-support` | [`rag-contact-support/`](./rag-contact-support/) | **RAG** + **`contact_support`**, **`Session.sessionContext`**, two CLI turns (KB vs ticket), **`wait`** + **`Agent.resume`** with **`InMemoryRunStore`** (scripted LLM; no keys). |
 | `@opencoreagents/example-real-world-with-express` | [`real-world-with-express/`](./real-world-with-express/) | **Express** BFF + **`public/`** HTML/JS UI: JSON chat + **SSE**, **`GET /status`**, run + session status, wait/resume; **`API_KEY`**, CORS, **`X-Request-Id`**, SIGTERM shutdown; **`InMemoryRunStore`**; mock or **OpenAI** / **Anthropic**. |
 | `@opencoreagents/example-dynamic-runtime-rest` | [`dynamic-runtime-rest/`](./dynamic-runtime-rest/) | **`RedisDynamicDefinitionsStore`** (`store.Agent`, `store.methods`), BullMQ **`POST /v1/run`**, **`GET /v1/jobs/:id`**. |
-| `@opencoreagents/example-plan-rest-express` | [`plan-rest-express/`](./plan-rest-express/) | Minimal Express app: **`Agent.define`** + **`createPlanRestRouter`** (`@opencoreagents/rest-api`) — plan-rest-shaped JSON API; mock LLM + **`InMemoryRunStore`**. |
+| `@opencoreagents/example-plan-rest-express` | [`plan-rest-express/`](./plan-rest-express/) | Minimal Express app: **`Agent.define`** + **`createRuntimeRestRouter`** (`@opencoreagents/rest-api`); routes per **`docs/plan-rest.md`**; mock LLM + **`InMemoryRunStore`**; **Swagger** at **`/docs`**. |
 | `@opencoreagents/example-telegram-mocked` | [`telegram-example-mocked/`](./telegram-example-mocked/) | **Mock** Telegram **`Update`** / **`Message`** → **`NormalizedInboundMessage`** → **`ConversationGateway`** → **`MockTelegramClient`** outbox (no Telegram network or bot token). |
 
 ### `minimal-run` — `@opencoreagents/example-minimal-run`
@@ -131,7 +131,7 @@ For production or any shared runtime, swap to **`RedisMemoryAdapter`** (`@openco
 | **Scripts** | `pnpm start` → `tsx src/server.ts`; `pnpm typecheck` |
 | **Build first** | `pnpm turbo run build --filter=@opencoreagents/core --filter=@opencoreagents/rest-api` |
 | **Run** | `pnpm --filter @opencoreagents/example-plan-rest-express start` |
-| **Endpoints** | `GET /agents`, `POST /agents/:agentId/run`, `POST /agents/:agentId/resume`, `GET /runs/:runId` (see [`docs/plan-rest.md`](../docs/plan-rest.md)) |
+| **Endpoints** | Plan contract: `GET /agents`, `POST …/run`, `POST …/resume`, `GET /runs/:runId`, `GET /runs/:runId/history`, `GET /agents/:agentId/runs`, `GET …/memory`, **`GET /openapi.json`**, **`GET /docs`** — full table [`docs/plan-rest.md`](../docs/plan-rest.md) |
 | **Docs** | [plan-rest-express/README.md](./plan-rest-express/README.md), [`packages/rest-api/README.md`](../packages/rest-api/README.md) |
 
 ### `telegram-example-mocked` — `@opencoreagents/example-telegram-mocked`
