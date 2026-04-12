@@ -1,6 +1,6 @@
 # OpenCore Agents
 
-TypeScript **monorepo** — libraries ship as **`@opencoreagents/*`** on npm.
+TypeScript **monorepo**: **`@opencoreagents/*`** in **`packages/`**, consumed via **`pnpm` workspaces** from a clone. **Not** on public npm yet.
 
 **Production-shaped agent backends in TypeScript**—so you ship **APIs and workers** your team can own, not a demo script that dies on the first timeout.
 
@@ -56,7 +56,7 @@ There is also an optional path where **prompts and tool configs live in Redis** 
 
 Stateful **engine**: protocol loop, pluggable adapters (LLM, memory, vector, queues), RAG and multi-agent helpers, CLI/scaffold.
 
-Published as **`@opencoreagents/*`** packages (see [Packages](#packages) below).
+Fourteen **`@opencoreagents/*`** packages in **`packages/`** (see [Packages](#packages) below). Registry releases, when used, are **maintainer-only**: [GitHub Packages](#github-packages).
 
 ---
 
@@ -315,6 +315,15 @@ pnpm turbo run build test lint
 ```
 
 CI runs the same via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+### GitHub Packages
+
+**Maintainers only.** The workflow [`.github/workflows/publish.yml`](.github/workflows/publish.yml) builds every `packages/*` workspace package and runs **`pnpm publish -r`** against **`https://npm.pkg.github.com`**. It uses **`GITHUB_TOKEN`**, which only authorizes publishes **for this repository**—not for arbitrary forks publishing the same package names.
+
+- **Manual:** Actions → *Publish to GitHub Packages* → run workflow. Leave **dry run** checked to verify without uploading; uncheck to publish (**requires** `packages: write` / maintainer role on **this** repo).
+- **Release:** Publishing a **GitHub Release** (not only a git tag) runs the same path with **dry run** off. Bump `version` in each `packages/*/package.json` before the release so the registry accepts it.
+- **Scope:** Packages are **`@opencoreagents/*`**. GitHub ties that npm scope to the **repository owner** (user or org). If the repo is not under the `opencoreagents` account, either move it there or rename the scope in every `package.json`.
+- **Consumers (after a maintainer has published):** Copy [`.npmrc.example`](.npmrc.example) to `.npmrc`, add a PAT with `read:packages` (and SSO if your org requires it), then install `@opencoreagents/...` from the GitHub registry. Until then, depend on **git + workspace** or **path** dependencies from a clone.
 
 ---
 

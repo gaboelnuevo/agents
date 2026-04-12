@@ -1,7 +1,7 @@
 {
   "name": "@opencoreagents/rest-api",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "private": false,
   "license": "Apache-2.0",
   "description": "Express router: JSON API for Agent.run/resume and optional BullMQ dispatch (like dynamic-runtime-rest)",
   "type": "module",
@@ -14,7 +14,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -47,5 +49,8 @@
     "supertest": "^7.0.0",
     "typescript": "^5.7.3",
     "vitest": "^3"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   }
 }

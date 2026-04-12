@@ -1,0 +1,76 @@
+# Publish all `packages/*` to GitHub Packages (npm registry).
+#
+# Requirements:
+# - Package scope `@opencoreagents` must match the GitHub owner (user or org) that hosts
+#   this repository (GitHub enforces this for npm on GPR). If your repo is under e.g.
+#   `myuser/agentic-labs`, either transfer/create under org `opencoreagents` or rename
+#   the scope in every `packages/*/package.json`.
+# - Consumes need a PAT with `read:packages` (or SSO) and `.npmrc` pointing the scope
+#   at `https://npm.pkg.github.com` — see root `.npmrc.example`.
+
+name: Publish to GitHub Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "If true, only pnpm publish --dry-run (no upload)"
+        type: boolean
+        default: true
+  release:
+    types: [published]
+
+concurrency:
+  group: publish-github-packages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Authenticate to GitHub Packages (pnpm)
+        run: |
+          echo "@opencoreagents:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check scope vs repository owner
+        run: |
+          owner="${{ github.repository_owner }}"
+          echo "Repository owner: $owner"
+          olower=$(echo "$owner" | tr '[:upper:]' '[:lower:]')
+          if [ "$olower" != "opencoreagents" ]; then
+            echo "::warning::GitHub Packages npm expects the package scope to match the repo owner. These packages are @opencoreagents/* — publish may return 403 unless the repo lives under the org/user 'opencoreagents' (or you rename the scope in every package.json)."
+          fi
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm turbo run build --filter="./packages/*"
+
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        run: pnpm publish -r --filter "./packages/*" --dry-run --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+        run: pnpm publish -r --filter "./packages/*" --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

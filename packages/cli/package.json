@@ -1,7 +1,7 @@
 {
   "name": "@opencoreagents/cli",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "private": false,
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
@@ -13,7 +13,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "bin": {
     "runtime": "./dist/bin.js"
   },
@@ -27,5 +29,8 @@
   },
   "dependencies": {
     "@opencoreagents/scaffold": "workspace:*"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   }
 }

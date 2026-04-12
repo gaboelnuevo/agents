@@ -1,0 +1,4 @@
+@opencoreagents:registry=https://npm.pkg.github.com
+
+# For private GitHub Packages, uncomment and set a PAT with `read:packages` (and SSO if required):
+# //npm.pkg.github.com/:_authToken=ghp_xxxxxxxx
