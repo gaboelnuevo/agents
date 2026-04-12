@@ -281,7 +281,7 @@ The sections below point to documentation in this repository that goes beyond th
 
 | Resource | What you get |
 |----------|----------------|
-| [Agent Engine overview](./README.md) | Full narrative: loop diagram, engine invariants, dynamic definitions, `scope` / `projectId`, `toolTimeoutMs`, BullMQ and Redis defaults, and more detail than §1–§2 here. |
+| [Documentation index](./README.md) | Hub: **Getting started** (this guide), **[Agent Engine overview](./agent-engine-overview.md)** (full narrative), quick links to **Engine reference** and other docs. |
 | [Repository root README](../README.md) | Monorepo layout, `pnpm` / Turbo commands, how packages relate. |
 | [plan.md](./plan.md) | Roadmap and implementation progress. |
 | [technical-debt.md](./technical-debt.md) | Known gaps and deferrals. |
