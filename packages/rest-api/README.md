@@ -188,7 +188,7 @@ Set **`swagger: true`** (or an object) on **`createRuntimeRestRouter`** to add:
 
 Defaults: **`openapi.json`** + **`docs`**. Customize with **`swagger: { openApiPath, uiPath, info?: { title, version, description } }`**.
 
-These routes are registered **before** API-key and tenant middleware, so they do not require **`Authorization`** or **`X-Project-Id`**. Put **`app.use`** in front of the router if you need to protect them. Production notes (CSP, public spec): [`docs/planning/technical-debt.md`](../../docs/planning/technical-debt.md) §7 (*OpenAPI / Swagger UI*).
+These routes are registered **before** API-key and tenant middleware, so they do not require **`Authorization`** or **`X-Project-Id`**. Put **`app.use`** in front of the router if you need to protect them. Production notes (CSP, public spec): [`docs/planning/technical-debt-security-production.md`](../../docs/planning/technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1 (*OpenAPI / Swagger UI*).
 
 You can also call **`buildRuntimeRestOpenApiSpec({ … })`** and **`runtimeRestSwaggerUiHtml(openApiPath, uiPath)`** from **`@opencoreagents/rest-api`** to serve the spec or UI yourself.
 

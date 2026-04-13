@@ -2,7 +2,7 @@
 
 > **Product vision:** an HTTP/JSON layer for **`run` / `resume` / memory / logs / inter-agent send`** with SDK semantics. **Monorepo reality:** the engine is **`@opencoreagents/core`**; transport is **your** BFF or a **library router** — see **`@opencoreagents/rest-api`** below (this file is the **contract reference** for that package’s URL shape).
 
-Sources: [`brainstorm/07-multi-agente-rest-sesiones.md`](../brainstorm/07-multi-agente-rest-sesiones.md) §REST, [`core/14-consumers.md`](../core/14-consumers.md) §REST API, [`technical-debt.md`](./technical-debt.md) §1 / §5 / §7.
+Sources: [`brainstorm/07-multi-agente-rest-sesiones.md`](../brainstorm/07-multi-agente-rest-sesiones.md) §REST, [`core/14-consumers.md`](../core/14-consumers.md) §REST API, gap register [`technical-debt.md`](./technical-debt.md) (hub): [`technical-debt-platform-core-ci.md`](./technical-debt-platform-core-ci.md) §1, [`technical-debt-deferred.md`](./technical-debt-deferred.md) §3 (docs), [`technical-debt-security-production.md`](./technical-debt-security-production.md) §1 (security).
 
 ---
 
@@ -31,14 +31,14 @@ Express **`Router`** from **`createRuntimeRestRouter(options)`** after **`Agent.
 | **POST** | `/agents/:agentId/resume` | Body: **`runId`**, **`sessionId`**, **`resumeInput` `{ type, content }`**, optional **`projectId`**, **`wait`**. Inline needs **`runStore`** on **`AgentRuntime`**. JSON responses include effective **`projectId`** when enqueuing or completing inline. |
 | **GET** | `/runs/:runId?sessionId=` | Snapshot from **`runStore`**; **`sessionId`** query required; checks session match; when **`run.projectId`** is set, must match effective tenant (**403**). Response may include **`projectId`**. |
 | **GET** | `/runs/:runId/history?sessionId=` | Full **`Run.history`** (**`ProtocolMessage[]`**) — same **`sessionId`** / **`run.projectId`** rules as **`GET /runs/:runId`**. |
-| **GET** | `/agents/:agentId/runs` | With **`runStore`**: dashboard-style list via **`RunStore.listByAgent`** — optional **`?status=`**, **`?sessionId=`**, **`?limit=`** (default **50**, max **100**). Rows with **`run.projectId`** set are dropped when it disagrees with the effective tenant (same legacy caveat as **`GET /runs`** when **`projectId`** is absent on stored runs — [`technical-debt.md`](./technical-debt.md) §7). |
+| **GET** | `/agents/:agentId/runs` | With **`runStore`**: dashboard-style list via **`RunStore.listByAgent`** — optional **`?status=`**, **`?sessionId=`**, **`?limit=`** (default **50**, max **100**). Rows with **`run.projectId`** set are dropped when it disagrees with the effective tenant (same legacy caveat as **`GET /runs`** when **`projectId`** is absent on stored runs — [`technical-debt-security-production.md`](./technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1). |
 | **GET** | `/jobs/:jobId` | Only with **`dispatch`** — BullMQ job state + **`run`** summary when completed. |
 
 **Options (summary):** **`runtime`** (inline + memory + inter-agent send when **`runtime.config.messageBus`** is set), **`dispatch: { engine, queueEvents?, jobWaitTimeoutMs? }`** (BullMQ, peers **`@opencoreagents/adapters-bullmq`** + **`bullmq`**), **`projectId`** (fixed tenant) or multi-tenant via **`X-Project-Id`** → **`?projectId=`** → **`body.projectId`**, **`resolveProjectId(req)`**, **`allowedProjectIds`**, **`agentIds`**, **`apiKey`** / **`resolveApiKey(req, res)`** (tenant resolved **before** auth — use **`getRuntimeRestRouterProjectId(res)`** for per-project secrets), **`runStore`**, **`swagger`** (OpenAPI **3.0** + Swagger UI on **`/openapi.json`** / **`/docs`** by default).
 
 **Exports:** **`createRuntimeRestRouter`**, **`defaultRuntimeRestResolveProjectId`**, **`getRuntimeRestRouterProjectId`**, **`mapEngineErrorToHttp`**, **`RUNTIME_REST_ENGINE_ERROR_CODES`**, **`isBullmqJobWaitTimeoutError`**, **`buildRuntimeRestOpenApiSpec`**, **`normalizeRuntimeRestSwaggerPaths`**, **`runtimeRestSwaggerInfo`**, **`runtimeRestSwaggerUiHtml`**, **`summarizeEngineRun`**, **`summarizeRunListEntry`**, **`RuntimeRestRunListItem`**.
 
-**Limits / gaps (library, not product):** JSON body **512kb**; **no** **`endUserId`** / **`expiresAtMs`** on **`POST` run/resume** bodies (use **`dispatch`** / **`EngineJobPayload`** if needed); **read-only** memory via **`GET …/memory`** ( **`endUserId`** as query only); **no** define CRUD routes; **no** in-router rate limit or idempotency; legacy **`Run`** rows without **`projectId`** skip tenant check on **`GET /runs`** until migrated on resume — [`technical-debt.md`](./technical-debt.md) §7. Non-**`EngineError`** failures still return generic bodies (**500** / **400**). **`MessageBus`** keys are **`toAgentId`**-scoped — same shared-store caveats as [**`technical-debt.md`**](./technical-debt.md) §1 (**`run:agent:{id}`** / **`bus:agent:{id}`**). With **`swagger`**, **`/openapi.json`** and **`/docs`** skip API-key middleware and Swagger UI loads from **unpkg** — host CSP / network policy: [**`technical-debt.md`**](./technical-debt.md) §1 (**`rest-api`** row), §7 (**OpenAPI / Swagger UI**), §9.
+**Limits / gaps (library, not product):** JSON body **512kb**; **no** **`endUserId`** / **`expiresAtMs`** on **`POST` run/resume** bodies (use **`dispatch`** / **`EngineJobPayload`** if needed); **read-only** memory via **`GET …/memory`** ( **`endUserId`** as query only); **no** define CRUD routes; **no** in-router rate limit or idempotency; legacy **`Run`** rows without **`projectId`** skip tenant check on **`GET /runs`** until migrated on resume — [`technical-debt-security-production.md`](./technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1. Non-**`EngineError`** failures still return generic bodies (**500** / **400**). **`MessageBus`** keys are **`toAgentId`**-scoped — same shared-store caveats as [**`technical-debt-platform-core-ci.md`**](./technical-debt-platform-core-ci.md#1-platform-and-packages) §1 (**Message bus stream keys**). With **`swagger`**, **`/openapi.json`** and **`/docs`** skip API-key middleware and Swagger UI loads from **unpkg** — host CSP / network policy: [**`technical-debt-platform-core-ci.md`**](./technical-debt-platform-core-ci.md#1-platform-and-packages) §1 (**`rest-api`** row), [`technical-debt-security-production.md`](./technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1 (**OpenAPI / Swagger UI**), [`technical-debt-security-production.md`](./technical-debt-security-production.md#3-production-architecture-checklist-host--operator) §3.
 
 **Try it:** [`examples/plan-rest-express/`](../../examples/plan-rest-express/) — enables **`swagger`** (**`GET /openapi.json`**, **`GET /docs`**) without **`REST_API_KEY`**.
 
@@ -107,10 +107,10 @@ Long-term product surface (from brainstorm **`07`**). **`rest-api`** covers only
 | **GET** | `/agents` | List agent ids for tenant | ✓ |
 | **POST** | `/agents/:id/run` | User message → run (job or inline) | ✓ (`message` body; no **`endUserId`**/**`expiresAtMs`** in HTTP — use queue payload) |
 | **POST** | `/agents/:id/resume` | Resume **`wait`** | ✓ |
-| **GET** | `/runs/:runId` | Run snapshot | ✓ ( **`sessionId`** query; **`run.projectId`** vs tenant when set — debt §7) |
+| **GET** | `/runs/:runId` | Run snapshot | ✓ ( **`sessionId`** query; **`run.projectId`** vs tenant when set — debt §1) |
 | **GET** | `/runs/:runId/history` | Full **`Run.history`** | ✓ (same **`sessionId`** / tenant rules) |
 | **GET** | `/agents/:id/memory` | Scoped memory read | ✓ (**`MemoryAdapter.query`**; needs router **`runtime`**) |
-| **GET** | `/agents/:id/runs` | List run summaries (dashboard) | ✓ (**`RunStore.listByAgent`** + tenant filter when **`run.projectId`** set — debt §7) |
+| **GET** | `/agents/:id/runs` | List run summaries (dashboard) | ✓ (**`RunStore.listByAgent`** + tenant filter when **`run.projectId`** set — debt §1) |
 | **GET** | `/agents/:id/logs` or extended run history | Dashboards | **`GET /runs/:runId/history`** (full **`Run.history`**) + **`GET /agents/:id/runs`** (list summaries); no separate **`/agents/:id/logs`** path |
 | **POST** | `/agents/:from/send` | Inter-agent | ✓ (**`MessageBus.send`**; **`system_send_message`** rules; needs **`runtime` + `messageBus`**) |
 
@@ -125,7 +125,7 @@ Long-term product surface (from brainstorm **`07`**). **`rest-api`** covers only
 | **R0 — Contract** | OpenAPI + error model | **`swagger`** + **`buildRuntimeRestOpenApiSpec`**: **`RuntimeRestJsonError`**; paths gated by **`hasDispatch`**, **`hasMemoryRead`**, **`hasInterAgentSend`**, **`hasRunStore`** (incl. **`/agents/{agentId}/runs`**, **`/runs/{runId}/history`**, **`/agents/{fromAgentId}/send`**). **`mapEngineErrorToHttp`** for **`EngineError`** on inline **`run` / `resume` / `GET /runs*`**. **`RUNTIME_REST_ENGINE_ERROR_CODES`**. |
 | **R1 — Minimal server** | run / resume / run read / inter-agent | **`rest-api`** inline + **`runStore`**; **`GET /agents/:id/memory`**, **`GET /agents/:id/runs`**, **`GET /runs/:id`**, **`GET /runs/:id/history`**, **`POST …/send`** with **`runtime`** (**`messageBus`** for send); tests cover memory, list, history, **`MessageBus`**, resume after **`wait`**, **`agentIds`** ∩ registry. |
 | **R2 — Async** | **202** + poll | **`dispatch`** + **`GET /jobs/:jobId`**, **`wait=1`** (tested); **`isBullmqJobWaitTimeoutError`** for **504** vs **502** on **`waitUntilFinished`**; worker = [`dispatchEngineJob`](../../packages/core/src/engine/dispatchJob.ts) / [`21-dynamic-runtime-rest.md`](../core/21-dynamic-runtime-rest.md). |
-| **R3 — Multi-tenant** | Safe tenancy | Fixed / resolved **`projectId`**, **`allowedProjectIds`**, **`resolveApiKey`**; **`Run.projectId`** + **`GET /runs`** **403** on mismatch; legacy runs → [`technical-debt.md`](./technical-debt.md) **§7**. |
+| **R3 — Multi-tenant** | Safe tenancy | Fixed / resolved **`projectId`**, **`allowedProjectIds`**, **`resolveApiKey`**; **`Run.projectId`** + **`GET /runs`** **403** on mismatch; legacy runs → [`technical-debt-security-production.md`](./technical-debt-security-production.md#1-security-integrity-and-production-readiness) **§1**. |
 | **R4 — Streaming** | SSE / hooks on wire | Not in **`rest-api`**; see **`real-world-with-express`**. |
 
 ---
@@ -153,6 +153,6 @@ For the **URL table in § Implemented today**, the **`@opencoreagents/rest-api`*
 - [`examples/dynamic-runtime-rest/`](../../examples/dynamic-runtime-rest/)
 - [`examples/README.md`](../../examples/README.md)
 - [`plan.md`](./plan.md)
-- [`technical-debt.md`](./technical-debt.md)
+- [`technical-debt.md`](./technical-debt.md) (hub: [`technical-debt-security-production.md`](./technical-debt-security-production.md), [`technical-debt-platform-core-ci.md`](./technical-debt-platform-core-ci.md), [`technical-debt-deferred.md`](./technical-debt-deferred.md))
 - Cluster: [`core/19-cluster-deployment.md`](../core/19-cluster-deployment.md)
 - Dynamic runtime: [`core/21-dynamic-runtime-rest.md`](../core/21-dynamic-runtime-rest.md)

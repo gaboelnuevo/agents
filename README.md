@@ -68,7 +68,7 @@ You keep **auth, tenant isolation, billing, and your data plane**.
 
 This codebase gives you the **agent runtime and integration patterns** so you are not rebuilding loops, job dispatch, and dynamic registration from scratch.
 
-Before customer traffic, read [**`docs/planning/technical-debt.md`**](docs/planning/technical-debt.md) and [**`docs/core/08-scope-and-security.md`**](docs/core/08-scope-and-security.md).
+Before customer traffic, read [**`docs/planning/technical-debt.md`**](docs/planning/technical-debt.md) (start with [**`technical-debt-security-production.md`**](docs/planning/technical-debt-security-production.md) for tenancy and HTTP gaps) and [**`docs/core/08-scope-and-security.md`**](docs/core/08-scope-and-security.md).
 
 Demos use permissive defaults (mock LLM, in-memory stores) on purpose—**swap them for Redis, real LLMs, and strict keys** in your deployment.
 
@@ -315,7 +315,7 @@ Your **HTTP control plane** (Express or any framework) typically **writes defini
 
 - [`docs/planning/README.md`](docs/planning/README.md) — index (plan, scaffold, technical debt, REST, CLI, MCP)
 - [`docs/planning/plan.md`](docs/planning/plan.md) — implementation plan
-- [`docs/planning/technical-debt.md`](docs/planning/technical-debt.md) — known gaps and deferrals
+- [`docs/planning/technical-debt.md`](docs/planning/technical-debt.md) — known gaps (hub; priority splits: [`technical-debt-security-production.md`](docs/planning/technical-debt-security-production.md), [`technical-debt-platform-core-ci.md`](docs/planning/technical-debt-platform-core-ci.md), [`technical-debt-deferred.md`](docs/planning/technical-debt-deferred.md))
 
 ---
 

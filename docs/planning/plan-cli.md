@@ -13,7 +13,7 @@
 | **`runtime` binary** | **Shipped** — `packages/cli`: `init`, `generate agent|tool|skill` delegating to `@opencoreagents/scaffold`. |
 | **Runtime commands** (`run`, `resume`, `memory`, `logs`, `list`, `send`) | **Not in monorepo** — brainstorm only; users run generated project scripts or embed the SDK. |
 
-See [`technical-debt.md`](./technical-debt.md) §4 (CLI and scaffold).
+See [`technical-debt-deferred.md`](./technical-debt-deferred.md#2-cli-and-scaffold) §2 (CLI and scaffold).
 
 ---
 

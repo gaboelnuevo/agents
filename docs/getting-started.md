@@ -284,7 +284,7 @@ The sections below point to documentation in this repository that goes beyond th
 | [Documentation index](./README.md) | Hub: **Getting started** (this guide), **[Agent Engine overview](./agent-engine-overview.md)** (full narrative), quick links to **Engine reference** and other docs. |
 | [Repository root README](../README.md) | Monorepo layout, `pnpm` / Turbo commands, how packages relate. |
 | [plan.md](./planning/plan.md) | Roadmap and implementation progress. |
-| [technical-debt.md](./planning/technical-debt.md) | Known gaps and deferrals. |
+| [technical-debt.md](./planning/technical-debt.md) | Known gaps (hub; triage [security & production](./planning/technical-debt-security-production.md) before [deferred / examples](./planning/technical-debt-deferred.md)). |
 
 ### Core engine reference (`docs/core/`)
 

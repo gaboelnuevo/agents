@@ -26,7 +26,7 @@ interface MemoryScope {
 
 The adapter uses `MemoryScope` to build storage keys. When `endUserId` is present, `longTerm` and `vectorMemory` are keyed by it instead of `sessionId`, enabling persistence across conversations for the same end-user. See [15-multi-tenancy.md §4.3](./15-multi-tenancy.md) for the full end-user memory model.
 
-**`RedisMemoryAdapter` / `UpstashRedisMemoryAdapter`:** each `(keyPrefix):(memoryType)` is stored as a Redis **LIST**; **`save`** uses **`RPUSH`** so concurrent workers do not drop each other’s appends. Older deployments that used a **STRING** value (JSON array) are migrated to LIST on the first write after upgrade ([`technical-debt.md` §8](../planning/technical-debt.md)).
+**`RedisMemoryAdapter` / `UpstashRedisMemoryAdapter`:** each `(keyPrefix):(memoryType)` is stored as a Redis **LIST**; **`save`** uses **`RPUSH`** so concurrent workers do not drop each other’s appends. Older deployments that used a **STRING** value (JSON array) are migrated to LIST on the first write after upgrade ([`technical-debt-security-production.md` §2](../planning/technical-debt-security-production.md#2-multi-worker-concurrency-and-integrity)).
 
 ### Key patterns
 

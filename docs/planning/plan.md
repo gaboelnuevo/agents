@@ -11,7 +11,7 @@
 | [`plan-cli.md`](./plan-cli.md) | **`@opencoreagents/cli`**: scaffold (done) vs future **`run` / `resume` / memory / logs**. |
 | [`plan-rest.md`](./plan-rest.md) | **HTTP/JSON** — vision + **`@opencoreagents/rest-api`** (`createRuntimeRestRouter`), async **`dispatch`**, tenancy, gaps. |
 | [`plan-mcp.md`](./plan-mcp.md) | **Model Context Protocol** — MCP server as channel over SDK or REST. |
-| [`technical-debt.md`](./technical-debt.md) | **Gaps and deferrals** — security, tenancy, REST/MCP product shape; pairs with **§9** below. |
+| [`technical-debt.md`](./technical-debt.md) | **Gaps and deferrals** (hub): **[security & production](./technical-debt-security-production.md)**, **[platform / CI](./technical-debt-platform-core-ci.md)**, **[deferred](./technical-debt-deferred.md)** — pairs with **§9** below. |
 
 **Runnable examples:** [`examples/minimal-run`](../../examples/minimal-run/) (mock LLM, **`AgentRuntime`**, no keys); [`examples/openai-tools-skill`](../../examples/openai-tools-skill/) (`OpenAILLMAdapter` + tool + skill, **`OPENAI_API_KEY`**); [`examples/console-wait`](../../examples/console-wait/) (**`onWait`** + stdin); [`examples/rag`](../../examples/rag/) (**`registerRagToolsAndSkills`**, **`registerRagCatalog(runtime, …)`**, **`system_ingest_rag_source`** / **`system_vector_search`**; optional **`start:openai`**); [`examples/rag-contact-support`](../../examples/rag-contact-support/) (same RAG stack + custom **`contact_support`** tool, scripted LLM).
 
@@ -35,7 +35,7 @@
 | **Core Vitest suite** (`packages/core/tests`) | **Green in CI** — includes **`engine`**, **`run-store`**, **`session-expiry`**, **`rag-file-catalog`**, **`runtime-tool-allowlist`**, **`send-message-validation`**, **`vector-limits`**, **`tool-failure-observation`**, **`memory-scope`**, **`parse-recovery`**, **`runtime-limits`**, **`watch-usage`**, **`hooks`**, **`multi-agent`**, plus **`skill-define`**, **`tool-runner`**, **`resolve-llm-adapter`** |
 | **Session expiry** | **Done** — optional **`SessionOptions.expiresAtMs`** / **`Session.isExpired()`**; **`RunBuilder`** rejects expired sessions on **`run`**, **`resume`**, and **`onWait`** continuations; **`SessionExpiredError`** (`SESSION_EXPIRED`) — tests: `packages/core/tests/session-expiry.test.ts` |
 
-For package-level detail, see **`docs/planning/scaffold.md` §0.8** and **§12**. Known gaps and deferrals: [**`docs/planning/technical-debt.md`**](./technical-debt.md).
+For package-level detail, see **`docs/planning/scaffold.md` §0.8** and **§12**. Known gaps and deferrals: [**`docs/planning/technical-debt.md`**](./technical-debt.md) (hub; triage **[security & production](./technical-debt-security-production.md)** first).
 
 ---
 
@@ -93,7 +93,7 @@ For package-level detail, see **`docs/planning/scaffold.md` §0.8** and **§12**
 | 1.10 | `ToolRunner` — registry, allowlist check, validate, execute | `src/tools/ToolRunner.ts` | Unit: register, resolve, allowlist deny, validate fail, execute success/error |
 | 1.11 | Built-in tools: `system_save_memory`, `system_get_memory` | `src/tools/builtins.ts` | Unit: each tool with mock `MemoryAdapter` |
 | 1.12 | `EngineDeps`, `EngineHooks`, `LLMResponseMeta` types | `src/engine/types.ts` | Type-only |
-| 1.13 | `ContextBuilder` | `src/context/ContextBuilder.ts` | Unit: deterministic output; tool catalog from agent + skills (+ registry). **`SecurityContext` on input type is unused in `build()`** — see [`technical-debt.md`](./technical-debt.md) §7 |
+| 1.13 | `ContextBuilder` | `src/context/ContextBuilder.ts` | Unit: deterministic output; tool catalog from agent + skills (+ registry). **`SecurityContext` on input type is unused in `build()`** — see [`technical-debt-security-production.md`](./technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1 |
 | 1.14 | `executeRun` — main loop (+ `createRun`) | `src/engine/Engine.ts` | Integration: thought→action→result cycle; wait→resume; max iterations; parse recovery (1 re-prompt then fail) |
 | 1.15 | Define API: `Tool.define`, `Skill.define`, `Agent.define`, `Session`, **`Agent.load(agentId, runtime, { session })`** | `src/define/*.ts`, `src/runtime/AgentRuntime.ts` | Integration: **`new AgentRuntime({ … })`** → define→load→run with in-memory adapters |
 | 1.16 | `watchUsage` helper | `src/engine/watchUsage.ts` | Unit: totals + **wasted** tokens when parse fails (`onLLMAfterParse`) |
@@ -282,9 +282,9 @@ Use **`@opencoreagents/adapters-upstash`** when you want **HTTP-only** Redis (se
 | Step | What | Verify |
 |------|------|--------|
 | 9.1 | End-to-end: define tools + skills + agent → **`new AgentRuntime({ memoryAdapter, llmAdapter, … })`** → **`Agent.load(..., runtime, { session })`** → run with **TCP Redis** (`adapters-redis`) or Upstash REST + OpenAI | Full cycle completes, memory persists across runs |
-| 9.2 | End-user session: `endUserId` scoping — `longTerm` keyed by user, `shortTerm` by session | **`tests/memory-scope.test.ts`** — **`InMemoryMemoryAdapter`**; **TCP/Upstash** adapters still use one key prefix per scope (see `technical-debt`) |
+| 9.2 | End-user session: `endUserId` scoping — `longTerm` keyed by user, `shortTerm` by session | **`tests/memory-scope.test.ts`** — **`InMemoryMemoryAdapter`**; **TCP/Upstash** adapters still use one key prefix per scope (see [`technical-debt-platform-core-ci.md`](./technical-debt-platform-core-ci.md#1-platform-and-packages) §1, memory keys row) |
 | 9.3 | `watchUsage` in production-like run — verify token accumulation, `organizationId`/`projectId` present | **`tests/watch-usage.test.ts`** — totals, **wasted** (recoverable + **fatal** **`StepSchemaError`**), **`getUsage()`** after run/reject |
-| 9.4 | Security: define with `end_user` principal fails; run with wrong `projectId` fails | **`SecurityError`** exists but is **not thrown** in core yet — enforce in host layer; see [`technical-debt.md`](./technical-debt.md) §7 |
+| 9.4 | Security: define with `end_user` principal fails; run with wrong `projectId` fails | **`SecurityError`** exists but is **not thrown** in core yet — enforce in host layer; see [`technical-debt-security-production.md`](./technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1 |
 | 9.5 | Error resilience: LLM returns garbage → 1 re-prompt → valid step OR `StepSchemaError` | **`tests/parse-recovery.test.ts`** — recovery success + **`StepSchemaError`** when recovery exhausted |
 | 9.6 | Timeout: global run timeout triggers `RunTimeoutError`, abort triggers `RunCancelledError` | **`tests/runtime-limits.test.ts`** — `startedAtMs` in the past vs **`runTimeoutMs`**; **`AbortSignal`** already aborted |
 | 9.7 | RAG catalog: **`validateRagFileCatalog`**, **`AgentRuntime.registerRagCatalog`**, **`ragCatalogForProject`** → **`buildEngineDeps`** | **`tests/rag-file-catalog.test.ts`** |

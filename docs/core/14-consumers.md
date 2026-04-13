@@ -63,4 +63,4 @@ Deeper implementation of each is **out of scope** for this file.
 
 ## Production note
 
-Any **SDK** or **queue** consumer that faces the internet should sit behind **authentication**, **tenant resolution** (`projectId`, optional `endUserId`), and **rate limits** before calling `Agent.load` / `dispatchEngineJob`. Reuse the checklist in [08-scope-and-security.md §7](./08-scope-and-security.md) and the concrete gaps in [`technical-debt.md` §7–§9](../planning/technical-debt.md) (tool leakage, `RunStore` races, job idempotency).
+Any **SDK** or **queue** consumer that faces the internet should sit behind **authentication**, **tenant resolution** (`projectId`, optional `endUserId`), and **rate limits** before calling `Agent.load` / `dispatchEngineJob`. Reuse the checklist in [08-scope-and-security.md §7](./08-scope-and-security.md) and the concrete gaps in [`technical-debt-security-production.md` §1–§3](../planning/technical-debt-security-production.md) (tool leakage, `RunStore` races, job idempotency).

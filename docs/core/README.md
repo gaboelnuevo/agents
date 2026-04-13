@@ -17,7 +17,7 @@ The monorepo implements the engine, adapters (**OpenAI** and **Anthropic**; **TC
 | [05-adapters.md](./05-adapters.md) | Memory, Tool, **RunStore**; **`adapters-bullmq`** (priority queue); **QStash** alternative; **`adapters-redis`** (TCP, default for clusters); Upstash REST + vector; **`adapters-http-tool`**; **`dynamic-definitions`** (store facade: **`store.methods`** + **`store.Agent`**, per-job hydrate) |
 | [06-mvp.md](./06-mvp.md) | Minimum engine scope, adapters, **RunStore** / cluster resume, risks |
 | [07-definition-syntax.md](./07-definition-syntax.md) | JSON + library `Tool.define` / `Skill.define` / `defineBatch` / `Agent.define`, `SkillDefinitionPersisted`, `load`, `run` |
-| [08-scope-and-security.md](./08-scope-and-security.md) | Scope, **SecurityLayer**, **§7 production checklist**, [`technical-debt.md`](../planning/technical-debt.md) §7–§9 |
+| [08-scope-and-security.md](./08-scope-and-security.md) | Scope, **SecurityLayer**, **§7 production checklist**, [`technical-debt-security-production.md`](../planning/technical-debt-security-production.md) §1–§3 |
 | [09-communication-multiagent.md](./09-communication-multiagent.md) | **MessageBus** + **`AgentRuntime`**, `system_send_message`, `wait`/`resume` across agents |
 | [10-llm-adapter.md](./10-llm-adapter.md) | **LLMAdapter** contract; wiring via **`AgentRuntime`** (`llmAdapter` / `llmAdaptersByProvider`) |
 | [11-context-builder.md](./11-context-builder.md) | Prompt ordering, truncation, **effectiveToolAllowlist** (registry ∩ agent/skills); **SecurityContext** not applied to prompt tools yet ([08](./08-scope-and-security.md) §2), **Step** shape |

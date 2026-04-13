@@ -41,7 +41,7 @@ When the agent references `tools: ["system_save_memory", "upstash_trigger"]`:
 
 Definitions may be registered from **code** (`Tool.define` / `Skill.define` / `Agent.define`) or **hydrated** from a store into the same registry (`Skill.define` with JSON metadata + optional `execute`, or `Skill.defineBatch`); resolution rules are unchanged. See [07-definition-syntax.md](./07-definition-syntax.md) §9.2b.
 
-**Today in core:** the prompt tool catalog is the agent allowlist (**explicit `tools` + tools from `skills`**) intersected with the **tool registry** and optional **`AgentRuntime.allowedToolIds`** — see `ContextBuilder` / `effectiveToolAllowlist`. **`SecurityContext` is not applied there yet** (no role-based hiding of tools in the LLM payload). Hosts must treat **definition resolution + agent allowlist** as the enforced surface unless they add their own filtering. Gap: [`technical-debt.md` §7](../planning/technical-debt.md) (`SecurityContext` / `ContextBuilder`).
+**Today in core:** the prompt tool catalog is the agent allowlist (**explicit `tools` + tools from `skills`**) intersected with the **tool registry** and optional **`AgentRuntime.allowedToolIds`** — see `ContextBuilder` / `effectiveToolAllowlist`. **`SecurityContext` is not applied there yet** (no role-based hiding of tools in the LLM payload). Hosts must treat **definition resolution + agent allowlist** as the enforced surface unless they add their own filtering. Gap: [`technical-debt-security-production.md` §1](../planning/technical-debt-security-production.md#1-security-integrity-and-production-readiness) (`SecurityContext` / `ContextBuilder`).
 
 ---
 
@@ -117,7 +117,7 @@ interface SecurityContext {
 - **Run / resume**: same tenant; optional quotas; for end-users, validate **`endUserId`** belongs to the customer.
 - **Define**: administrative scopes; **`end_user`** principals must not define tools/agents.
 
-**Inside core today:** **`ToolRunner`** enforces the **agent + skills (+ runtime) tool allowlist** and per-tool **`validate`**, but **does not** re-check **`SecurityContext.roles` / `scopes`** on each invocation. **`ContextBuilder`** receives **`securityContext`** on its input type but **does not use it** when building the tool list. See [`technical-debt.md` §7](../planning/technical-debt.md).
+**Inside core today:** **`ToolRunner`** enforces the **agent + skills (+ runtime) tool allowlist** and per-tool **`validate`**, but **does not** re-check **`SecurityContext.roles` / `scopes`** on each invocation. **`ContextBuilder`** receives **`securityContext`** on its input type but **does not use it** when building the tool list. See [`technical-debt-security-production.md` §1](../planning/technical-debt-security-production.md#1-security-integrity-and-production-readiness).
 
 ### 3.4 Alignment with `security` definitions
 
@@ -176,12 +176,12 @@ The **SecurityLayer** and **tenant rules** in this doc are **contracts** for you
 | Area | What to enforce in production |
 |------|------------------------------|
 | **Entry** | Authenticate every **`run`** / **`resume`**; map the principal to **`projectId`** (and **`endUserId`** when the agent serves end-users). Do not expose **`Agent.load`** / **`AgentRuntime`** construction without this step. |
-| **Runs** | Treat **`runId`** as sensitive; bind **resume** to the same **session/tenant** as create (see [`technical-debt.md` §7](../planning/technical-debt.md)). Use **`RunStore`** + queue **idempotency** in clusters ([`technical-debt.md` §8](../planning/technical-debt.md)). |
+| **Runs** | Treat **`runId`** as sensitive; bind **resume** to the same **session/tenant** as create (see [`technical-debt-security-production.md` §1](../planning/technical-debt-security-production.md#1-security-integrity-and-production-readiness)). Use **`RunStore`** + queue **idempotency** in clusters ([`technical-debt-security-production.md` §2](../planning/technical-debt-security-production.md#2-multi-worker-concurrency-and-integrity)). |
 | **Tools** | Treat every **`system_*`** tool registered by **`AgentRuntime`** or **`@opencoreagents/rag`** (memory, vector, RAG catalog, file I/O, messaging), plus any **custom** file/HTTP tools, as **privileged**; allowlist per product; cap **LLM** and **embedding** cost (**`topK`**, timeouts). |
 | **Errors & logs** | Do not stream raw **tool** stack traces or internal **`e.message`** back to the model or client; log server-side with **`runId`**. |
 | **Infra** | Redis/vector **TLS**, **ACL**, key **prefixes** per environment; identical **bootstrap** (**`AgentRuntime`** wiring + definitions) on every worker ([19-cluster-deployment.md](./19-cluster-deployment.md)). |
 
-Full gap list: [`technical-debt.md` §7–§9](../planning/technical-debt.md).
+Full gap list: [`technical-debt-security-production.md` §1–§3](../planning/technical-debt-security-production.md) (sections **1–3** in that file; hub: [`technical-debt.md`](../planning/technical-debt.md)).
 
 ---
 

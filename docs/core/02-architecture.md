@@ -1,6 +1,6 @@
 # Internal engine architecture
 
-Each worker process constructs **`new AgentRuntime({ … })`** at boot (adapters, built-in tools, optional **`runStore`** / **`messageBus`**) and passes that instance into **`Agent.load`** / job dispatch — see [19-cluster-deployment.md §2](./19-cluster-deployment.md). Definitions (**`Tool.define`**, **`Skill.define`** / **`defineBatch`**, **`Agent.define`**) fill the in-process registry; skills may also be hydrated from JSON ([07-definition-syntax.md §9.2b](./07-definition-syntax.md)). **Production:** auth and tenant isolation live **outside** the engine package — [08-scope-and-security.md §7](./08-scope-and-security.md), [`technical-debt.md`](../planning/technical-debt.md) §7–§9.
+Each worker process constructs **`new AgentRuntime({ … })`** at boot (adapters, built-in tools, optional **`runStore`** / **`messageBus`**) and passes that instance into **`Agent.load`** / job dispatch — see [19-cluster-deployment.md §2](./19-cluster-deployment.md). Definitions (**`Tool.define`**, **`Skill.define`** / **`defineBatch`**, **`Agent.define`**) fill the in-process registry; skills may also be hydrated from JSON ([07-definition-syntax.md §9.2b](./07-definition-syntax.md)). **Production:** auth and tenant isolation live **outside** the engine package — [08-scope-and-security.md §7](./08-scope-and-security.md), [`technical-debt-security-production.md`](../planning/technical-debt-security-production.md) §1–§3.
 
 ## Component view
 

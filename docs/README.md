@@ -20,7 +20,7 @@ Developer **monorepo** entry (packages, `pnpm` commands): [README](../README.md)
 | **REST plugin (`createRuntimeRestRouter`)** | [planning/plan-rest.md](./planning/plan-rest.md) |
 | **Dynamic definitions + Redis + workers** | [core/21-dynamic-runtime-rest.md](./core/21-dynamic-runtime-rest.md) |
 | **Roadmap** | [planning/plan.md](./planning/plan.md) |
-| **Known gaps** | [technical-debt.md](./planning/technical-debt.md) |
+| **Known gaps** | [technical-debt.md](./planning/technical-debt.md) (hub: [security & production](./planning/technical-debt-security-production.md), [platform / CI](./planning/technical-debt-platform-core-ci.md), [deferred](./planning/technical-debt-deferred.md)) |
 | **Scope and security** | [core/08-scope-and-security.md](./core/08-scope-and-security.md) |
 | **Agent Engine (product overview)** | [agent-engine-overview.md](./agent-engine-overview.md) |
 | **Runnable examples** (`examples/*` index) | [examples/README.md](../examples/README.md) |

@@ -50,13 +50,13 @@ This allows an end-user facing agent to recall facts about a returning customer 
 
 ## 3. Tool visibility and security
 
-**Implemented today:** The prompt’s tool list is **`effectiveToolAllowlist`**: tools from the agent definition (**explicit `tools` + tools from resolved `skills`**) intersected with the **tool registry** and optional **`AgentRuntime.allowedToolIds`**. **`SecurityContext` is not applied inside `ContextBuilder` to hide tools** — see [08-scope-and-security.md](./08-scope-and-security.md) §2 and [technical-debt.md](../planning/technical-debt.md) §7.
+**Implemented today:** The prompt’s tool list is **`effectiveToolAllowlist`**: tools from the agent definition (**explicit `tools` + tools from resolved `skills`**) intersected with the **tool registry** and optional **`AgentRuntime.allowedToolIds`**. **`SecurityContext` is not applied inside `ContextBuilder` to hide tools** — see [08-scope-and-security.md](./08-scope-and-security.md) §2 and [technical-debt-security-production.md](../planning/technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1.
 
 **Memory blocks:** Do not surface **other projects'** or **other end-users'** data: **`MemoryAdapter`** / keying must respect **`projectId`** and **`endUserId`** ([15-multi-tenancy.md](./15-multi-tenancy.md), [05-adapters.md](./05-adapters.md)).
 
 **Host responsibility:** Authenticate and authorize **before** **`Agent.load(agentId, runtime, { session })`**; optionally narrow **`allowedToolIds`** or omit definitions so the model never sees forbidden tools.
 
-**Target (core, not shipped):** Intersect the catalog with **`SecurityContext.scopes`** and default-deny sensitive tools (e.g. `system_send_message`) without explicit scope — same gap as [technical-debt.md](../planning/technical-debt.md) §7.
+**Target (core, not shipped):** Intersect the catalog with **`SecurityContext.scopes`** and default-deny sensitive tools (e.g. `system_send_message`) without explicit scope — same gap as [technical-debt-security-production.md](../planning/technical-debt-security-production.md#1-security-integrity-and-production-readiness) §1.
 
 ---
 

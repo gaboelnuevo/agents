@@ -157,7 +157,7 @@ Pass **`runStore`** (and other adapters) in the **`AgentRuntime`** constructor a
 - **Memory adapters (`Redis` / `Upstash`)** use **read–modify–write** for **`save`** (append to a JSON list). Concurrent **`system_save_memory`** for the **same** session + `memoryType` can **lose** updates. Use app-level serialization, **Lua** / **`WATCH`**, or list primitives if you need atomic append under load.
 - **`EngineJobPayload`** (BullMQ) includes **`sessionId`**, optional **`endUserId`**, and optional **`expiresAtMs`**. **`dispatchEngineJob`** forwards **`endUserId`** into **`Session`** and throws **`EngineJobExpiredError`** if the job is processed after **`expiresAtMs`** — treat as **non-retryable** in BullMQ if appropriate. For B2B2C **`longTerm`** / **`vectorMemory`**, enqueue jobs with **`endUserId`** set when the run is on behalf of an end-user ([15-multi-tenancy.md §4](./15-multi-tenancy.md)).
 
-Full table: [`technical-debt.md` §8](../planning/technical-debt.md).
+Full table: [`technical-debt-security-production.md` §2](../planning/technical-debt-security-production.md#2-multi-worker-concurrency-and-integrity).
 
 ---
 
