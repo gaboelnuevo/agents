@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Runtime · Playground</title>
+    <style>
+      :root {
+        --bg: #f4f2ef;
+        --surface: #fff;
+        --text: #1a1a1a;
+        --muted: #5c5c5c;
+        --border: #e0dcd6;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --radius: 10px;
+        --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141414;
+          --surface: #1e1e1e;
+          --text: #f0f0f0;
+          --muted: #9a9a9a;
+          --border: #333;
+          --accent: #3b82f6;
+          --accent-hover: #60a5fa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .wrap {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 1.75rem 1.25rem 3rem;
+      }
+      header {
+        margin-bottom: 1.5rem;
+      }
+      header h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.35rem;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      header a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      header a:hover {
+        text-decoration: underline;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+      label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+      }
+      input[type="text"],
+      input[type="password"],
+      select,
+      textarea {
+        width: 100%;
+        font: inherit;
+        padding: 0.55rem 0.65rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+      }
+      textarea {
+        min-height: 7rem;
+        resize: vertical;
+        font-family: var(--mono);
+        font-size: 0.85rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .row:last-child {
+        margin-bottom: 0;
+      }
+      .grow {
+        flex: 1;
+        min-width: 8rem;
+      }
+      button {
+        font: inherit;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+      }
+      button:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid var(--border);
+      }
+      button.secondary:hover:not(:disabled) {
+        background: var(--bg);
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.9rem;
+        color: var(--text);
+      }
+      .check input {
+        width: auto;
+      }
+      #status {
+        font-size: 0.85rem;
+        color: var(--muted);
+        min-height: 1.25rem;
+        margin-bottom: 0.5rem;
+      }
+      #status.err {
+        color: #b91c1c;
+      }
+      @media (prefers-color-scheme: dark) {
+        #status.err {
+          color: #f87171;
+        }
+      }
+      pre {
+        margin: 0;
+        padding: 0.85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .reply {
+        margin-top: 0.75rem;
+        padding: 0.85rem 1rem;
+        border-left: 3px solid var(--accent);
+        background: var(--bg);
+        border-radius: 0 6px 6px 0;
+        font-size: 0.95rem;
+      }
+      .reply strong {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>OpenCore Agents · Runtime playground</h1>
+        <p>
+          Same API as <a href="/docs" target="_blank" rel="noopener">/docs</a> — try runs and
+          <code>continue</code> without <code>curl</code>.
+        </p>
+      </header>
+
+      <div class="card">
+        <div class="row">
+          <div class="grow">
+            <label for="apiKey">REST API key (optional)</label>
+            <input type="password" id="apiKey" placeholder="If the server uses REST_API_KEY…" autocomplete="off" />
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" class="secondary" id="saveKey">Save in this browser</button>
+          <button type="button" class="secondary" id="clearKey">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="grow">
+            <label for="agentId">Agent</label>
+            <select id="agentId"></select>
+          </div>
+          <button type="button" class="secondary" id="reloadAgents">Load agents</button>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <label for="sessionId">sessionId</label>
+            <input type="text" id="sessionId" autocomplete="off" />
+          </div>
+          <button type="button" class="secondary" id="newSession">New session</button>
+        </div>
+        <div class="row">
+          <label class="check">
+            <input type="checkbox" id="wait" />
+            Wait for job to finish (<code>wait</code>)
+          </label>
+        </div>
+        <div class="row">
+          <label for="message">Message</label>
+        </div>
+        <textarea id="message" placeholder="Message to send to the agent…"></textarea>
+        <div class="row" style="margin-top: 1rem">
+          <button type="button" id="sendRun">Send run</button>
+          <button type="button" class="secondary" id="sendContinue" title="Requires a run in completed state">
+            Continue (same runId)
+          </button>
+        </div>
+        <p style="margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--muted)">
+          <strong>Current runId:</strong> <span id="runIdLabel">—</span>
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <button type="button" class="secondary" id="fetchRun">Refresh run (GET /runs/…)</button>
+        </div>
+        <div id="status"></div>
+        <div id="replyBox" class="reply" hidden>
+          <strong>Latest reply (result)</strong>
+          <div id="replyText"></div>
+        </div>
+        <pre id="output">{ }</pre>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const KEY_STORAGE = "opencore-runtime-ui-api-key";
+
+        const el = {
+          apiKey: document.getElementById("apiKey"),
+          agentId: document.getElementById("agentId"),
+          sessionId: document.getElementById("sessionId"),
+          message: document.getElementById("message"),
+          wait: document.getElementById("wait"),
+          output: document.getElementById("output"),
+          status: document.getElementById("status"),
+          runIdLabel: document.getElementById("runIdLabel"),
+          replyBox: document.getElementById("replyBox"),
+          replyText: document.getElementById("replyText"),
+        };
+
+        let lastRunId = "";
+        let lastAgentId = "";
+
+        function headers(json) {
+          const h = {};
+          if (json) h["Content-Type"] = "application/json";
+          const k = el.apiKey.value.trim();
+          if (k) h["Authorization"] = "Bearer " + k;
+          return h;
+        }
+
+        function setStatus(text, isErr) {
+          el.status.textContent = text || "";
+          el.status.classList.toggle("err", Boolean(isErr));
+        }
+
+        function showJson(obj) {
+          el.output.textContent = JSON.stringify(obj, null, 2);
+        }
+
+        function setRunId(id, agentId) {
+          lastRunId = id || "";
+          if (agentId) lastAgentId = agentId;
+          el.runIdLabel.textContent = lastRunId || "—";
+        }
+
+        function showReply(text) {
+          if (text != null && String(text).length) {
+            el.replyText.textContent = text;
+            el.replyBox.hidden = false;
+          } else {
+            el.replyBox.hidden = true;
+          }
+        }
+
+        async function parseJson(res) {
+          const t = await res.text();
+          try {
+            return JSON.parse(t);
+          } catch {
+            return { _raw: t || "(empty)" };
+          }
+        }
+
+        async function reloadAgents() {
+          setStatus("Loading agents…");
+          try {
+            const res = await fetch("/agents", { headers: headers(false) });
+            const data = await parseJson(res);
+            if (!res.ok) {
+              setStatus(res.status + " " + (data.error || ""), true);
+              showJson(data);
+              return;
+            }
+            const ids = Array.isArray(data.agentIds) ? data.agentIds : [];
+            el.agentId.innerHTML = "";
+            if (!ids.length) {
+              const o = document.createElement("option");
+              o.value = "";
+              o.textContent = "(none)";
+              el.agentId.appendChild(o);
+              setStatus("No agents in the registry.");
+            } else {
+              for (const id of ids) {
+                const o = document.createElement("option");
+                o.value = id;
+                o.textContent = id;
+                el.agentId.appendChild(o);
+              }
+              setStatus(ids.length + " agent(s).");
+            }
+            showJson(data);
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+          }
+        }
+
+        function newSession() {
+          el.sessionId.value = crypto.randomUUID();
+          setStatus("New sessionId generated.");
+        }
+
+        async function pollJob(jobId) {
+          const maxMs = 120000;
+          const t0 = Date.now();
+          while (Date.now() - t0 < maxMs) {
+            const res = await fetch("/jobs/" + encodeURIComponent(jobId), { headers: headers(false) });
+            const data = await parseJson(res);
+            if (!res.ok) {
+              setStatus("Job poll: " + res.status, true);
+              showJson(data);
+              return null;
+            }
+            if (data.state === "completed" || data.state === "failed") {
+              return data;
+            }
+            await new Promise((r) => setTimeout(r, 400));
+          }
+          setStatus("Timed out waiting for the job.", true);
+          return null;
+        }
+
+        async function sendRun() {
+          const agentId = el.agentId.value;
+          const sessionId = el.sessionId.value.trim();
+          const message = el.message.value.trim();
+          if (!agentId) {
+            setStatus("Choose an agent.", true);
+            return;
+          }
+          if (!sessionId) {
+            setStatus("sessionId is required.", true);
+            return;
+          }
+          if (!message) {
+            setStatus("Enter a message.", true);
+            return;
+          }
+
+          setStatus("Sending…");
+          showReply("");
+          lastAgentId = agentId;
+
+          try {
+            const res = await fetch("/agents/" + encodeURIComponent(agentId) + "/run", {
+              method: "POST",
+              headers: headers(true),
+              body: JSON.stringify({
+                message,
+                sessionId,
+                wait: el.wait.checked,
+              }),
+            });
+            const data = await parseJson(res);
+            showJson(data);
+
+            if (res.status === 202 && data.jobId && !el.wait.checked) {
+              setStatus("Job queued, waiting for result…");
+              const job = await pollJob(data.jobId);
+              if (job && job.run) {
+                setRunId(job.run.runId, agentId);
+                showReply(job.run.reply);
+                setStatus("Done (" + job.state + ").");
+                showJson(job);
+              } else if (job) {
+                setStatus("Job " + job.state + (job.failedReason ? ": " + job.failedReason : ""), job.state === "failed");
+                showJson(job);
+              }
+              return;
+            }
+
+            if (!res.ok) {
+              setStatus(res.status + " " + (data.error || data.code || ""), true);
+              return;
+            }
+
+            if (data.runId) {
+              setRunId(data.runId, agentId);
+              showReply(data.reply);
+            }
+            setStatus("OK (" + res.status + ").");
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+          }
+        }
+
+        async function sendContinue() {
+          const agentId = el.agentId.value;
+          const sessionId = el.sessionId.value.trim();
+          const message = el.message.value.trim();
+          const runId = lastRunId;
+
+          if (!agentId || !sessionId || !message) {
+            setStatus("Agent, sessionId, and message are required.", true);
+            return;
+          }
+          if (!runId) {
+            setStatus("No runId: run an agent first (Continue uses the last runId from this page).", true);
+            return;
+          }
+
+          setStatus("Continuing…");
+          showReply("");
+
+          try {
+            const res = await fetch("/agents/" + encodeURIComponent(agentId) + "/continue", {
+              method: "POST",
+              headers: headers(true),
+              body: JSON.stringify({
+                runId,
+                sessionId,
+                message,
+                wait: el.wait.checked,
+              }),
+            });
+            const data = await parseJson(res);
+            showJson(data);
+
+            if (res.status === 202 && data.jobId && !el.wait.checked) {
+              setStatus("Continue job queued, waiting…");
+              const job = await pollJob(data.jobId);
+              if (job && job.run) {
+                setRunId(job.run.runId, agentId);
+                showReply(job.run.reply);
+                setStatus("Continue finished.");
+                showJson(job);
+              } else if (job) {
+                setStatus("Job " + job.state, job.state === "failed");
+                showJson(job);
+              }
+              return;
+            }
+
+            if (!res.ok) {
+              setStatus(res.status + " " + (data.error || data.code || ""), true);
+              return;
+            }
+
+            if (data.runId) {
+              setRunId(data.runId, agentId);
+              showReply(data.reply);
+            }
+            setStatus("Continue OK.");
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+          }
+        }
+
+        async function fetchRun() {
+          const sessionId = el.sessionId.value.trim();
+          const runId = lastRunId;
+          if (!runId || !sessionId) {
+            setStatus("Need runId (from a run) and sessionId.", true);
+            return;
+          }
+          setStatus("GET /runs/…");
+          try {
+            const res = await fetch(
+              "/runs/" + encodeURIComponent(runId) + "?sessionId=" + encodeURIComponent(sessionId),
+              { headers: headers(false) },
+            );
+            const data = await parseJson(res);
+            showJson(data);
+            if (!res.ok) {
+              setStatus(res.status + "", true);
+              return;
+            }
+            showReply(typeof data.reply === "string" ? data.reply : "");
+            setStatus("Status: " + (data.status || "?"));
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+          }
+        }
+
+        document.getElementById("saveKey").onclick = function () {
+          const v = el.apiKey.value.trim();
+          if (v) sessionStorage.setItem(KEY_STORAGE, v);
+          else sessionStorage.removeItem(KEY_STORAGE);
+          setStatus(v ? "API key saved (this tab only)." : "Key removed from storage.");
+        };
+        document.getElementById("clearKey").onclick = function () {
+          el.apiKey.value = "";
+          sessionStorage.removeItem(KEY_STORAGE);
+          setStatus("Key cleared.");
+        };
+        document.getElementById("reloadAgents").onclick = reloadAgents;
+        document.getElementById("newSession").onclick = newSession;
+        document.getElementById("sendRun").onclick = sendRun;
+        document.getElementById("sendContinue").onclick = sendContinue;
+        document.getElementById("fetchRun").onclick = fetchRun;
+
+        (function init() {
+          const saved = sessionStorage.getItem(KEY_STORAGE);
+          if (saved) el.apiKey.value = saved;
+          newSession();
+          reloadAgents();
+        })();
+      })();
+    </script>
+  </body>
+</html>
