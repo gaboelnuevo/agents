@@ -59,7 +59,7 @@ Implementation notes:
 
 ## References
 
-- Runnable baseline without runtime subcommands: [`examples/minimal-run`](../../examples/minimal-run/) (`Agent.run` + mock LLM).
+- Runnable baseline without runtime subcommands: [`examples/minimal-run`](../../examples/minimal-run/) (`Agent.run` + mock LLM); OpenClaw / AgentSkills **`SKILL.md`** + **`exec`**: [`examples/load-openclaw-skills`](../../examples/load-openclaw-skills/).
 - Brainstorm: [`06-library-adapters-cli.md`](../brainstorm/06-library-adapters-cli.md) (folder layout, MVP bullets).
 - Multi-agent + CLI snippet: [`07-multi-agent-rest-sessions.md`](../brainstorm/07-multi-agent-rest-sessions.md) §Extra CLI.
 - Consumers overview: [`core/14-consumers.md`](../core/14-consumers.md).

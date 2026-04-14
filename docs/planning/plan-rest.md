@@ -93,6 +93,7 @@ Idempotency, JWT → **`projectId`** (**`resolveProjectId`**), mTLS, rate limits
 | **Chat-shaped BFF + SSE** | [`real-world-with-express`](../../examples/real-world-with-express/). |
 | **202 + worker + Redis definitions** | [`dynamic-runtime-rest`](../../examples/dynamic-runtime-rest/) (add **`createRuntimeRestRouter({ dispatch })`** if you want **`/agents/...`** on the same API). |
 | **No HTTP** | [`minimal-run`](../../examples/minimal-run/). |
+| **OpenClaw / AgentSkills `SKILL.md` on disk + `exec`** | [`load-openclaw-skills`](../../examples/load-openclaw-skills/) (**`skill-loader-openclaw`**, mock LLM, no keys). |
 
 **TLS:** Terminate at reverse proxy or dev tooling — not in `core`.
 

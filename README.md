@@ -86,7 +86,7 @@ The engine runs the loop, memory scopes, optional **`RunStore`** for cluster **`
 
 Requires **`OPENAI_API_KEY`**.
 
-**`OpenAILLMAdapter`** is the real **`LLMAdapter`** for Chat Completions. For a **keyless** mock-LLM walkthrough, see [`examples/minimal-run`](examples/minimal-run/).
+**`OpenAILLMAdapter`** is the real **`LLMAdapter`** for Chat Completions. For **keyless** mock-LLM walkthroughs, see [`examples/minimal-run`](examples/minimal-run/) (smallest loop) and [`examples/load-openclaw-skills`](examples/load-openclaw-skills/) (**`SKILL.md`** packs + **`exec`** via **`skill-loader-openclaw`**).
 
 **`InMemoryMemoryAdapter`** keeps session memory **inside the Node process** only—fine for tests and single-process demos; it is **not** shared across workers or restarts.
 
@@ -120,7 +120,7 @@ console.log(run.status, run.history);
 
 ### LLM and memory adapters
 
-**Other LLM providers:** swap **`OpenAILLMAdapter`** for **`AnthropicLLMAdapter`** from **`@opencoreagents/adapters-anthropic`**, or implement **`LLMAdapter`** yourself (see the mock in [`examples/minimal-run`](examples/minimal-run/)).
+**Other LLM providers:** swap **`OpenAILLMAdapter`** for **`AnthropicLLMAdapter`** from **`@opencoreagents/adapters-anthropic`**, or implement **`LLMAdapter`** yourself (see mocks in [`examples/minimal-run`](examples/minimal-run/) and [`examples/load-openclaw-skills`](examples/load-openclaw-skills/)).
 
 **Memory — in-process vs Redis:** keep **`InMemoryMemoryAdapter`** when a single process owns the whole run and you do not need durability or sharing.
 

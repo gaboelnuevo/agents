@@ -213,4 +213,4 @@ const run = await agent.run("Start the interactive flow.").onWait(async (step) =
 
 ## Full examples (monorepo clone)
 
-Runnable sources for the fragments above: **`examples/minimal-run`**, **`examples/openai-tools-skill`**, **`examples/console-wait`**. Paths exist only in a full clone of [OpenCoreAgents/runtime](https://github.com/OpenCoreAgents/runtime), not inside the npm skill tarball.
+Runnable sources for the fragments above: **`examples/minimal-run`**, **`examples/load-openclaw-skills`** (OpenClaw **`SKILL.md`** + **`skill-loader-openclaw`**), **`examples/openai-tools-skill`**, **`examples/console-wait`**. Paths exist only in a full clone of [OpenCoreAgents/runtime](https://github.com/OpenCoreAgents/runtime), not inside the npm skill tarball.

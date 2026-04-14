@@ -53,6 +53,9 @@ function normalizeRagEntries(
  * Optional **`allowedToolIds`** on {@link EngineConfig} intersects with each agent’s tool list;
  * omit it or pass `"*"` for no extra restriction.
  *
+ * Optional **`defaultSkillIdsGlobal`** prepends skill ids when the engine builds deps
+ * (`buildEngineDeps` / `RunBuilder`), before each agent's own `skills`.
+ *
  * RAG file catalogs are per **`projectId`**: call **`registerRagCatalog(projectId, entries)`** (or
  * **`registerRagCatalog(runtime, projectId, entries)`** from **`@opencoreagents/rag`**) so
  * `system_list_rag_sources` / `system_ingest_rag_source` use that list for sessions in that project; if a project

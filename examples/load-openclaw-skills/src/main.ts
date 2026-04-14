@@ -1,11 +1,12 @@
 /**
  * Loads OpenClaw-style SKILL.md skills from ../skills, registers `exec`,
- * merges skill instructions into the system prompt (core ContextBuilder does not
- * yet append skill descriptions), and runs a short scripted loop that calls `exec`.
+ * attaches them to the runtime via `defaultSkillIdsGlobal` (all agents inherit
+ * those skills), merges skill instructions into the system
+ * prompt (ContextBuilder does not append skill bodies yet), and runs a short
+ * scripted loop that calls `exec`.
  */
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { LLMAdapter, LLMRequest, LLMResponse } from "@opencoreagents/core";
 import {
   Agent,
   AgentRuntime,
@@ -14,6 +15,7 @@ import {
   getSkillDefinition,
 } from "@opencoreagents/core";
 import { loadOpenClawSkills, registerOpenClawExecTool } from "@opencoreagents/skill-loader-openclaw";
+import { DemoScriptLlm } from "./demoScriptLlm.js";
 
 /** Tenant / project id for definitions, session, and skill resolution. */
 const PROJECT_ID = "demo-openclaw";
@@ -34,38 +36,9 @@ function openClawSkillPromptBlock(skillIds: string[]): string {
   return `\n\n## Loaded OpenClaw skills\n${parts.join("\n\n")}`;
 }
 
-/** Fixed sequence of Step JSON objects so the run completes without a real LLM. */
-class DemoScriptLlm implements LLMAdapter {
-  private i = 0;
-  async generate(_req: LLMRequest): Promise<LLMResponse> {
-    const steps = [
-      // Step 1 — protocol “think” turn (no side effects).
-      JSON.stringify({
-        type: "thought",
-        content: "User wants the OpenClaw demo; follow skill openclaw_demo and call exec.",
-      }),
-      // Step 2 — invoke the exec tool (matches what openclaw_demo SKILL.md describes).
-      JSON.stringify({
-        type: "action",
-        tool: "exec",
-        input: { command: "node -p 42" },
-      }),
-      // Step 3 — final answer after the engine appends the tool observation to history.
-      JSON.stringify({
-        type: "result",
-        content:
-          "OpenClaw demo finished: exec ran node -p 42; check observation for stdout 42.",
-      }),
-    ];
-    // Advance one scripted response per engine LLM call; extra calls get a harmless result.
-    const content = steps[this.i++] ?? JSON.stringify({ type: "result", content: "done" });
-    return { content };
-  }
-}
-
 async function main(): Promise<void> {
   // 1. Parse SKILL.md files, run gates, register each eligible skill via Skill.define.
-  const { loaded, skipped } = await loadOpenClawSkills({
+  const { loaded: openclawSkillsIds, skipped } = await loadOpenClawSkills({
     dirs: [skillsRoot],
     onLoaded: (name) => console.log(`[openclaw] loaded skill: ${name}`),
     onSkipped: (name, reason) => console.log(`[openclaw] skipped skill: ${name} — ${reason}`),
@@ -74,7 +47,7 @@ async function main(): Promise<void> {
   });
 
   // 2. Log load outcome (e.g. gated_missing_bin skipped, openclaw_demo loaded).
-  console.log(`[openclaw] summary: ${loaded.length} loaded, ${skipped.length} skipped`);
+  console.log(`[openclaw] summary: ${openclawSkillsIds.length} loaded, ${skipped.length} skipped`);
 
   // 3. Register the shell-less exec tool OpenClaw skills expect.
   await registerOpenClawExecTool();
@@ -84,21 +57,23 @@ async function main(): Promise<void> {
     "You are a demo agent. Follow the JSON Step protocol. " +
     "When skills apply, obey their instructions.";
 
-  // 5. Agent: allow exec, attach loaded skill ids for allowlist / future context behavior.
+  // 5. Agent: allow exec. Skill ids are preloaded on the runtime (step 6) via `defaultSkillIdsGlobal`
+  //    so you need not repeat `skills: loaded` on each Agent.define.
   await Agent.define({
     id: "openclaw-demo-agent",
     projectId: PROJECT_ID,
-    systemPrompt: basePrompt + openClawSkillPromptBlock(loaded),
+    systemPrompt: basePrompt + openClawSkillPromptBlock(openclawSkillsIds),
     tools: ["exec"],
-    skills: loaded,
     llm: { provider: "openai", model: "gpt-4o-mini" },
   });
 
-  // 6. Runtime: mock LLM + in-process memory (not durable across restarts).
+  // 6. Runtime: mock LLM + in-process memory + default OpenClaw skills for every agent.
+  const defaultSkillIdsGlobal = openclawSkillsIds;
   const runtime = new AgentRuntime({
-    llmAdapter: new DemoScriptLlm(),
+    llmAdapter: new DemoScriptLlm(), // or OpenAILLMAdapter etc.
     memoryAdapter: new InMemoryMemoryAdapter(),
     maxIterations: 10,
+    defaultSkillIdsGlobal: defaultSkillIdsGlobal,
   });
 
   // 7. Session ties the run to projectId (and optional fileReadRoot / sessionContext in real apps).

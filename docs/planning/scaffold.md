@@ -448,7 +448,7 @@ agents/                    → repo root (Turborepo)
 │       └── vitest.config.ts
 │
 ├── examples/                         → runnable samples (pnpm workspace members; not published packages)
-│   └── …                             → e.g. minimal-run, openai-tools-skill, plan-rest-express, dynamic-runtime-rest
+│   └── …                             → e.g. minimal-run, load-openclaw-skills, openai-tools-skill, plan-rest-express, dynamic-runtime-rest
 │
 └── docs/                             → documentation (not a package)
 ```

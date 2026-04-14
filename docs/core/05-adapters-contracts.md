@@ -43,7 +43,7 @@ const runtime = new AgentRuntime({
 });
 ```
 
-After **`Agent.define` / `Agent.load`**, call **`Agent.run`** / **`Agent.resume`** (SDK) or **`executeRun`** / **`dispatchEngineJob`** (workers) as in [14-consumers.md](./14-consumers.md). **Runnable baseline:** [examples/minimal-run](../../examples/minimal-run) (in-memory + mock LLM); swap adapters per READMEs for production.
+After **`Agent.define` / `Agent.load`**, call **`Agent.run`** / **`Agent.resume`** (SDK) or **`executeRun`** / **`dispatchEngineJob`** (workers) as in [14-consumers.md](./14-consumers.md). **Runnable baseline:** [examples/minimal-run](../../examples/minimal-run) (in-memory + mock LLM); OpenClaw **`SKILL.md`** loading + **`exec`**: [examples/load-openclaw-skills](../../examples/load-openclaw-skills); swap adapters per READMEs for production.
 
 ## Memory adapter
 

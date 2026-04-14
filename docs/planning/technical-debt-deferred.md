@@ -11,6 +11,7 @@ Lower-priority follow-ups: **sample apps**, **generator placeholders**, **docume
 | Item | Notes |
 |------|--------|
 | **`@opencoreagents/rag` + `examples/rag`** | Per-project catalog: **`registerRagCatalog(runtime, projectId, sources)`** from **`@opencoreagents/rag`** (or **`AgentRuntime.registerRagCatalog`**) after **`registerRagToolsAndSkills()`**. **`fileReadRoot`** can default on **`AgentRuntime`** (session overrides). **`examples/rag`** uses **`createDemoVectorAdapter()`** (in-memory, single-process) and permissive demo **`security.roles`** — **not** production. Ship a **durable** **`VectorAdapter`**, explicit embedding model + **dimensions** config, and minimal roles for real traffic. |
+| **`examples/load-openclaw-skills`** | Keyless demo: **`loadOpenClawSkills`**, **`registerOpenClawExecTool`**, **`defaultSkillIdsGlobal`** for shared OpenClaw skill ids, scripted mock LLM. Not production (**`exec`**, broad tool exposure). Prompt still merges skill text manually — see **`ContextBuilder` + skill / OpenClaw text** in [platform / core / CI](./technical-debt-platform-core-ci.md) §2. |
 | **REST sample smoke (optional CI)** | No CI job today that **`curl`**s a live **[`examples/plan-rest-express`](../../examples/plan-rest-express/)** process; **`packages/rest-api`** is covered by **`pnpm test`** only. Add only if you want an extra integration smoke beyond unit tests. |
 
 ---

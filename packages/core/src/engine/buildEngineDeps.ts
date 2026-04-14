@@ -11,6 +11,7 @@ import {
   applyRuntimeToolAllowlist,
   effectiveToolAllowlist,
 } from "../define/effectiveToolAllowlist.js";
+import { mergeAgentDefinitionWithRuntimeDefaultSkills } from "../define/mergeAgentDefaultSkills.js";
 
 /** Derives the engine `SecurityContext` from a loaded agent and session (same as `RunBuilder`). */
 export function securityContextForAgent(
@@ -39,8 +40,12 @@ export function buildEngineDeps(
   opts?: { hooks?: EngineHooks; signal?: AbortSignal },
 ): Omit<EngineDeps, "resumeMessages" | "startedAtMs"> {
   const cfg = runtime.config;
+  const agentMerged = mergeAgentDefinitionWithRuntimeDefaultSkills(
+    agent,
+    cfg.defaultSkillIdsGlobal,
+  );
   const toolRegistry = resolveToolRegistry(session.projectId);
-  const agentAllow = effectiveToolAllowlist(agent, session.projectId);
+  const agentAllow = effectiveToolAllowlist(agentMerged, session.projectId);
   const allow = applyRuntimeToolAllowlist(agentAllow, cfg.allowedToolIds);
   const runner = new ToolRunner(toolRegistry, allow, {
     toolTimeoutMs: cfg.toolTimeoutMs,
@@ -49,7 +54,7 @@ export function buildEngineDeps(
   const llmAdapter = resolveLlmAdapterForProvider(cfg, agent.llm?.provider);
 
   return {
-    agent,
+    agent: agentMerged,
     session,
     fileReadRoot: session.fileReadRoot ?? cfg.fileReadRoot,
     memoryAdapter: cfg.memoryAdapter,

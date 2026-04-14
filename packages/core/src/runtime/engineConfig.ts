@@ -37,6 +37,12 @@ export interface EngineConfig {
    */
   fileReadRoot?: string;
   /**
+   * Skill ids merged into **every** agent on this runtime when the engine builds deps
+   * (`buildEngineDeps` / `RunBuilder`). Applied before the agent's own `skills`; duplicates are
+   * dropped (first occurrence wins).
+   */
+  defaultSkillIdsGlobal?: readonly string[];
+  /**
    * Extra tool allowlist for this runtime: intersected with the agent + skills allowlist.
    * Omit or `"*"` → no extra restriction (default).
    */

@@ -51,6 +51,153 @@ describe("engine", () => {
     expect(allow.has("system_save_memory")).toBe(true);
   });
 
+  it("buildEngineDeps merges defaultSkillIdsGlobal so agents need not list those skills", async () => {
+    await Tool.define({
+      id: "t-from-default-skill",
+      projectId: "p1",
+      description: "noop",
+      inputSchema: { type: "object", properties: {} },
+      execute: async () => ({ ok: true }),
+    });
+    await Skill.define({
+      id: "sk-runtime-default",
+      projectId: "p1",
+      description: "default skill",
+      tools: ["t-from-default-skill"],
+    });
+    await Agent.define({
+      id: "a-def-skills",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const mem = new InMemoryMemoryAdapter();
+    const llm = new QueueLLM([
+      JSON.stringify({
+        type: "action",
+        tool: "t-from-default-skill",
+        input: {},
+      }),
+      JSON.stringify({ type: "result", content: "ran tool from default skill" }),
+    ]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      maxIterations: 10,
+      defaultSkillIdsGlobal: ["sk-runtime-default"],
+    });
+
+    const agentDef = getAgentDefinition("p1", "a-def-skills");
+    const session = new Session({ id: "s-def-sk", projectId: "p1" });
+    const base = buildEngineDeps(agentDef!, session, rt);
+
+    expect(agentDef!.skills).toBeUndefined();
+    expect(base.agent.skills).toEqual(["sk-runtime-default"]);
+
+    const run = createRun("a-def-skills", session.id, "go", "p1");
+    const result = await executeRun(run, { ...base, startedAtMs: Date.now() });
+    expect(result.status).toBe("completed");
+    expect(
+      result.history.some(
+        (h) => h.type === "result" && h.content === "ran tool from default skill",
+      ),
+    ).toBe(true);
+  });
+
+  it("buildEngineDeps merges defaultSkillIdsGlobal for every project", async () => {
+    await Tool.define({
+      id: "t-global-skill",
+      description: "g",
+      inputSchema: { type: "object", properties: {} },
+      execute: async () => ({ ok: true }),
+    });
+    await Skill.define({
+      id: "sk-global-default",
+      description: "global",
+      tools: ["t-global-skill"],
+    });
+    await Agent.define({
+      id: "a-other-project",
+      projectId: "p-xyz",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const mem = new InMemoryMemoryAdapter();
+    const llm = new QueueLLM([
+      JSON.stringify({
+        type: "action",
+        tool: "t-global-skill",
+        input: {},
+      }),
+      JSON.stringify({ type: "result", content: "global default skill" }),
+    ]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      maxIterations: 10,
+      defaultSkillIdsGlobal: ["sk-global-default"],
+    });
+
+    const agentDef = getAgentDefinition("p-xyz", "a-other-project");
+    const session = new Session({ id: "s-glob", projectId: "p-xyz" });
+    const base = buildEngineDeps(agentDef!, session, rt);
+    expect(base.agent.skills).toEqual(["sk-global-default"]);
+
+    const run = createRun("a-other-project", session.id, "go", "p-xyz");
+    const result = await executeRun(run, { ...base, startedAtMs: Date.now() });
+    expect(result.status).toBe("completed");
+    expect(
+      result.history.some(
+        (h) => h.type === "result" && h.content === "global default skill",
+      ),
+    ).toBe(true);
+  });
+
+  it("buildEngineDeps merges global defaults then agent skills (dedupe)", async () => {
+    await Skill.define({
+      id: "sk-g",
+      projectId: "p-order",
+      description: "g",
+      tools: [],
+    });
+    await Skill.define({
+      id: "sk-x",
+      projectId: "p-order",
+      description: "x",
+      tools: [],
+    });
+    await Skill.define({
+      id: "sk-a",
+      projectId: "p-order",
+      description: "a",
+      tools: [],
+    });
+    await Agent.define({
+      id: "a-order",
+      projectId: "p-order",
+      systemPrompt: "Test.",
+      tools: [],
+      skills: ["sk-a", "sk-g"],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const mem = new InMemoryMemoryAdapter();
+    const llm = new QueueLLM([JSON.stringify({ type: "result", content: "ok" })]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      defaultSkillIdsGlobal: ["sk-g", "sk-x"],
+    });
+    const agentDef = getAgentDefinition("p-order", "a-order");
+    const session = new Session({ id: "s-order", projectId: "p-order" });
+    const base = buildEngineDeps(agentDef!, session, rt);
+    expect(base.agent.skills).toEqual(["sk-g", "sk-x", "sk-a"]);
+  });
+
   it("exports createRun and executeRun", () => {
     expect(typeof executeRun).toBe("function");
     const run = createRun("agent-x", "sess-1", "hello");

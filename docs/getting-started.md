@@ -319,7 +319,7 @@ Additional core docs: purpose ([core/01-purpose.md](./core/01-purpose.md)); MVP 
 
 | Resource | What you get |
 |----------|----------------|
-| [examples/README.md](../examples/README.md) | Table of **`examples/*`** packages: minimal run, OpenAI + tools, **`wait`** in the console, RAG, multi-agent, Express BFF, **`plan-rest-express`** (`createRuntimeRestRouter`), dynamic-runtime REST, Telegram-shaped gateway mock, and how to run them. |
+| [examples/README.md](../examples/README.md) | Table of **`examples/*`** packages: minimal run, **OpenClaw / AgentSkills `SKILL.md`** (**`load-openclaw-skills`**), OpenAI + tools, **`wait`** in the console, RAG, multi-agent, Express BFF, **`plan-rest-express`** (`createRuntimeRestRouter`), dynamic-runtime REST, Telegram-shaped gateway mock, and how to run them. |
 
 ### Integration and product plans (drafts)
 

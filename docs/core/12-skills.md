@@ -4,6 +4,8 @@
 
 Related: [02-architecture.md](./02-architecture.md); [05-adapters-contracts.md](./05-adapters-contracts.md) (ToolRunner / tool contracts); [07-definition-syntax.md](./07-definition-syntax.md) (`Skill.define` / `defineBatch`, §9.2b); [08-scope-and-security.md](./08-scope-and-security.md) (definition resolution); [11-context-builder.md](./11-context-builder.md); [19-cluster-deployment.md](./19-cluster-deployment.md) §1.1 (registry per worker).
 
+**Runnable:** load OpenClaw / AgentSkills-style **`SKILL.md`** from disk with **`@opencoreagents/skill-loader-openclaw`** — [examples/load-openclaw-skills](../../examples/load-openclaw-skills/).
+
 ---
 
 ## 1. Tool (reminder)

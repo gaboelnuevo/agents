@@ -7,6 +7,7 @@ Demonstrates **`loadOpenClawSkills`** and **`registerOpenClawExecTool`** from **
 - Scans **`skills/*/`** for **`SKILL.md`** (OpenClaw / AgentSkills-style frontmatter + body).
 - Prints **loaded** vs **skipped** (see **`gated_missing_bin`** — skipped when a required binary is absent).
 - Registers the global **`exec`** tool (no shell; first token is the binary).
+- Preloads loaded skill ids on **`AgentRuntime`** via **`defaultSkillIdsGlobal`** so agents need not list them again on **`Agent.define`**.
 - Merges each skill’s description + instructions into **`Agent.define.systemPrompt`**. Today’s **`ContextBuilder`** only unions **tool ids** from skills; it does **not** append skill text, so this example inlines instructions explicitly (same effect OpenClaw aims for).
 
 Uses a **scripted mock LLM** (no **`OPENAI_API_KEY`**). **`node`** must be on **`PATH`** so **`exec`** can run **`node -p 42`**.
