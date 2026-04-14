@@ -122,6 +122,7 @@ If you use [pnpm](https://pnpm.io/installation), you can run **`pnpm docker:up`*
 
 ### 5. Check that it works
 
+- [http://localhost:3010/](http://localhost:3010/) — redirects to **`/ui`**, a small web playground (list agents, run, continue, poll jobs)
 - [http://localhost:3010/health](http://localhost:3010/health) — add [`?details=1`](http://localhost:3010/health?details=1) to include `projectId` and queue in the JSON
 - [http://localhost:3010/docs](http://localhost:3010/docs) (OpenAPI UI — use **Authorize** with your **`REST_API_KEY`** for protected routes)
 

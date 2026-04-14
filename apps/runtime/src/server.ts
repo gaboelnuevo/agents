@@ -2,6 +2,8 @@
  * HTTP: plan REST (`@opencoreagents/rest-api`) + Redis definition CRUD under `/v1`.
  * Workers run separately (`pnpm start:worker`).
  */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createEngineQueue } from "@opencoreagents/adapters-bullmq";
 import {
   RedisMemoryAdapter,
@@ -37,6 +39,8 @@ import {
   openClawAgentRuntimeSlice,
 } from "./runtime/runtimeShared.js";
 import { isChatEndpointAvailable } from "./runtime/runtimeChat.js";
+
+const runtimePublicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../public");
 
 function resolveRestApiKey(): string | undefined {
   return process.env.REST_API_KEY?.trim();
@@ -156,6 +160,12 @@ async function main(): Promise<void> {
     res.json(base);
   });
 
+  app.get("/", (_req, res) => {
+    res.redirect(302, "/ui/");
+  });
+
+  app.use("/ui", express.static(runtimePublicDir, { index: "index.html", extensions: ["html"] }));
+
   app.use(
     "/v1",
     restApiKeyAuth,
@@ -260,7 +270,7 @@ async function main(): Promise<void> {
         : "";
     const sseNote = runEventsStreamRedis ? "  GET /v1/runs/:runId/stream?sessionId= (SSE run events)" : "";
     console.log(
-      `[opencoreagents-runtime] routes: GET /health (?details=1 for projectId+queue)  GET|POST plan REST + /openapi.json + /docs  /v1/definitions …${chatNote}${chatSseNote}${sseNote}`,
+      `[opencoreagents-runtime] routes: GET /ui (playground)  GET /health (?details=1 for projectId+queue)  GET|POST plan REST + /openapi.json + /docs  /v1/definitions …${chatNote}${chatSseNote}${sseNote}`,
     );
     console.log(`[opencoreagents-runtime] start worker: pnpm start:worker (same RUNTIME_CONFIG / stack file)`);
   });
