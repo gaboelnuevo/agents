@@ -1,6 +1,6 @@
 # CLI planning (`@opencoreagents/cli`)
 
-> Roadmap for the **command-line** surface: what exists today vs the **library-parity** CLI sketched in [`brainstorm/06-libreria-adapters-cli.md`](../brainstorm/06-libreria-adapters-cli.md). Complements [`plan.md`](./plan.md) (monorepo/engine) and [`core/14-consumers.md`](../core/14-consumers.md) §CLI.
+> Roadmap for the **command-line** surface: what exists today vs the **library-parity** CLI sketched in [`brainstorm/06-library-adapters-cli.md`](../brainstorm/06-library-adapters-cli.md). Complements [`plan.md`](./plan.md) (monorepo/engine) and [`core/14-consumers.md`](../core/14-consumers.md) §CLI.
 
 **Non-goals:** Reimplementing the engine loop in the CLI — all execution stays in **`packages/core`** via **`AgentRuntime`**, **`Agent.load(agentId, runtime, { session })`**, **`RunBuilder`**, hooks.
 
@@ -60,6 +60,6 @@ Implementation notes:
 ## References
 
 - Runnable baseline without runtime subcommands: [`examples/minimal-run`](../../examples/minimal-run/) (`Agent.run` + mock LLM).
-- Brainstorm: [`06-libreria-adapters-cli.md`](../brainstorm/06-libreria-adapters-cli.md) (folder layout, MVP bullets).
-- Multi-agent + CLI snippet: [`07-multi-agente-rest-sesiones.md`](../brainstorm/07-multi-agente-rest-sesiones.md) §Extra CLI.
+- Brainstorm: [`06-library-adapters-cli.md`](../brainstorm/06-library-adapters-cli.md) (folder layout, MVP bullets).
+- Multi-agent + CLI snippet: [`07-multi-agent-rest-sessions.md`](../brainstorm/07-multi-agent-rest-sessions.md) §Extra CLI.
 - Consumers overview: [`core/14-consumers.md`](../core/14-consumers.md).

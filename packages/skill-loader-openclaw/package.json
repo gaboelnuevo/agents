@@ -7,6 +7,9 @@
   "description": "Load OpenClaw / AgentSkills-compatible SKILL.md packs into @opencoreagents/core Skill.define",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "openclaw-skill-install": "./dist/cli/install-skill.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -23,7 +26,9 @@
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "skills:install": "tsx src/cli/install-skill.ts",
+    "skills:download": "tsx src/cli/install-skill.ts"
   },
   "dependencies": {
     "@opencoreagents/core": "workspace:*",
@@ -31,7 +36,8 @@
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4.0.9"
+    "@types/js-yaml": "^4.0.9",
+    "tsx": "^4.19.3"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

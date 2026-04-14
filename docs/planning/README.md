@@ -33,4 +33,4 @@ Roadmap, monorepo layout, known gaps, and planned or shipped consumer surfaces (
 | [CLI](./plan-cli.md) | Command-line surface beyond **`init` / `generate`** |
 | [MCP](./plan-mcp.md) | Model Context Protocol as a channel |
 
-Early ideation and Spanish brainstorm notes live under **[`docs/brainstorm/`](../brainstorm/)** (non-normative).
+Early ideation and brainstorm notes live under **[`docs/brainstorm/`](../brainstorm/)** (non-normative).

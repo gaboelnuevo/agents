@@ -6,7 +6,7 @@ Analysis based on the conversation and brainstorm documents (`00`–`09`, especi
 
 ## 1. What you are proposing (reminder)
 
-Not “another chat with a model API.” It is a **control system** over the LLM: explicit contracts, append-only history, effects only via engine/adapters, pauses until the real world, same semantics in **SDK / CLI / REST**, and a path to **multi-tenant** (project, session, security). That matches the brainstorm thesis: **automate flows and decisions with traceability**, not loose answers ([`01-contexto-e-ideas.md`](./01-contexto-e-ideas.md)).
+Not “another chat with a model API.” It is a **control system** over the LLM: explicit contracts, append-only history, effects only via engine/adapters, pauses until the real world, same semantics in **SDK / CLI / REST**, and a path to **multi-tenant** (project, session, security). That matches the brainstorm thesis: **automate flows and decisions with traceability**, not loose answers ([`01-context-and-ideas.md`](./01-context-and-ideas.md)).
 
 That definition is the compass for market fit: the buyer or adopter wants **governance + repeatability + integration in their stack**, not just “more model.”
 
@@ -91,7 +91,7 @@ This avoids the false dichotomy “SaaS only vs library only”: strong **market
 **Invalidate or weaken**
 
 - They only want chat with RAG: provider products already cover that.
-- They have no rules or structured outputs: your value thesis ([`01`](./01-contexto-e-ideas.md)) does not apply.
+- They have no rules or structured outputs: your value thesis ([`01`](./01-context-and-ideas.md)) does not apply.
 
 ---
 

@@ -1,6 +1,6 @@
 # Messaging channels (WhatsApp, Telegram, etc.) — integration notes
 
-**Brainstorm / design sketch.** How an external chat channel fits **`Session`**, **`Run`**, **`wait`/`resume`**, and what stays **outside** the engine. Complements [`07-multi-agente-rest-sesiones.md`](./07-multi-agente-rest-sesiones.md) and [`../core/14-consumers.md`](../core/14-consumers.md).
+**Brainstorm / design sketch.** How an external chat channel fits **`Session`**, **`Run`**, **`wait`/`resume`**, and what stays **outside** the engine. Complements [`07-multi-agent-rest-sessions.md`](./07-multi-agent-rest-sessions.md) and [`../core/14-consumers.md`](../core/14-consumers.md).
 
 ---
 
@@ -77,7 +77,7 @@ Explicitly **not** automatic: merging all past runs into one prompt without a po
 ## Related docs
 
 - [`14-conversation-gateway-implementation-proposal.md`](./14-conversation-gateway-implementation-proposal.md) — **implementation proposal** (gateway, DTOs, idempotency, tests).
-- [`04-protocolo-comunicacion-y-loop.md`](./04-protocolo-comunicacion-y-loop.md) — protocol and loop.
+- [`04-protocol-communication-and-loop.md`](./04-protocol-communication-and-loop.md) — protocol and loop.
 - [`../core/04-protocol.md`](../core/04-protocol.md) — step types.
 - [`../core/11-context-builder.md`](../core/11-context-builder.md) — how LLM messages are assembled.
 - [`../core/19-cluster-deployment.md`](../core/19-cluster-deployment.md) — **`RunStore`**, workers, sessions.

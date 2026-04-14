@@ -2,7 +2,7 @@
 
 > **Product vision:** an HTTP/JSON layer for **`run` / `resume` / memory / logs / inter-agent send`** with SDK semantics. **Monorepo reality:** the engine is **`@opencoreagents/core`**; transport is **your** BFF or a **library router** — see **`@opencoreagents/rest-api`** below (this file is the **contract reference** for that package’s URL shape).
 
-Sources: [`brainstorm/07-multi-agente-rest-sesiones.md`](../brainstorm/07-multi-agente-rest-sesiones.md) §REST, [`core/14-consumers.md`](../core/14-consumers.md) §REST API, gap register [`technical-debt.md`](./technical-debt.md) (hub): [`technical-debt-platform-core-ci.md`](./technical-debt-platform-core-ci.md) §1, [`technical-debt-deferred.md`](./technical-debt-deferred.md) §3 (docs), [`technical-debt-security-production.md`](./technical-debt-security-production.md) §1 (security).
+Sources: [`brainstorm/07-multi-agent-rest-sessions.md`](../brainstorm/07-multi-agent-rest-sessions.md) §REST, [`core/14-consumers.md`](../core/14-consumers.md) §REST API, gap register [`technical-debt.md`](./technical-debt.md) (hub): [`technical-debt-platform-core-ci.md`](./technical-debt-platform-core-ci.md) §1, [`technical-debt-deferred.md`](./technical-debt-deferred.md) §3 (docs), [`technical-debt-security-production.md`](./technical-debt-security-production.md) §1 (security).
 
 ---
 
@@ -145,7 +145,7 @@ For the **URL table in § Implemented today**, the **`@opencoreagents/rest-api`*
 
 ## References
 
-- [`brainstorm/07-multi-agente-rest-sesiones.md`](../brainstorm/07-multi-agente-rest-sesiones.md)
+- [`brainstorm/07-multi-agent-rest-sessions.md`](../brainstorm/07-multi-agent-rest-sessions.md)
 - [`core/14-consumers.md`](../core/14-consumers.md)
 - [`packages/rest-api/README.md`](../../packages/rest-api/README.md)
 - [`examples/plan-rest-express/`](../../examples/plan-rest-express/)

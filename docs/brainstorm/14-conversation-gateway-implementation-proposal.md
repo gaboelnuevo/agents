@@ -1,6 +1,6 @@
 # Implementation proposal — Conversation Gateway (channel-agnostic)
 
-**Brainstorm / implementation sketch.** How to encapsulate external integration without coupling the product to a specific vendor. Complements [`13-canales-mensajeria-integracion.md`](./13-canales-mensajeria-integracion.md) (problem and context) and consumers in [`../core/14-consumers.md`](../core/14-consumers.md).
+**Brainstorm / implementation sketch.** How to encapsulate external integration without coupling the product to a specific vendor. Complements [`13-messaging-channels-integration.md`](./13-messaging-channels-integration.md) (problem and context) and consumers in [`../core/14-consumers.md`](../core/14-consumers.md).
 
 ---
 
@@ -78,7 +78,7 @@ ConversationGateway
 OutboundDispatcher  →  [Destination adapter]
 ```
 
-- **HTTP webhook**: respond **quickly** (200) and enqueue if work is long; see [`13`](./13-canales-mensajeria-integracion.md) §4.
+- **HTTP webhook**: respond **quickly** (200) and enqueue if work is long; see [`13`](./13-messaging-channels-integration.md) §4.
 
 ---
 
@@ -195,8 +195,8 @@ Flush = one **`NormalizedInboundMessage`** with `text` built from merged lines (
 
 ## 9. Related documents
 
-- [`13-canales-mensajeria-integracion.md`](./13-canales-mensajeria-integracion.md) — motivation and engine boundaries.
-- [`07-multi-agente-rest-sesiones.md`](./07-multi-agente-rest-sesiones.md) — REST and sessions.
+- [`13-messaging-channels-integration.md`](./13-messaging-channels-integration.md) — motivation and engine boundaries.
+- [`07-multi-agent-rest-sessions.md`](./07-multi-agent-rest-sessions.md) — REST and sessions.
 - [`../core/19-cluster-deployment.md`](../core/19-cluster-deployment.md) — `RunStore` and workers in distributed deployment.
 
 ---
@@ -500,5 +500,5 @@ Not required for a first cut; add when the product needs them.
 | **Scoped idempotency keys** | If `externalMessageId` is only unique **per channel account**, namespace the store: e.g. `(projectId, provider, externalMessageId)` to avoid cross-tenant collisions. |
 | **Mid-run user message** | Serialization (§5.1) orders turns; if you need **cancel** or **interrupt** the current run when a new line arrives, that is a **product/engine** rule not shown in the sketch. |
 | **Streaming / rich replies** | `OutboundDispatcher` can be extended with **chunks** or **structured payloads** (cards, buttons) — the sketch uses a single final **string** for simplicity. |
-| **Edge verification** | **Signature** validation and raw payload trust belong in the **adapter** before **`NormalizedInboundMessage`**; see [`13`](./13-canales-mensajeria-integracion.md). |
+| **Edge verification** | **Signature** validation and raw payload trust belong in the **adapter** before **`NormalizedInboundMessage`**; see [`13`](./13-messaging-channels-integration.md). |
 | **Metrics / tracing** | Beyond `inbound_discarded_total`: latency (`enqueue` → first token / reply), **`run` vs `resume`** ratio, and **`runId`** ↔ **`externalMessageId`** in logs for support. |

@@ -6,20 +6,20 @@
 
 ## Vision and problem
 
-- Strong focus on **automating flows and decisions** with **explicit criteria and traceability**, not “more chat with a model” (see [`01-contexto-e-ideas.md`](./01-contexto-e-ideas.md), [`00-elevator-pitch.md`](./00-elevator-pitch.md)).
+- Strong focus on **automating flows and decisions** with **explicit criteria and traceability**, not “more chat with a model” (see [`01-context-and-ideas.md`](./01-context-and-ideas.md), [`00-elevator-pitch.md`](./00-elevator-pitch.md)).
 - AI fits better **after** rules and structured outputs; model-only without contracts leads to **loss of control and repeatability**.
 
 ## What the technical product is
 
 - An **Agent Engine / runtime**: the LLM is **inference**; the engine is **control** (loop, step parsing, tools, memory, wait/resume) ([`../core/01-purpose.md`](../core/01-purpose.md), [`../core/03-execution-model.md`](../core/03-execution-model.md), [`../core/04-protocol.md`](../core/04-protocol.md)).
 - Articulated differentiators: **layered memory**, **skills vs tools** with execution only via **ToolRunner**, **typed protocol** (`thought` / `action` / `observation` / `wait` / `result`), **append-only history**, **durable state outside the prompt** ([`../core/05-adapters-contracts.md`](../core/05-adapters-contracts.md), [`../core/12-skills.md`](../core/12-skills.md)).
-- **Wait/resume** as a first-class primitive fits the real world (human, webhook, time), not only chat turns ([`04-protocolo-comunicacion-y-loop.md`](./04-protocolo-comunicacion-y-loop.md)).
+- **Wait/resume** as a first-class primitive fits the real world (human, webhook, time), not only chat turns ([`04-protocol-communication-and-loop.md`](./04-protocol-communication-and-loop.md)).
 
 ## Delivery shape
 
-- **Same semantics** in **SDK (Promise + hooks)**, **CLI**, and **REST** avoids duplicating the loop and helps dev + ops adoption ([`05-sdk-estilo-promise-y-prd.md`](./05-sdk-estilo-promise-y-prd.md), [`06-libreria-adapters-cli.md`](./06-libreria-adapters-cli.md), [`07-multi-agente-rest-sesiones.md`](./07-multi-agente-rest-sesiones.md), [`../core/14-consumers.md`](../core/14-consumers.md)).
+- **Same semantics** in **SDK (Promise + hooks)**, **CLI**, and **REST** avoids duplicating the loop and helps dev + ops adoption ([`05-sdk-promise-style-and-prd.md`](./05-sdk-promise-style-and-prd.md), [`06-library-adapters-cli.md`](./06-library-adapters-cli.md), [`07-multi-agent-rest-sessions.md`](./07-multi-agent-rest-sessions.md), [`../core/14-consumers.md`](../core/14-consumers.md)).
 - **Multi-agent** as **MessageBus + tool** (`system_send_message`), not one mega-model with many voices; still one loop per agent ([`../core/09-communication-multiagent.md`](../core/09-communication-multiagent.md)).
-- **Dynamic platform** (`Agent.define` / `Tool.define` / `Skill.define`, project vs global) is **evolutionary vision**, not mandatory for engine MVP ([`08-plataforma-dinamica-proyectos.md`](./08-plataforma-dinamica-proyectos.md), [`../core/07-definition-syntax.md`](../core/07-definition-syntax.md), [`../planning/mvp.md`](../planning/mvp.md)).
+- **Dynamic platform** (`Agent.define` / `Tool.define` / `Skill.define`, project vs global) is **evolutionary vision**, not mandatory for engine MVP ([`08-dynamic-projects-platform.md`](./08-dynamic-projects-platform.md), [`../core/07-definition-syntax.md`](../core/07-definition-syntax.md), [`../planning/mvp.md`](../planning/mvp.md)).
 
 ## Security and serious product
 

@@ -50,4 +50,4 @@ Recommended default for a **platform**: **A** or **A + C** (MCP tool list is a c
 - Consumers summary: [`core/14-consumers.md`](../core/14-consumers.md)
 - REST plan (often under MCP): [`plan-rest.md`](./plan-rest.md)
 - CLI (alternative surface): [`plan-cli.md`](./plan-cli.md)
-- Brainstorm library + hooks philosophy: [`brainstorm/06-libreria-adapters-cli.md`](../brainstorm/06-libreria-adapters-cli.md)
+- Brainstorm library + hooks philosophy: [`brainstorm/06-library-adapters-cli.md`](../brainstorm/06-library-adapters-cli.md)

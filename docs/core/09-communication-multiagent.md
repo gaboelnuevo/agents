@@ -2,7 +2,7 @@
 
 How multiple agents **send messages** and **coordinate** without leaving the engine model: one loop per agent, **tools** to send, **MessageBus** to deliver, and **`wait` / `resume`** when a reply is needed.
 
-Related: [06-adapters-infrastructure.md](./06-adapters-infrastructure.md) (MessageBus backends, Redis packages), [08-scope-and-security.md](./08-scope-and-security.md) (isolation), [14-consumers.md](./14-consumers.md), [19-cluster-deployment.md](./19-cluster-deployment.md) (**`messageBus`** on **`AgentRuntime`** on every worker for cross-process delivery; **`runStore`** when **`wait`** spans workers). Optional brainstorm: [../brainstorm/07-multi-agente-rest-sesiones.md](../brainstorm/07-multi-agente-rest-sesiones.md).
+Related: [06-adapters-infrastructure.md](./06-adapters-infrastructure.md) (MessageBus backends, Redis packages), [08-scope-and-security.md](./08-scope-and-security.md) (isolation), [14-consumers.md](./14-consumers.md), [19-cluster-deployment.md](./19-cluster-deployment.md) (**`messageBus`** on **`AgentRuntime`** on every worker for cross-process delivery; **`runStore`** when **`wait`** spans workers). Optional brainstorm: [../brainstorm/07-multi-agent-rest-sessions.md](../brainstorm/07-multi-agent-rest-sessions.md).
 
 **Tool id:** **`system_send_message`**. Like other engine primitives, it uses the **`system_`** prefix so it stays distinct from app-defined tools and is easy to spot in allowlists and protocol traces.
 
