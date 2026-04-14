@@ -35,7 +35,7 @@ describe("code-skills pack", () => {
     expect(existsSync(join(engineDocs, "core", "03-execution-model.md"))).toBe(true);
     expect(existsSync(join(engineDocs, "core", "10-llm-adapter.md"))).toBe(true);
     expect(existsSync(join(engineDocs, "core", "08-scope-and-security.md"))).toBe(true);
-    expect(existsSync(join(engineDocs, "planning"))).toBe(false);
+    expect(existsSync(join(engineDocs, "planning", "mvp.md"))).toBe(true);
 
     const workspacePlanning = join(skillDocsDirectory("opencoreagents-workspace"), "planning");
     expect(existsSync(join(workspacePlanning, "plan.md"))).toBe(true);
