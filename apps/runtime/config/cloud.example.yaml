@@ -1,0 +1,39 @@
+# Copy to `cloud.yaml` (gitignored). Secrets and URLs come from the environment or a secret manager; use `${VAR}` in strings.
+
+environment: cloud
+
+server:
+  port: 3010
+  host: "0.0.0.0"
+
+project:
+  # Set PROJECT_ID in the environment for tenant / environment isolation (overrides default).
+  id: "${PROJECT_ID:-default}"
+
+redis:
+  url: "${REDIS_URL}"
+
+bullmq:
+  queueName: ""
+
+definitions:
+  keyPrefix: def
+
+run:
+  waitTimeoutMs: 120000
+
+# Example: OpenAI in production (set OPENAI_API_KEY in the environment).
+llm:
+  defaultProvider: openai
+  openai:
+    apiKey: "${OPENAI_API_KEY}"
+    baseUrl: ""
+  anthropic:
+    apiKey: "${ANTHROPIC_API_KEY}"
+    baseUrl: ""
+
+# Mount skills at config/skills in the container/pod so ./skills resolves (same as Docker image/Compose).
+openclaw:
+  enabled: true
+  skillsDirs:
+    - ./skills

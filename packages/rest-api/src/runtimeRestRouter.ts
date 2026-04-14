@@ -169,6 +169,17 @@ function optionalApiKeyAuth(config: {
   };
 }
 
+/**
+ * Same **`Authorization: Bearer …`** / **`X-Api-Key`** checks as {@link createRuntimeRestRouter}’s internal middleware.
+ * Use to protect routes **outside** that router (e.g. admin mounts) with the same secret.
+ */
+export function createOptionalRuntimeRestApiKeyMiddleware(options: {
+  apiKey?: string;
+  resolveApiKey?: (req: Request, res: Response) => string | undefined;
+}): RequestHandler {
+  return optionalApiKeyAuth(options);
+}
+
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }

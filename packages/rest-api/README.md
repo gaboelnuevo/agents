@@ -26,7 +26,7 @@ Install **`@opencoreagents/adapters-bullmq`** and **`bullmq`** when using **`dis
 | **GET** | `/agents/:agentId/runs` | Requires **`runStore`**. Optional **`?status=`** (**`running` \| `waiting` \| `completed` \| `failed`**), **`?sessionId=`**, **`?limit=`** (default **50**, max **100**). **`RunStore.listByAgent`** — same **`run.projectId`** vs tenant rule as **`GET /runs`** when **`projectId`** is set on rows. |
 | **GET** | `/jobs/:jobId` | Only when **`dispatch`** is set — poll BullMQ job (**`state`**, **`run`** summary when completed), same idea as **`GET /v1/jobs/:id`** in **`dynamic-runtime-rest`**. |
 
-Optional auth: **`resolveApiKey(req, res)`** (recommended — lazy env, **per-`projectId` secrets** via **`getRuntimeRestRouterProjectId(res)`**) and/or static **`apiKey`**. Tenant middleware runs **before** API-key checks. When the effective secret is non-empty, clients must send **`Authorization: Bearer …`** or **`X-Api-Key`**.
+Optional auth: **`resolveApiKey(req, res)`** (recommended — lazy env, **per-`projectId` secrets** via **`getRuntimeRestRouterProjectId(res)`**) and/or static **`apiKey`**. Tenant middleware runs **before** API-key checks. When the effective secret is non-empty, clients must send **`Authorization: Bearer …`** or **`X-Api-Key`**. Use **`createOptionalRuntimeRestApiKeyMiddleware({ … })`** (same rules) to protect **other** Express mounts with the same secret (e.g. admin routes next to this router).
 
 ### One fixed project
 

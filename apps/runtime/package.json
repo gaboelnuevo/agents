@@ -1,0 +1,37 @@
+{
+  "name": "@opencoreagents/runtime",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Production-oriented runtime: declarative stack (YAML/JSON), Express plan REST, BullMQ worker, Redis definitions and agent memory, Docker Compose.",
+  "scripts": {
+    "start:server": "tsx src/server.ts",
+    "start:worker": "tsx src/worker.ts",
+    "config:print": "tsx src/cli.ts print",
+    "config:env": "tsx src/cli.ts env",
+    "docker:up": "docker compose -f docker-compose-with-redis.yml up --build",
+    "docker:down": "docker compose -f docker-compose-with-redis.yml down",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@opencoreagents/adapters-anthropic": "workspace:*",
+    "@opencoreagents/adapters-bullmq": "workspace:*",
+    "@opencoreagents/adapters-openai": "workspace:*",
+    "@opencoreagents/adapters-http-tool": "workspace:*",
+    "@opencoreagents/adapters-redis": "workspace:*",
+    "@opencoreagents/core": "workspace:*",
+    "@opencoreagents/dynamic-definitions": "workspace:*",
+    "@opencoreagents/rest-api": "workspace:*",
+    "@opencoreagents/skill-loader-openclaw": "workspace:*",
+    "bullmq": "^5.73.1",
+    "express": "^4.21.2",
+    "ioredis": "^5.4.1",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

@@ -4,6 +4,8 @@ Roadmap, monorepo layout, known gaps, and planned or shipped consumer surfaces (
 
 **Hub:** **[Documentation index](../README.md)** · **[Getting started](../getting-started.md)**
 
+**Runnable stack (Docker, no pnpm):** root **[README](../../README.md#easy-getting-started-runnable-stack)** — **`@opencoreagents/runtime`** + Compose; detail in **[`apps/runtime/README.md`](../../apps/runtime/README.md)**.
+
 ---
 
 ## Suggested reading order
@@ -30,6 +32,7 @@ Roadmap, monorepo layout, known gaps, and planned or shipped consumer surfaces (
 | [Technical debt — platform / core / CI](./technical-debt-platform-core-ci.md) | Sections **1–4**: packages, engine, tests, ops |
 | [Technical debt — deferred](./technical-debt-deferred.md) | Sections **1–4**: examples, CLI, docs, OSS |
 | [REST](./plan-rest.md) | HTTP/JSON contract + **`@opencoreagents/rest-api`** |
+| [**Runnable stack** (`apps/runtime`)](../../apps/runtime/README.md) | **`@opencoreagents/runtime`**: Docker Compose (Redis + API + worker); guides in **`apps/runtime/docs/`** |
 | [CLI](./plan-cli.md) | Command-line surface beyond **`init` / `generate`** |
 | [MCP](./plan-mcp.md) | Model Context Protocol as a channel |
 

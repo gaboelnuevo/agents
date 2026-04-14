@@ -1,0 +1,9 @@
+config/*.yaml
+!config/*.example.yaml
+config/*.yml
+!config/*.example.yml
+config/*.json
+!config/*.example.json
+.env
+.env.runtime
+.env.stack

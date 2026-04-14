@@ -14,8 +14,22 @@ There is also an optional path where **prompts and tool configs live in Redis** 
 
 ---
 
+## Easy getting started (runnable stack)
+
+To try the **REST API** contract ([**plan-rest**](docs/planning/plan-rest.md)) against a real **Redis + API + BullMQ worker** without wiring packages yourself, use the reference app **`@opencoreagents/runtime`**:
+
+1. Install [Docker](https://docs.docker.com/get-docker/) (Desktop or Engine + Compose v2). No pnpm required.
+2. Configure YAML: in **`apps/runtime`**, **`cp config/docker.stack.example.yaml config/docker.stack.yaml`** and edit (see **[`apps/runtime/README.md`](apps/runtime/README.md)**).
+3. From the **repository root**: **`docker compose -f apps/runtime/docker-compose-with-redis.yml up --build`**
+4. Open [http://localhost:3010/health](http://localhost:3010/health) and the OpenAPI UI at `/docs` on the same port.
+
+Full guides (Docker, config, security, cloud): **[`apps/runtime/README.md`](apps/runtime/README.md)** and **[`apps/runtime/docs/`](apps/runtime/docs/README.md)**.
+
+---
+
 ## Contents
 
+- [Easy getting started (runnable stack)](#easy-getting-started-runnable-stack)
 - [What you ship faster](#what-you-ship-faster)
 - [What teams build with it](#what-teams-build-with-it)
 - [Under the hood](#under-the-hood)

@@ -1,0 +1,38 @@
+# Copy to `docker.stack.yaml` (gitignored), edit, then `docker compose … up`. Compose mounts that file into the API and worker.
+# Only placeholders (${OPENAI_API_KEY}, etc.) — never commit real secrets in your copy.
+environment: local
+
+server:
+  port: 3010
+  host: "0.0.0.0"
+
+project:
+  # Isolates Redis definition keys, memory prefixes, and dispatch scope. Set explicitly per deployment.
+  id: default
+
+redis:
+  url: "redis://redis:6379"
+
+bullmq:
+  queueName: ""
+
+definitions:
+  keyPrefix: def
+
+run:
+  waitTimeoutMs: 60000
+
+llm:
+  defaultProvider: openai
+  openai:
+    apiKey: "${OPENAI_API_KEY}"
+    baseUrl: ""
+  anthropic:
+    apiKey: "${ANTHROPIC_API_KEY}"
+    baseUrl: ""
+
+# Worker image must include these paths (or mount volumes). See apps/runtime/docs/configuration.md § OpenClaw.
+openclaw:
+  enabled: true
+  skillsDirs:
+    - ./skills

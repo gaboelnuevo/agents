@@ -1,0 +1,56 @@
+# From repo root:
+#   docker compose -f apps/runtime/docker-compose-with-redis.yml up --build
+#
+# Before first run: (1) apps/runtime/config/docker.stack.yaml from docker.stack.example.yaml
+# (2) optional apps/runtime/.env from .env.example — so API keys exist before the first `up` (no restart needed).
+# REST_API_KEY default below lets the API bind for published ports; override in .env for non-local use.
+# OpenClaw: ./skills is mounted at .../config/skills so skillsDirs: [./skills] in docker.stack.yaml resolves correctly.
+# API: http://localhost:3010/health
+x-runtime-image: &runtime-build
+  context: ../..
+  dockerfile: apps/runtime/Dockerfile
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: *runtime-build
+    ports:
+      - "3010:3010"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      RUNTIME_CONFIG: /app/apps/runtime/config/docker.stack.yaml
+      # Non-empty => server binds 0.0.0.0 (per stack) and enforces this key on routes. Empty => loopback-only bind (published port may not work).
+      REST_API_KEY: ${REST_API_KEY:-docker-local-change-me}
+    volumes:
+      - ./config/docker.stack.yaml:/app/apps/runtime/config/docker.stack.yaml:ro
+      - ./skills:/app/apps/runtime/config/skills:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["pnpm", "exec", "tsx", "src/server.ts"]
+
+  worker:
+    build: *runtime-build
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      RUNTIME_CONFIG: /app/apps/runtime/config/docker.stack.yaml
+    volumes:
+      - ./config/docker.stack.yaml:/app/apps/runtime/config/docker.stack.yaml:ro
+      - ./skills:/app/apps/runtime/config/skills:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["pnpm", "exec", "tsx", "src/worker.ts"]

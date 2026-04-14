@@ -8,6 +8,7 @@ export {
   type RuntimeRestSwaggerPaths,
 } from "./openapi.js";
 export {
+  createOptionalRuntimeRestApiKeyMiddleware,
   createRuntimeRestRouter,
   defaultRuntimeRestResolveProjectId,
   getRuntimeRestRouterProjectId,

@@ -1,0 +1,39 @@
+# Reference stack for processes on the host. Copy to `config/local.yaml` and set project.id + secrets.
+# Redis: run `docker compose -f docker-compose-with-redis.yml up -d redis` in this directory, or use your own instance.
+environment: local
+
+server:
+  port: 3010
+  host: "0.0.0.0"
+
+project:
+  id: default
+
+redis:
+  url: "redis://127.0.0.1:6379"
+
+bullmq:
+  # Omit or set to "" to use the library default queue name.
+  queueName: ""
+
+definitions:
+  keyPrefix: def
+
+run:
+  waitTimeoutMs: 60000
+
+# Worker: adapters for agent.llm.provider (openai | anthropic). Set keys via env (${…}).
+llm:
+  defaultProvider: openai
+  openai:
+    apiKey: "${OPENAI_API_KEY}"
+    baseUrl: ""
+  anthropic:
+    apiKey: "${ANTHROPIC_API_KEY}"
+    baseUrl: ""
+
+# OpenClaw: default in code is ./skills (relative to stack file); for local.yaml under config/, ../skills is apps/runtime/skills.
+openclaw:
+  enabled: true
+  skillsDirs:
+    - ../skills

@@ -33,6 +33,61 @@ importers:
         specifier: ^3
         version: 3.2.4(@types/node@22.19.17)(tsx@4.21.0)
 
+  apps/runtime:
+    dependencies:
+      '@opencoreagents/adapters-anthropic':
+        specifier: workspace:*
+        version: link:../../packages/adapters-anthropic
+      '@opencoreagents/adapters-bullmq':
+        specifier: workspace:*
+        version: link:../../packages/adapters-bullmq
+      '@opencoreagents/adapters-http-tool':
+        specifier: workspace:*
+        version: link:../../packages/adapters-http-tool
+      '@opencoreagents/adapters-openai':
+        specifier: workspace:*
+        version: link:../../packages/adapters-openai
+      '@opencoreagents/adapters-redis':
+        specifier: workspace:*
+        version: link:../../packages/adapters-redis
+      '@opencoreagents/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@opencoreagents/dynamic-definitions':
+        specifier: workspace:*
+        version: link:../../packages/dynamic-definitions
+      '@opencoreagents/rest-api':
+        specifier: workspace:*
+        version: link:../../packages/rest-api
+      '@opencoreagents/skill-loader-openclaw':
+        specifier: workspace:*
+        version: link:../../packages/skill-loader-openclaw
+      bullmq:
+        specifier: ^5.73.1
+        version: 5.73.1
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.10.1
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.1.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
+      tsx:
+        specifier: ^4.19.3
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   examples/console-wait:
     dependencies:
       '@opencoreagents/core':
