@@ -264,67 +264,7 @@ export function createChatRouter(opts: {
         return;
       }
 
-      if (run.status === "failed") {
-        const runId = randomUUID();
-        await opts.redis.set(bindKey, JSON.stringify({ runId, agentId: chatAgentId }));
-
-        const job = await opts.engine.addRun({
-          projectId,
-          agentId: chatAgentId,
-          sessionId,
-          runId,
-          userInput: message,
-        });
-        jobId = job.id ?? "";
-        if (!jobId) {
-          await opts.redis.del(bindKey);
-          res.status(500).json({ sessionId, error: "enqueue failed (missing job id)" });
-          return;
-        }
-        if (!wait) {
-          res.status(202).json({
-            jobId,
-            sessionId,
-            projectId,
-            runId,
-            agentId: chatAgentId,
-            statusUrl: `/jobs/${jobId}`,
-            pollUrl: `/jobs/${jobId}`,
-          });
-          return;
-        }
-        let finishedValue: unknown;
-        try {
-          finishedValue = await job.waitUntilFinished(opts.queueEvents, opts.jobWaitTimeoutMs);
-        } catch (waitErr) {
-          const msg = errorMessage(waitErr);
-          if (isBullmqJobWaitTimeoutError(waitErr)) {
-            res.status(504).json({ jobId, sessionId, projectId, runId, error: msg });
-            return;
-          }
-          res.status(502).json({ jobId, sessionId, projectId, runId, error: msg });
-          return;
-        }
-        let runDone = await resolveRunForChatReply(opts.runStore, finishedValue);
-        if (!runDone) runDone = await resolveRunForChatReply(opts.runStore, job.returnvalue);
-        if (runDone) {
-          const s = summarizeEngineRun(runDone);
-          res.json({
-            jobId,
-            sessionId,
-            projectId,
-            runId: s.runId,
-            agentId: chatAgentId,
-            status: s.status,
-            ...(s.reply !== undefined ? { reply: s.reply } : {}),
-          });
-          return;
-        }
-        res.status(500).json({ jobId, sessionId, error: "job finished but return value is missing or not a Run" });
-        return;
-      }
-
-      if (run.status === "completed") {
+      if (run.status === "failed" || run.status === "completed") {
         const job = await opts.engine.addContinue({
           projectId,
           agentId: chatAgentId,

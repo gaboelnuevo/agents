@@ -133,9 +133,37 @@ export class RunBuilder implements PromiseLike<Run> {
   }
 
   /**
+   * When **`executeRun`** throws after **`continueRun`** CAS (**`completed`/`failed` → `running`**) or after a
+   * **`resume`** while Redis still shows **`waiting`**, the store would otherwise stay non-terminal and
+   * HTTP chat would keep returning **`run_in_progress`** / **`run_waiting`**. Persist terminal state here.
+   */
+  private async persistExecuteFailure(
+    store: RunStore,
+    run: Run,
+    cas: "running" | "waiting" | null,
+  ): Promise<void> {
+    if (
+      run.status !== "failed" &&
+      run.status !== "completed" &&
+      run.status !== "waiting"
+    ) {
+      run.status = "failed";
+    }
+    if (cas === "running" || cas === "waiting") {
+      const ok = await store.saveIfStatus(run, cas);
+      if (!ok) {
+        await store.save(run);
+      }
+      return;
+    }
+    await store.save(run);
+  }
+
+  /**
    * After `executeRun`, persist with compare-and-swap when advancing from a **`waiting`** row
    * (`Agent.resume` or in-process `onWait` after a prior save that left `waiting`), or from **`running`**
-   * after **`Agent.continueRun`** (initial CAS already moved **`completed` → `running`**).
+   * after **`Agent.continueRun`** (initial CAS already moved **`completed` → `running`** or
+   * **`failed` → `running`**).
    */
   private async persistAfterExecute(
     store: RunStore,
@@ -198,9 +226,9 @@ export class RunBuilder implements PromiseLike<Run> {
           `Run ${this.init.runId} belongs to a different agent`,
         );
       }
-      if (loaded.status !== "completed") {
+      if (loaded.status !== "completed" && loaded.status !== "failed") {
         throw new RunInvalidStateError(
-          `Cannot continue run ${this.init.runId}: status is "${loaded.status}", expected "completed"`,
+          `Cannot continue run ${this.init.runId}: status is "${loaded.status}", expected "completed" or "failed"`,
         );
       }
       if (
@@ -226,6 +254,7 @@ export class RunBuilder implements PromiseLike<Run> {
       if (!cont) {
         throw new RunInvalidStateError("continueRun: userInput is required");
       }
+      const priorStatus = loaded.status;
       run = loaded;
       run.status = "running";
       run.state.pending = null;
@@ -237,10 +266,13 @@ export class RunBuilder implements PromiseLike<Run> {
           content: `[continue:user] ${cont}`,
         },
       ];
-      const ok = await cfg.runStore.saveIfStatus(run, "completed");
+      const ok = await cfg.runStore.saveIfStatus(
+        run,
+        priorStatus === "failed" ? "failed" : "completed",
+      );
       if (!ok) {
         throw new RunInvalidStateError(
-          `Run ${this.init.runId} is no longer completed (concurrent continue or stale job)`,
+          `Run ${this.init.runId} is no longer ${priorStatus} (concurrent continue or stale job)`,
         );
       }
     } else {
@@ -298,12 +330,26 @@ export class RunBuilder implements PromiseLike<Run> {
       hooks: this.hooks,
     });
 
+    const failureCasForPrimaryExecute = (): "running" | "waiting" | null => {
+      if (isContinueInit(this.init)) return "running";
+      if (isResumeInit(this.init)) return "waiting";
+      return null;
+    };
+
     let lastPersistedWasWaiting = false;
-    let result = await executeRun(run, {
-      ...baseDeps,
-      startedAtMs: Date.now(),
-      resumeMessages,
-    });
+    let result: Run;
+    try {
+      result = await executeRun(run, {
+        ...baseDeps,
+        startedAtMs: Date.now(),
+        resumeMessages,
+      });
+    } catch (e) {
+      if (cfg.runStore) {
+        await this.persistExecuteFailure(cfg.runStore, run, failureCasForPrimaryExecute());
+      }
+      throw e;
+    }
 
     if (cfg.runStore) {
       await this.persistAfterExecute(cfg.runStore, result, {
@@ -329,16 +375,23 @@ export class RunBuilder implements PromiseLike<Run> {
       result.status = "running";
       result.state.pending = null;
 
-      result = await executeRun(result, {
-        ...baseDeps,
-        startedAtMs: Date.now(),
-        resumeMessages: [
-          {
-            role: "user",
-            content: `[resume:text] ${reply}`,
-          },
-        ],
-      });
+      try {
+        result = await executeRun(result, {
+          ...baseDeps,
+          startedAtMs: Date.now(),
+          resumeMessages: [
+            {
+              role: "user",
+              content: `[resume:text] ${reply}`,
+            },
+          ],
+        });
+      } catch (e) {
+        if (cfg.runStore) {
+          await this.persistExecuteFailure(cfg.runStore, result, "waiting");
+        }
+        throw e;
+      }
 
       if (cfg.runStore) {
         await this.persistAfterExecute(cfg.runStore, result, {

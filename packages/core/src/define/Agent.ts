@@ -11,7 +11,7 @@ export interface AgentInstance {
     runId: string,
     input: { type: string; content: string },
   ): RunBuilder;
-  /** New user turn on a **`completed`** run (same **`runId`**). Requires **`runStore`**. */
+  /** New user turn on a **`completed`** or **`failed`** run (same **`runId`**). Requires **`runStore`**. */
   continueRun(runId: string, userInput: string): RunBuilder;
 }
 

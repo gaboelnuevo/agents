@@ -1,6 +1,6 @@
 /**
  * Aligns with `docs/chat-runs-and-planner.md` — convenience **`POST /v1/chat`**:
- * binding key, first message → **`addRun`**, **`completed`** → **`addContinue`**, **`failed`** → new **`addRun`**,
+ * binding key, first message → **`addRun`**, **`completed`** / **`failed`** → **`addContinue`** (same **`runId`**),
  * **`running`** / **`waiting`** → **409**, disabled chat → **503**.
  */
 import type { RedisDynamicDefinitionsStore } from "@opencoreagents/adapters-redis";
@@ -271,16 +271,17 @@ describe("POST /v1/chat (docs/chat-runs-and-planner.md)", () => {
     expect(res.body.error).toBe("run_waiting");
   });
 
-  it("after failed run, next message starts a new addRun and updates binding", async () => {
+  it("after failed run, next message enqueues addContinue on the same runId", async () => {
     const redis = makeRedis();
     const runs = new Map<string, Run>();
-    const addRun = vi.fn().mockReturnValueOnce(mockJob("ja")).mockReturnValueOnce(mockJob("jb"));
+    const addRun = vi.fn().mockReturnValueOnce(mockJob("ja"));
+    const addContinue = vi.fn().mockReturnValue(mockJob("jb"));
     const app = mountChatRouter({
       config: { ...defaultStackConfig, project: { id: PROJECT } },
       redis,
       runs,
       addRun,
-      addContinue: vi.fn(),
+      addContinue,
     });
 
     const sessionId = "sess-fail";
@@ -295,15 +296,16 @@ describe("POST /v1/chat (docs/chat-runs-and-planner.md)", () => {
       .post("/v1/chat")
       .send({ message: "b", sessionId })
       .expect(202);
-    expect(second.body.runId).not.toBe(runId1);
-    expect(addRun).toHaveBeenCalledTimes(2);
-    expect(addRun.mock.calls[1][0]).toMatchObject({
+    expect(second.body.runId).toBe(runId1);
+    expect(addRun).toHaveBeenCalledTimes(1);
+    expect(addContinue).toHaveBeenCalledTimes(1);
+    expect(addContinue.mock.calls[0][0]).toMatchObject({
       userInput: "b",
-      runId: second.body.runId,
+      runId: runId1,
     });
 
     const bindKey = chatBindingRedisKey(PREFIX, PROJECT, sessionId);
     const bound = JSON.parse((await redis.get(bindKey))!);
-    expect(bound.runId).toBe(second.body.runId);
+    expect(bound.runId).toBe(runId1);
   });
 });

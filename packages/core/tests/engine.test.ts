@@ -4,6 +4,7 @@ import {
   AgentRuntime,
   Session,
   Skill,
+  StepSchemaError,
   Tool,
   buildEngineDeps,
   createRun,
@@ -571,6 +572,120 @@ describe("engine", () => {
     const results = second.history.filter((h) => h.type === "result");
     expect(results.map((h) => h.content)).toContain("second answer");
     expect(results.pop()?.content).toBe("second answer");
+  });
+
+  it("continueRun: exhausted parse recovery persists failed (not stuck running in runStore)", async () => {
+    const mem = new InMemoryMemoryAdapter();
+    const store = new InMemoryRunStore();
+    const llm = new QueueLLM([
+      JSON.stringify({ type: "result", content: "first answer" }),
+      "not-json-one",
+      "not-json-two",
+    ]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      runStore: store,
+      maxIterations: 10,
+      maxParseRecovery: 1,
+    });
+
+    await Agent.define({
+      id: "a-continue-parse-fail",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const session = new Session({ id: "s-continue-parse-fail", projectId: "p1" });
+    const agent = await Agent.load("a-continue-parse-fail", rt, { session });
+    const first = await agent.run("hello");
+    expect(first.status).toBe("completed");
+
+    await expect(agent.continueRun(first.runId, "follow up")).rejects.toThrow(StepSchemaError);
+    const stored = await store.load(first.runId);
+    expect(stored?.status).toBe("failed");
+  });
+
+  it("continueRun after failed keeps same runId and history for the next turn", async () => {
+    const mem = new InMemoryMemoryAdapter();
+    const store = new InMemoryRunStore();
+    const llm = new QueueLLM([
+      JSON.stringify({ type: "result", content: "first answer" }),
+      "not-json-one",
+      "not-json-two",
+      JSON.stringify({ type: "result", content: "after fail" }),
+    ]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      runStore: store,
+      maxIterations: 10,
+      maxParseRecovery: 1,
+    });
+
+    await Agent.define({
+      id: "a-continue-after-fail",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const session = new Session({ id: "s-continue-after-fail", projectId: "p1" });
+    const agent = await Agent.load("a-continue-after-fail", rt, { session });
+    const first = await agent.run("hello");
+    expect(first.status).toBe("completed");
+
+    await expect(agent.continueRun(first.runId, "follow up")).rejects.toThrow(StepSchemaError);
+
+    const third = await agent.continueRun(first.runId, "try again");
+    expect(third.runId).toBe(first.runId);
+    expect(third.status).toBe("completed");
+    expect(
+      third.history.some((h) => h.type === "result" && h.content === "first answer"),
+    ).toBe(true);
+    expect(
+      third.history.some((h) => h.type === "result" && h.content === "after fail"),
+    ).toBe(true);
+    expect(third.state.continueInputs).toEqual(["follow up", "try again"]);
+  });
+
+  it("resume: exhausted parse recovery persists failed (not stuck waiting in runStore)", async () => {
+    const mem = new InMemoryMemoryAdapter();
+    const store = new InMemoryRunStore();
+    const llm = new QueueLLM([
+      JSON.stringify({ type: "wait", reason: "need" }),
+      "not-json-one",
+      "not-json-two",
+    ]);
+    const rt = new AgentRuntime({
+      llmAdapter: llm,
+      memoryAdapter: mem,
+      runStore: store,
+      maxIterations: 10,
+      maxParseRecovery: 1,
+    });
+
+    await Agent.define({
+      id: "a-resume-parse-fail",
+      projectId: "p1",
+      systemPrompt: "Test.",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o" },
+    });
+
+    const session = new Session({ id: "s-resume-parse-fail", projectId: "p1" });
+    const agent = await Agent.load("a-resume-parse-fail", rt, { session });
+    const waiting = await agent.run("start");
+    expect(waiting.status).toBe("waiting");
+
+    await expect(
+      agent.resume(waiting.runId, { type: "text", content: "go" }),
+    ).rejects.toThrow(StepSchemaError);
+    const stored = await store.load(waiting.runId);
+    expect(stored?.status).toBe("failed");
   });
 
   it("resume rejects when sessionId does not match stored run", async () => {

@@ -11,7 +11,7 @@ Execution model: [03-execution-model.md](./03-execution-model.md). `Step` shape:
 | State | Meaning |
 |-------|---------|
 | `completed` | Valid `result` processed; history closed normally. |
-| `failed` | Unrecoverable error on this run; do not continue the loop without a new `run` or explicit “retry run” policy. |
+| `failed` | Unrecoverable error on this run; the engine loop stopped. A new **`run`** job is one recovery path; **`continueRun`** from **`failed`** is also supported (same **`runId`**, CAS **`failed` → `running`**) when the product wants to keep transcript context (e.g. runtime **`POST /v1/chat`**). |
 | `waiting` | Not an error; run paused until `resume`. |
 
 ---
@@ -35,7 +35,7 @@ Export errors as **stable** classes or codes (`RUN_INVALID_STATE`, `STEP_SCHEMA_
 ## 3. History on failure
 
 - **Append** a protocol message or log entry with meta `type` (e.g. `error`) or `state.lastError` **without** breaking immutability of the rest of history: prefer **one final** documented event `meta: { engineError: true }`.
-- After `failed`, reject new `action` / LLM turns; `resume` only if the product allows “retry from failed” (not recommended in MVP).
+- After `failed`, the stored document is terminal until a **`continueRun`** (or similar) explicitly re-opens the run; **`resume`** applies only to **`waiting`** unless you add a separate policy.
 
 ---
 

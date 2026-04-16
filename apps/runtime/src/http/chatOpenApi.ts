@@ -35,7 +35,7 @@ export function extendOpenApiWithChat(
     post: {
       summary: "Send a chat message",
       description:
-        "Creates or continues a session-bound run. Omit **`sessionId`** to start a new session (response includes one). Use **`wait`** in the JSON body or **`?wait=1`** to block until the job completes; otherwise the server responds **202** with **`jobId`** and **`pollUrl`**.",
+        "Creates or continues a session-bound run. Omit **`sessionId`** to start a new session (response includes one). Follow-up messages use **`continue`** on the same **`runId`** when the stored run is **`completed`** or **`failed`** (failed runs resume with full prior context). Use **`wait`** in the JSON body or **`?wait=1`** to block until the job completes; otherwise the server responds **202** with **`jobId`** and **`pollUrl`**.",
       tags: ["Chat"],
       parameters: [
         {
