@@ -41,7 +41,7 @@
         background: var(--bg);
       }
       .wrap {
-        max-width: 42rem;
+        max-width: 52rem;
         margin: 0 auto;
         padding: 1.75rem 1.25rem 3rem;
       }
@@ -192,6 +192,233 @@
         display: block;
         margin-bottom: 0.35rem;
       }
+      .tabs-wrap {
+        margin-bottom: 1rem;
+      }
+      .tablist {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        padding: 0.2rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+      .tablist button {
+        flex: 1;
+        min-width: 5.5rem;
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid transparent;
+        font-weight: 500;
+      }
+      .tablist button:hover:not(:disabled) {
+        background: var(--bg);
+        color: var(--text);
+      }
+      .tablist button[aria-selected="true"] {
+        background: var(--bg);
+        color: var(--accent);
+        border-color: var(--border);
+        box-shadow: none;
+      }
+      .tab-panel[hidden] {
+        display: none !important;
+      }
+      .tab-panel .card {
+        margin-bottom: 0;
+      }
+      .global-options {
+        margin-bottom: 1rem;
+        padding: 0.65rem 1rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+      .global-options .row {
+        margin-bottom: 0;
+      }
+      .panel-heading {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin: 0 0 0.5rem;
+      }
+      .panel-heading code {
+        text-transform: none;
+        font-size: 0.85em;
+      }
+      .chat-card .chat-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0 0 0.25rem;
+        letter-spacing: -0.02em;
+      }
+      .chat-card .chat-sub {
+        margin: 0 0 1rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      .chat-toolbar {
+        margin-bottom: 0.75rem;
+      }
+      .chat-toolbar .grow label {
+        margin-bottom: 0.25rem;
+      }
+      .chat-session-input {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+      .chat-thread {
+        min-height: 14rem;
+        max-height: min(50vh, 26rem);
+        overflow-y: auto;
+        padding: 0.85rem;
+        margin-bottom: 0.75rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        scroll-behavior: smooth;
+      }
+      .chat-msg {
+        display: flex;
+        margin-bottom: 0.65rem;
+      }
+      .chat-msg-user {
+        justify-content: flex-end;
+      }
+      .chat-msg-assistant {
+        justify-content: flex-start;
+      }
+      .chat-msg-system {
+        justify-content: center;
+      }
+      .chat-bubble {
+        max-width: 88%;
+        padding: 0.55rem 0.8rem;
+        border-radius: 14px;
+        font-size: 0.95rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .chat-msg-user .chat-bubble {
+        background: var(--accent);
+        color: #fff;
+        border-bottom-right-radius: 5px;
+      }
+      .chat-msg-assistant .chat-bubble {
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-bottom-left-radius: 5px;
+      }
+      .chat-msg-system .chat-bubble {
+        background: transparent;
+        color: var(--muted);
+        border: 1px dashed var(--border);
+        font-size: 0.78rem;
+        max-width: 100%;
+        text-align: center;
+        padding: 0.35rem 0.55rem;
+      }
+      .chat-bubble-pending {
+        border-style: dashed;
+        opacity: 0.85;
+        font-style: italic;
+      }
+      .chat-composer {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+      }
+      .chat-composer textarea {
+        flex: 1;
+        min-height: 2.85rem;
+        max-height: 10rem;
+        margin-bottom: 0;
+      }
+      .chat-composer button {
+        flex-shrink: 0;
+        align-self: flex-end;
+      }
+      .chat-run-meta {
+        margin: 0.65rem 0 0;
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-family: var(--mono);
+        word-break: break-all;
+      }
+      .inspect-table-wrap {
+        overflow-x: auto;
+        margin-top: 0.5rem;
+        max-height: min(40vh, 18rem);
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+      table.inspect {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+      table.inspect th,
+      table.inspect td {
+        padding: 0.35rem 0.5rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      table.inspect th {
+        background: var(--bg);
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      table.inspect tr:last-child td {
+        border-bottom: none;
+      }
+      .hist-list {
+        margin: 0;
+        padding-left: 1.1rem;
+        font-size: 0.8rem;
+        max-height: min(45vh, 22rem);
+        overflow: auto;
+      }
+      .hist-list li {
+        margin-bottom: 0.45rem;
+      }
+      .hist-type {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        margin-right: 0.35rem;
+      }
+      .hist-meta {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+      }
+      .pill-row button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.78rem;
+      }
     </style>
   </head>
   <body>
@@ -199,64 +426,194 @@
       <header>
         <h1>OpenCore Agents · Runtime playground</h1>
         <p>
-          Same API as <a href="/docs" target="_blank" rel="noopener">/docs</a> — try runs and
-          <code>continue</code> without <code>curl</code>.
+          Same API as <a href="/docs" target="_blank" rel="noopener">/docs</a> — try runs,
+          <code>continue</code>, and <code>/v1/chat</code> without <code>curl</code>.
         </p>
       </header>
 
-      <div class="card">
-        <div class="row">
-          <div class="grow">
-            <label for="apiKey">REST API key (optional)</label>
-            <input type="password" id="apiKey" placeholder="If the server uses REST_API_KEY…" autocomplete="off" />
-          </div>
-        </div>
-        <div class="row">
-          <button type="button" class="secondary" id="saveKey">Save in this browser</button>
-          <button type="button" class="secondary" id="clearKey">Clear</button>
+      <div class="tabs-wrap">
+        <div class="tablist" role="tablist" aria-label="Playground sections">
+          <button type="button" role="tab" id="tab-agents" aria-selected="true" aria-controls="panel-agents" tabindex="0">
+            Agents
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-chat"
+            aria-selected="false"
+            aria-controls="panel-chat"
+            tabindex="-1"
+            title="Conversation view (POST /v1/chat)"
+          >
+            Chat
+          </button>
+          <button type="button" role="tab" id="tab-inspect" aria-selected="false" aria-controls="panel-inspect" tabindex="-1">
+            Inspect
+          </button>
+          <button type="button" role="tab" id="tab-settings" aria-selected="false" aria-controls="panel-settings" tabindex="-1">
+            Settings
+          </button>
         </div>
       </div>
 
-      <div class="card">
-        <div class="row">
-          <div class="grow">
-            <label for="agentId">Agent</label>
-            <select id="agentId"></select>
-          </div>
-          <button type="button" class="secondary" id="reloadAgents">Load agents</button>
-        </div>
-        <div class="row">
-          <div class="grow">
-            <label for="sessionId">sessionId</label>
-            <input type="text" id="sessionId" autocomplete="off" />
-          </div>
-          <button type="button" class="secondary" id="newSession">New session</button>
-        </div>
+      <div class="global-options">
         <div class="row">
           <label class="check">
             <input type="checkbox" id="wait" />
-            Wait for job to finish (<code>wait</code>)
+            Wait for job to finish (<code>wait</code>) — applies to agent runs and chat
           </label>
         </div>
-        <div class="row">
-          <label for="message">Message</label>
+      </div>
+
+      <div id="panel-agents" class="tab-panel" role="tabpanel" aria-labelledby="tab-agents">
+        <div class="card">
+          <div class="row">
+            <div class="grow">
+              <label for="agentId">Agent</label>
+              <select id="agentId"></select>
+            </div>
+            <button type="button" class="secondary" id="reloadAgents">Load agents</button>
+          </div>
+          <div class="row">
+            <div class="grow">
+              <label for="sessionId">sessionId</label>
+              <input type="text" id="sessionId" autocomplete="off" />
+            </div>
+            <button type="button" class="secondary" id="newSession">New session</button>
+          </div>
+          <div class="row">
+            <label for="message">Message</label>
+          </div>
+          <textarea id="message" placeholder="Message to send to the agent…"></textarea>
+          <div class="row" style="margin-top: 1rem">
+            <button type="button" id="sendRun">Send run</button>
+            <button type="button" class="secondary" id="sendContinue" title="Requires a run in completed state">
+              Continue (same runId)
+            </button>
+          </div>
+          <div class="row" style="margin-top: 1rem">
+            <button type="button" class="secondary" id="fetchRun">Refresh run (GET /runs/…)</button>
+            <button type="button" class="secondary" id="fetchRunTimeline">Run timeline (?timeline=1)</button>
+            <button type="button" class="secondary" id="listAgentRuns">List runs (this agent + session)</button>
+          </div>
+          <p style="margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--muted)">
+            <strong>Current runId:</strong> <span id="runIdLabel">—</span>
+          </p>
         </div>
-        <textarea id="message" placeholder="Message to send to the agent…"></textarea>
-        <div class="row" style="margin-top: 1rem">
-          <button type="button" id="sendRun">Send run</button>
-          <button type="button" class="secondary" id="sendContinue" title="Requires a run in completed state">
-            Continue (same runId)
-          </button>
+      </div>
+
+      <div id="panel-chat" class="tab-panel" role="tabpanel" aria-labelledby="tab-chat" hidden>
+        <div class="card chat-card">
+          <p class="chat-title">Conversation</p>
+          <p class="chat-sub">
+            Messages are sent to <code>POST /v1/chat</code> (default stack chat agent). The server keeps the thread for
+            this session ID. <strong>New conversation</strong> starts a new session. Enable chat in the stack and run the
+            worker. <kbd>Enter</kbd> sends, <kbd>Shift</kbd>+<kbd>Enter</kbd> newline.
+          </p>
+          <div class="row chat-toolbar">
+            <button type="button" class="secondary" id="newChatSession" title="New session UUID — new thread">
+              New conversation
+            </button>
+            <button type="button" class="secondary" id="fetchChatRun" title="GET /runs/:runId for this thread">
+              Refresh from run
+            </button>
+            <button type="button" class="secondary" id="fetchChatRunTimeline" title="GET /runs/:runId?timeline=1">
+              Load run timeline
+            </button>
+            <button type="button" class="secondary" id="loadChatSessionRuns" title="GET /sessions/:id/status?light=1">
+              Session runs
+            </button>
+          </div>
+          <div class="row">
+            <div class="grow">
+              <label for="chatSessionId">Session ID (thread key)</label>
+              <input type="text" id="chatSessionId" class="chat-session-input" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
+          <div
+            id="chatThread"
+            class="chat-thread"
+            role="log"
+            aria-relevant="additions"
+            aria-label="Chat messages"
+          ></div>
+          <div class="chat-composer">
+            <textarea id="chatMessage" rows="2" placeholder="Type a message…"></textarea>
+            <button type="button" id="sendChat">Send</button>
+          </div>
+          <p class="chat-run-meta"><span id="chatRunIdLabel">—</span></p>
         </div>
-        <p style="margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--muted)">
-          <strong>Current runId:</strong> <span id="runIdLabel">—</span>
-        </p>
+      </div>
+
+      <div id="panel-inspect" class="tab-panel" role="tabpanel" aria-labelledby="tab-inspect" hidden>
+        <div class="card">
+          <p class="chat-title">Session &amp; run inspector</p>
+          <p class="chat-sub">
+            <code>GET /sessions/:sessionId/status</code> lists persisted runs for the session (all agents in this project).
+            <code>GET /runs/:runId?sessionId=&amp;timeline=1</code> returns merged history (resume text after each
+            <code>wait</code>) plus <code>continueInputs</code> / <code>resumeInputs</code> when present.
+          </p>
+          <p class="panel-heading">Session</p>
+          <div class="row">
+            <div class="grow">
+              <label for="inspectSessionId">sessionId</label>
+              <input type="text" id="inspectSessionId" class="chat-session-input" autocomplete="off" spellcheck="false" />
+            </div>
+            <button type="button" class="secondary" id="inspectUseChatSession">Use chat session</button>
+          </div>
+          <div class="row">
+            <label class="check">
+              <input type="checkbox" id="inspectSessionFull" />
+              Include full <code>history</code> per run (larger — omits <code>?light=1</code>)
+            </label>
+          </div>
+          <p style="margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--muted)">
+            Default (unchecked): <code>GET /sessions/…/status?light=1</code> — counts and fields only. Checked: merged timeline
+            <code>history</code> for every run in the session.
+          </p>
+          <div class="row">
+            <button type="button" id="inspectLoadSession">Load session runs</button>
+          </div>
+          <div id="inspectSessionOut" class="inspect-table-wrap" hidden></div>
+
+          <p class="panel-heading" style="margin-top: 1.25rem">Single run</p>
+          <div class="row">
+            <div class="grow">
+              <label for="inspectRunId">runId</label>
+              <input type="text" id="inspectRunId" class="chat-session-input" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="grow">
+              <label for="inspectRunSessionId">sessionId (for GET /runs)</label>
+              <input type="text" id="inspectRunSessionId" class="chat-session-input" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
+          <div class="row">
+            <button type="button" id="inspectLoadRun">Load run with timeline</button>
+            <button type="button" class="secondary" id="inspectUseChatRun">Use chat runId + session</button>
+          </div>
+          <div id="inspectRunOut"></div>
+        </div>
+      </div>
+
+      <div id="panel-settings" class="tab-panel" role="tabpanel" aria-labelledby="tab-settings" hidden>
+        <div class="card">
+          <div class="row">
+            <div class="grow">
+              <label for="apiKey">REST API key (optional)</label>
+              <input type="password" id="apiKey" placeholder="If the server uses REST_API_KEY…" autocomplete="off" />
+            </div>
+          </div>
+          <div class="row">
+            <button type="button" class="secondary" id="saveKey">Save in this browser</button>
+            <button type="button" class="secondary" id="clearKey">Clear</button>
+          </div>
+          <p style="margin: 0; font-size: 0.8rem; color: var(--muted)">
+            Stored in <code>sessionStorage</code> for this tab only. Same key is used for Agents and Chat.
+          </p>
+        </div>
       </div>
 
       <div class="card">
-        <div class="row">
-          <button type="button" class="secondary" id="fetchRun">Refresh run (GET /runs/…)</button>
-        </div>
         <div id="status"></div>
         <div id="replyBox" class="reply" hidden>
           <strong>Latest reply (result)</strong>
@@ -275,16 +632,80 @@
           agentId: document.getElementById("agentId"),
           sessionId: document.getElementById("sessionId"),
           message: document.getElementById("message"),
+          chatSessionId: document.getElementById("chatSessionId"),
+          chatMessage: document.getElementById("chatMessage"),
           wait: document.getElementById("wait"),
           output: document.getElementById("output"),
           status: document.getElementById("status"),
           runIdLabel: document.getElementById("runIdLabel"),
+          chatRunIdLabel: document.getElementById("chatRunIdLabel"),
+          chatThread: document.getElementById("chatThread"),
           replyBox: document.getElementById("replyBox"),
           replyText: document.getElementById("replyText"),
+          inspectSessionId: document.getElementById("inspectSessionId"),
+          inspectSessionFull: document.getElementById("inspectSessionFull"),
+          inspectSessionOut: document.getElementById("inspectSessionOut"),
+          inspectRunId: document.getElementById("inspectRunId"),
+          inspectRunSessionId: document.getElementById("inspectRunSessionId"),
+          inspectRunOut: document.getElementById("inspectRunOut"),
         };
 
         let lastRunId = "";
         let lastAgentId = "";
+        let lastChatRunId = "";
+        let chatPendingNode = null;
+
+        const tabs = {
+          agents: document.getElementById("tab-agents"),
+          chat: document.getElementById("tab-chat"),
+          inspect: document.getElementById("tab-inspect"),
+          settings: document.getElementById("tab-settings"),
+        };
+        const panels = {
+          agents: document.getElementById("panel-agents"),
+          chat: document.getElementById("panel-chat"),
+          inspect: document.getElementById("panel-inspect"),
+          settings: document.getElementById("panel-settings"),
+        };
+
+        function selectTab(name) {
+          const order = ["agents", "chat", "inspect", "settings"];
+          if (!order.includes(name)) return;
+          order.forEach((key) => {
+            const sel = key === name;
+            tabs[key].setAttribute("aria-selected", sel ? "true" : "false");
+            tabs[key].tabIndex = sel ? 0 : -1;
+            panels[key].hidden = !sel;
+          });
+          try {
+            sessionStorage.setItem("opencore-runtime-ui-tab", name);
+          } catch (_) {}
+          if (name === "chat") scrollChatToBottom();
+        }
+
+        tabs.agents.addEventListener("click", () => selectTab("agents"));
+        tabs.chat.addEventListener("click", () => selectTab("chat"));
+        tabs.inspect.addEventListener("click", () => selectTab("inspect"));
+        tabs.settings.addEventListener("click", () => selectTab("settings"));
+
+        document.querySelector(".tablist").addEventListener("keydown", function (ev) {
+          const order = ["agents", "chat", "inspect", "settings"];
+          const active = order.find((k) => tabs[k].getAttribute("aria-selected") === "true") || "agents";
+          let i = order.indexOf(active);
+          if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+            ev.preventDefault();
+            i = (i + 1) % order.length;
+            const next = order[i];
+            selectTab(next);
+            tabs[next].focus();
+          } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+            ev.preventDefault();
+            i = (i - 1 + order.length) % order.length;
+            const next = order[i];
+            selectTab(next);
+            tabs[next].focus();
+          }
+        });
 
         function headers(json) {
           const h = {};
@@ -318,6 +739,51 @@
           }
         }
 
+        function scrollChatToBottom() {
+          if (!el.chatThread) return;
+          el.chatThread.scrollTop = el.chatThread.scrollHeight;
+        }
+
+        function appendChatBubble(role, text) {
+          const body = text == null ? "" : String(text);
+          const wrap = document.createElement("div");
+          wrap.className = "chat-msg chat-msg-" + role;
+          const bub = document.createElement("div");
+          bub.className = "chat-bubble";
+          bub.textContent = body;
+          wrap.appendChild(bub);
+          el.chatThread.appendChild(wrap);
+          scrollChatToBottom();
+        }
+
+        function removeChatPending() {
+          if (chatPendingNode && chatPendingNode.parentNode) {
+            chatPendingNode.parentNode.removeChild(chatPendingNode);
+          }
+          chatPendingNode = null;
+        }
+
+        function setChatPending() {
+          removeChatPending();
+          const wrap = document.createElement("div");
+          wrap.className = "chat-msg chat-msg-assistant";
+          const bub = document.createElement("div");
+          bub.className = "chat-bubble chat-bubble-pending";
+          bub.textContent = "…";
+          wrap.appendChild(bub);
+          el.chatThread.appendChild(wrap);
+          chatPendingNode = wrap;
+          scrollChatToBottom();
+        }
+
+        function initChatThreadWelcome() {
+          el.chatThread.innerHTML = "";
+          appendChatBubble(
+            "system",
+            "Write a message below. Your lines appear on the right; the assistant on the left (same API as POST /v1/chat).",
+          );
+        }
+
         async function parseJson(res) {
           const t = await res.text();
           try {
@@ -337,7 +803,13 @@
               showJson(data);
               return;
             }
-            const ids = Array.isArray(data.agentIds) ? data.agentIds : [];
+            const ids = Array.isArray(data.agents)
+              ? data.agents.map(function (a) {
+                  return a && a.id ? a.id : "";
+                }).filter(Boolean)
+              : Array.isArray(data.agentIds)
+                ? data.agentIds
+                : [];
             el.agentId.innerHTML = "";
             if (!ids.length) {
               const o = document.createElement("option");
@@ -363,6 +835,20 @@
         function newSession() {
           el.sessionId.value = crypto.randomUUID();
           setStatus("New sessionId generated.");
+        }
+
+        function newChatSession() {
+          el.chatSessionId.value = crypto.randomUUID();
+          lastChatRunId = "";
+          el.chatRunIdLabel.textContent = "runId: —";
+          el.chatThread.innerHTML = "";
+          appendChatBubble("system", "New conversation — a new session ID was generated.");
+          setStatus("New conversation started.");
+        }
+
+        function setChatRunId(id) {
+          lastChatRunId = id || "";
+          el.chatRunIdLabel.textContent = lastChatRunId ? "runId: " + lastChatRunId : "runId: —";
         }
 
         async function pollJob(jobId) {
@@ -447,6 +933,428 @@
           } catch (e) {
             setStatus(String(e.message || e), true);
           }
+        }
+
+        async function sendChat() {
+          const sessionId = el.chatSessionId.value.trim();
+          const message = el.chatMessage.value.trim();
+          if (!sessionId) {
+            setStatus("Chat sessionId is required.", true);
+            return;
+          }
+          if (!message) {
+            setStatus("Enter a chat message.", true);
+            return;
+          }
+
+          appendChatBubble("user", message);
+          el.chatMessage.value = "";
+          setStatus("Sending…");
+          showReply("");
+
+          const wait = el.wait.checked;
+          const qs = wait ? "?wait=1" : "";
+          setChatPending();
+          try {
+            const res = await fetch("/v1/chat" + qs, {
+              method: "POST",
+              headers: headers(true),
+              body: JSON.stringify({
+                message,
+                sessionId,
+                wait,
+              }),
+            });
+            const data = await parseJson(res);
+            showJson(data);
+
+            if (typeof data.runId === "string" && data.runId.trim()) {
+              setChatRunId(data.runId.trim());
+            }
+
+            if (res.status === 202 && data.jobId && !wait) {
+              setStatus("Waiting for assistant…");
+              const job = await pollJob(data.jobId);
+              removeChatPending();
+              if (job && job.run) {
+                if (job.run.runId) setChatRunId(job.run.runId);
+                const replyText =
+                  job.run.reply != null && String(job.run.reply).length
+                    ? String(job.run.reply)
+                    : "(empty reply)";
+                appendChatBubble("assistant", replyText);
+                showReply(job.run.reply);
+                setStatus("Done (" + job.state + ").");
+                showJson(job);
+              } else if (job) {
+                const errLine =
+                  "Job " +
+                  job.state +
+                  (job.failedReason ? ": " + job.failedReason : "");
+                appendChatBubble("system", errLine);
+                setStatus(errLine, job.state === "failed");
+                showJson(job);
+              } else {
+                appendChatBubble("system", "Timed out waiting for the assistant job.");
+                setStatus("Timed out waiting for the job.", true);
+              }
+              return;
+            }
+
+            removeChatPending();
+
+            if (!res.ok) {
+              const hint =
+                res.status === 503
+                  ? " Enable chat.defaultAgent in the stack YAML (or unset RUNTIME_CHAT_DEFAULT_AGENT=off)."
+                  : "";
+              const errText =
+                (typeof data.error === "string" && data.error) ||
+                (typeof data.code === "string" && data.code) ||
+                JSON.stringify(data);
+              appendChatBubble("system", res.status + " — " + errText + hint);
+              setStatus(res.status + " " + errText + hint, true);
+              return;
+            }
+
+            if (data.reply !== undefined) {
+              const replyText =
+                typeof data.reply === "string" ? data.reply : JSON.stringify(data.reply);
+              appendChatBubble("assistant", replyText || "(empty reply)");
+              showReply(data.reply);
+            } else {
+              appendChatBubble("system", "OK, but no reply field in the response.");
+            }
+            setStatus("Sent (" + res.status + ").");
+          } catch (e) {
+            removeChatPending();
+            const msg = String(e.message || e);
+            appendChatBubble("system", msg);
+            setStatus(msg, true);
+          }
+        }
+
+        function truncateText(s, max) {
+          const t = String(s ?? "");
+          return t.length <= max ? t : t.slice(0, max) + "…";
+        }
+
+        /** Pairs from `invoke_planner` tool observations (run uses planner internal sessionId, not chat). */
+        function collectPlannerRefs(history) {
+          const refs = [];
+          if (!Array.isArray(history)) return refs;
+          const seen = new Set();
+          for (let i = 0; i < history.length; i++) {
+            if (history[i].type !== "observation") continue;
+            var c = history[i].content;
+            if (c == null || typeof c !== "object") continue;
+            var rid = c.runId;
+            if (typeof rid !== "string" || rid.indexOf("run-invoke-planner-") !== 0) continue;
+            var sid = typeof c.sessionId === "string" ? c.sessionId : "";
+            var key = rid + "\0" + sid;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            refs.push({ runId: rid, sessionId: sid });
+          }
+          return refs;
+        }
+
+        function renderRunInspector(container, data) {
+          container.textContent = "";
+          if (!data || typeof data !== "object") return;
+
+          const head = document.createElement("div");
+          head.style.marginBottom = "0.65rem";
+          head.style.fontSize = "0.85rem";
+          var parts = [];
+          if (data.runId) parts.push("runId: " + data.runId);
+          if (data.agentId) parts.push("agent: " + data.agentId);
+          if (data.status) parts.push("status: " + data.status);
+          if (data.historyStepCount != null) parts.push("steps: " + data.historyStepCount);
+          head.textContent = parts.join(" · ");
+          container.appendChild(head);
+
+          if (Array.isArray(data.resumeInputs) && data.resumeInputs.length) {
+            var p1 = document.createElement("p");
+            p1.style.fontSize = "0.78rem";
+            p1.style.margin = "0.25rem 0";
+            p1.textContent = "resumeInputs: " + data.resumeInputs.join(" | ");
+            container.appendChild(p1);
+          }
+          if (Array.isArray(data.continueInputs) && data.continueInputs.length) {
+            var p2 = document.createElement("p");
+            p2.style.fontSize = "0.78rem";
+            p2.style.margin = "0.25rem 0";
+            p2.textContent = "continueInputs: " + data.continueInputs.join(" | ");
+            container.appendChild(p2);
+          }
+
+          var plannerRefs = collectPlannerRefs(data.history);
+          if (plannerRefs.length) {
+            var pillLabel = document.createElement("div");
+            pillLabel.style.fontSize = "0.72rem";
+            pillLabel.style.color = "var(--muted)";
+            pillLabel.style.marginTop = "0.35rem";
+            pillLabel.textContent = "Planner runs (invoke_planner) — opens with engine sessionId:";
+            container.appendChild(pillLabel);
+            var row = document.createElement("div");
+            row.className = "pill-row";
+            plannerRefs.forEach(function (ref) {
+              var b = document.createElement("button");
+              b.type = "button";
+              b.className = "secondary";
+              b.textContent = truncateText(ref.runId, 36);
+              b.title = ref.sessionId ? ref.runId + " @ " + ref.sessionId : ref.runId;
+              b.addEventListener("click", function () {
+                el.inspectRunId.value = ref.runId;
+                el.inspectRunSessionId.value =
+                  (ref.sessionId && ref.sessionId.trim()) ||
+                  el.inspectRunSessionId.value.trim() ||
+                  el.chatSessionId.value.trim();
+                void inspectLoadRun();
+              });
+              row.appendChild(b);
+            });
+            container.appendChild(row);
+          }
+
+          if (!Array.isArray(data.history) || !data.history.length) {
+            var empty = document.createElement("p");
+            empty.style.fontSize = "0.8rem";
+            empty.style.color = "var(--muted)";
+            empty.textContent = "No history in this response (use timeline=1 on GET /runs, or full session load).";
+            container.appendChild(empty);
+            return;
+          }
+
+          var ul = document.createElement("ul");
+          ul.className = "hist-list";
+          data.history.forEach(function (step) {
+            var li = document.createElement("li");
+            var badge = document.createElement("span");
+            badge.className = "hist-type";
+            badge.textContent = String(step.type || "?");
+            li.appendChild(badge);
+            if (step.meta && step.meta.ts) {
+              var meta = document.createElement("span");
+              meta.className = "hist-meta";
+              meta.textContent = String(step.meta.ts) + " · " + String(step.meta.source || "");
+              li.appendChild(meta);
+            }
+            li.appendChild(document.createElement("br"));
+            var pre = document.createElement("pre");
+            pre.style.margin = "0.25rem 0 0";
+            pre.style.whiteSpace = "pre-wrap";
+            pre.style.wordBreak = "break-word";
+            pre.style.fontSize = "0.75rem";
+            var blob;
+            try {
+              blob = JSON.stringify(step.content, null, 2);
+            } catch (_) {
+              blob = String(step.content);
+            }
+            pre.textContent = truncateText(blob, 8000);
+            li.appendChild(pre);
+            ul.appendChild(li);
+          });
+          container.appendChild(ul);
+        }
+
+        function renderSessionRunsTable(container, data) {
+          container.textContent = "";
+          container.hidden = false;
+          if (!data || !Array.isArray(data.runs)) {
+            var p = document.createElement("p");
+            p.textContent = "No runs array in response.";
+            container.appendChild(p);
+            return;
+          }
+          var sum = data.summary && data.summary.byStatus ? JSON.stringify(data.summary.byStatus) : "";
+          var cap = document.createElement("p");
+          cap.style.fontSize = "0.78rem";
+          cap.style.margin = "0 0 0.35rem";
+          cap.textContent = "Total: " + data.runs.length + (sum ? " · byStatus: " + sum : "");
+          container.appendChild(cap);
+
+          var table = document.createElement("table");
+          table.className = "inspect";
+          var thead = document.createElement("thead");
+          var hr = document.createElement("tr");
+          ["runId", "engine session", "agent", "status", "steps", "reply"].forEach(function (h) {
+            var th = document.createElement("th");
+            th.textContent = h;
+            hr.appendChild(th);
+          });
+          thead.appendChild(hr);
+          table.appendChild(thead);
+          var tb = document.createElement("tbody");
+          data.runs.forEach(function (r) {
+            var tr = document.createElement("tr");
+
+            var td0 = document.createElement("td");
+            var idLine = document.createElement("div");
+            idLine.style.fontFamily = "var(--mono)";
+            idLine.style.fontSize = "0.72rem";
+            idLine.textContent = String(r.runId || "");
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "secondary";
+            btn.style.marginTop = "0.25rem";
+            btn.textContent = "Inspect";
+            btn.addEventListener("click", function () {
+              el.inspectRunId.value = String(r.runId || "");
+              var rs = r.sessionId != null && String(r.sessionId).trim() ? String(r.sessionId).trim() : "";
+              el.inspectRunSessionId.value = rs || el.inspectSessionId.value.trim();
+              void inspectLoadRun();
+            });
+            td0.appendChild(idLine);
+            td0.appendChild(btn);
+            tr.appendChild(td0);
+
+            var tdSess = document.createElement("td");
+            tdSess.style.fontFamily = "var(--mono)";
+            tdSess.style.fontSize = "0.7rem";
+            tdSess.textContent = truncateText(r.sessionId != null ? String(r.sessionId) : "—", 48);
+            tr.appendChild(tdSess);
+
+            var td1 = document.createElement("td");
+            td1.textContent = String(r.agentId || "");
+            tr.appendChild(td1);
+
+            var td2 = document.createElement("td");
+            td2.textContent = String(r.status || "");
+            tr.appendChild(td2);
+
+            var td3 = document.createElement("td");
+            td3.textContent = r.historyStepCount != null ? String(r.historyStepCount) : "";
+            tr.appendChild(td3);
+
+            var td4 = document.createElement("td");
+            td4.textContent = truncateText(r.reply != null ? String(r.reply) : "", 200);
+            tr.appendChild(td4);
+
+            tb.appendChild(tr);
+          });
+          table.appendChild(tb);
+          container.appendChild(table);
+        }
+
+        async function fetchRunSnapshot(runId, sessionId, timeline) {
+          var qs = "?sessionId=" + encodeURIComponent(sessionId);
+          if (timeline) qs += "&timeline=1";
+          const res = await fetch("/runs/" + encodeURIComponent(runId) + qs, { headers: headers(false) });
+          const data = await parseJson(res);
+          return { res: res, data: data };
+        }
+
+        async function inspectLoadSession() {
+          const sid = el.inspectSessionId.value.trim();
+          if (!sid) {
+            setStatus("inspect sessionId required", true);
+            return;
+          }
+          setStatus("GET /sessions/…/status…");
+          var light = !el.inspectSessionFull.checked;
+          var q = light ? "?light=1" : "";
+          try {
+            const res = await fetch("/sessions/" + encodeURIComponent(sid) + "/status" + q, {
+              headers: headers(false),
+            });
+            const data = await parseJson(res);
+            showJson(data);
+            if (!res.ok) {
+              setStatus(res.status + " " + (data.error || ""), true);
+              el.inspectSessionOut.hidden = true;
+              return;
+            }
+            renderSessionRunsTable(el.inspectSessionOut, data);
+            setStatus("Session runs loaded (" + data.runs.length + ").");
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+            el.inspectSessionOut.hidden = true;
+          }
+        }
+
+        async function inspectLoadRun() {
+          const runId = el.inspectRunId.value.trim();
+          const sid = el.inspectRunSessionId.value.trim();
+          if (!runId || !sid) {
+            setStatus("inspect runId + sessionId required", true);
+            return;
+          }
+          setStatus("GET /runs/…?timeline=1");
+          try {
+            const snap = await fetchRunSnapshot(runId, sid, true);
+            showJson(snap.data);
+            if (!snap.res.ok) {
+              setStatus(snap.res.status + " " + (snap.data.error || ""), true);
+              el.inspectRunOut.textContent = "";
+              return;
+            }
+            renderRunInspector(el.inspectRunOut, snap.data);
+            setStatus("Run loaded (timeline).");
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+          }
+        }
+
+        async function fetchChatRun() {
+          const sessionId = el.chatSessionId.value.trim();
+          const runId = lastChatRunId;
+          if (!runId || !sessionId) {
+            setStatus("Send a message first (need runId + sessionId).", true);
+            return;
+          }
+          setStatus("Loading run…");
+          try {
+            const res = await fetch(
+              "/runs/" + encodeURIComponent(runId) + "?sessionId=" + encodeURIComponent(sessionId),
+              { headers: headers(false) },
+            );
+            const data = await parseJson(res);
+            showJson(data);
+            if (!res.ok) {
+              appendChatBubble("system", "Refresh failed: " + res.status);
+              setStatus(res.status + "", true);
+              return;
+            }
+            const st = data.status || "?";
+            appendChatBubble("system", "Refreshed run — status: " + st);
+            if (typeof data.reply === "string" && data.reply.length) {
+              appendChatBubble("assistant", data.reply);
+              showReply(data.reply);
+            }
+            setStatus("Run status: " + st);
+          } catch (e) {
+            const msg = String(e.message || e);
+            appendChatBubble("system", msg);
+            setStatus(msg, true);
+          }
+        }
+
+        async function fetchChatRunTimeline() {
+          const sessionId = el.chatSessionId.value.trim();
+          const runId = lastChatRunId;
+          if (!runId || !sessionId) {
+            setStatus("Send a message first (need runId + sessionId).", true);
+            return;
+          }
+          el.inspectRunId.value = runId;
+          el.inspectRunSessionId.value = sessionId;
+          selectTab("inspect");
+          await inspectLoadRun();
+        }
+
+        async function loadChatSessionRuns() {
+          const sessionId = el.chatSessionId.value.trim();
+          if (!sessionId) {
+            setStatus("Chat sessionId required.", true);
+            return;
+          }
+          el.inspectSessionId.value = sessionId;
+          el.inspectSessionFull.checked = false;
+          selectTab("inspect");
+          await inspectLoadSession();
         }
 
         async function sendContinue() {
@@ -537,6 +1445,48 @@
           }
         }
 
+        async function fetchRunTimelineAgents() {
+          const sessionId = el.sessionId.value.trim();
+          const runId = lastRunId;
+          if (!runId || !sessionId) {
+            setStatus("Need runId and sessionId (Agents tab).", true);
+            return;
+          }
+          el.inspectRunId.value = runId;
+          el.inspectRunSessionId.value = sessionId;
+          selectTab("inspect");
+          await inspectLoadRun();
+        }
+
+        async function listAgentRunsForSession() {
+          const agentId = el.agentId.value;
+          const sessionId = el.sessionId.value.trim();
+          if (!agentId || !sessionId) {
+            setStatus("Agent and sessionId required.", true);
+            return;
+          }
+          setStatus("GET /agents/…/runs…");
+          try {
+            const res = await fetch(
+              "/agents/" +
+                encodeURIComponent(agentId) +
+                "/runs?sessionId=" +
+                encodeURIComponent(sessionId) +
+                "&limit=50",
+              { headers: headers(false) },
+            );
+            const data = await parseJson(res);
+            showJson(data);
+            if (!res.ok) {
+              setStatus(res.status + " " + (data.error || ""), true);
+              return;
+            }
+            setStatus("Listed runs for " + agentId + " (" + (data.runs && data.runs.length) + ").");
+          } catch (e) {
+            setStatus(String(e.message || e), true);
+          }
+        }
+
         document.getElementById("saveKey").onclick = function () {
           const v = el.apiKey.value.trim();
           if (v) sessionStorage.setItem(KEY_STORAGE, v);
@@ -550,14 +1500,47 @@
         };
         document.getElementById("reloadAgents").onclick = reloadAgents;
         document.getElementById("newSession").onclick = newSession;
+        document.getElementById("newChatSession").onclick = newChatSession;
         document.getElementById("sendRun").onclick = sendRun;
+        document.getElementById("sendChat").onclick = sendChat;
         document.getElementById("sendContinue").onclick = sendContinue;
         document.getElementById("fetchRun").onclick = fetchRun;
+        document.getElementById("fetchRunTimeline").onclick = fetchRunTimelineAgents;
+        document.getElementById("listAgentRuns").onclick = listAgentRunsForSession;
+        document.getElementById("fetchChatRun").onclick = fetchChatRun;
+        document.getElementById("fetchChatRunTimeline").onclick = fetchChatRunTimeline;
+        document.getElementById("loadChatSessionRuns").onclick = loadChatSessionRuns;
+        document.getElementById("inspectLoadSession").onclick = inspectLoadSession;
+        document.getElementById("inspectLoadRun").onclick = inspectLoadRun;
+        document.getElementById("inspectUseChatSession").onclick = function () {
+          el.inspectSessionId.value = el.chatSessionId.value.trim();
+          setStatus("Inspect session set from chat.");
+        };
+        document.getElementById("inspectUseChatRun").onclick = function () {
+          el.inspectRunId.value = lastChatRunId;
+          el.inspectRunSessionId.value = el.chatSessionId.value.trim();
+          setStatus("Inspect run fields set from chat.");
+        };
+
+        el.chatMessage.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter" && !ev.shiftKey) {
+            ev.preventDefault();
+            sendChat();
+          }
+        });
 
         (function init() {
           const saved = sessionStorage.getItem(KEY_STORAGE);
           if (saved) el.apiKey.value = saved;
+          try {
+            const t = sessionStorage.getItem("opencore-runtime-ui-tab");
+            if (t === "chat" || t === "inspect" || t === "settings") selectTab(t);
+          } catch (_) {}
           newSession();
+          el.chatSessionId.value = crypto.randomUUID();
+          lastChatRunId = "";
+          el.chatRunIdLabel.textContent = "runId: —";
+          initChatThreadWelcome();
           reloadAgents();
         })();
       })();

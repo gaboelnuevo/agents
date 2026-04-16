@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RedisDynamicDefinitionsStore } from "@opencoreagents/adapters-redis";
-import type { Run, RunStore } from "@opencoreagents/core";
+import type { RunStore } from "@opencoreagents/core";
 import type { EngineQueue } from "@opencoreagents/adapters-bullmq";
 import {
   isBullmqJobWaitTimeoutError,
@@ -14,21 +14,11 @@ import {
   ensureDefaultChatAgentOnFirstChat,
   isChatEndpointAvailable,
 } from "../runtime/runtimeChat.js";
+import { resolveRunForChatReply } from "./chatRunReply.js";
 import { chatBindingRedisKey } from "./chatSessionStreamRouter.js";
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
-}
-
-function isRunLike(v: unknown): v is Run {
-  return (
-    v != null &&
-    typeof v === "object" &&
-    "runId" in v &&
-    typeof (v as Run).runId === "string" &&
-    "status" in v &&
-    typeof (v as Run).status === "string"
-  );
 }
 
 function parseWait(req: Request): boolean {
@@ -58,13 +48,6 @@ function parseBinding(raw: string | null): ChatBinding | null {
   } catch {
     return null;
   }
-}
-
-/** Prefer Redis-backed run after the worker saves; BullMQ `returnvalue` can lag or omit nested fields. */
-async function runForChatReply(store: RunStore, candidate: unknown): Promise<Run | null> {
-  if (!isRunLike(candidate)) return null;
-  const persisted = await store.load(candidate.runId);
-  return persisted ?? candidate;
 }
 
 export function createChatRouter(opts: {
@@ -172,8 +155,8 @@ export function createChatRouter(opts: {
           return;
         }
 
-        let runDone = await runForChatReply(opts.runStore, finishedValue);
-        if (!runDone) runDone = await runForChatReply(opts.runStore, job.returnvalue);
+        let runDone = await resolveRunForChatReply(opts.runStore, finishedValue);
+        if (!runDone) runDone = await resolveRunForChatReply(opts.runStore, job.returnvalue);
         if (runDone) {
           const s = summarizeEngineRun(runDone);
           res.json({
@@ -240,8 +223,8 @@ export function createChatRouter(opts: {
           res.status(502).json({ jobId, sessionId, projectId, runId, error: msg });
           return;
         }
-        let runDone = await runForChatReply(opts.runStore, finishedValue);
-        if (!runDone) runDone = await runForChatReply(opts.runStore, job.returnvalue);
+        let runDone = await resolveRunForChatReply(opts.runStore, finishedValue);
+        if (!runDone) runDone = await resolveRunForChatReply(opts.runStore, job.returnvalue);
         if (runDone) {
           const s = summarizeEngineRun(runDone);
           res.json({
@@ -322,8 +305,8 @@ export function createChatRouter(opts: {
           res.status(502).json({ jobId, sessionId, projectId, runId, error: msg });
           return;
         }
-        let runDone = await runForChatReply(opts.runStore, finishedValue);
-        if (!runDone) runDone = await runForChatReply(opts.runStore, job.returnvalue);
+        let runDone = await resolveRunForChatReply(opts.runStore, finishedValue);
+        if (!runDone) runDone = await resolveRunForChatReply(opts.runStore, job.returnvalue);
         if (runDone) {
           const s = summarizeEngineRun(runDone);
           res.json({
@@ -382,8 +365,8 @@ export function createChatRouter(opts: {
             .json({ jobId, sessionId, projectId, runId: binding.runId, error: msg });
           return;
         }
-        let runDone = await runForChatReply(opts.runStore, finishedValue);
-        if (!runDone) runDone = await runForChatReply(opts.runStore, job.returnvalue);
+        let runDone = await resolveRunForChatReply(opts.runStore, finishedValue);
+        if (!runDone) runDone = await resolveRunForChatReply(opts.runStore, job.returnvalue);
         if (runDone) {
           const s = summarizeEngineRun(runDone);
           res.json({

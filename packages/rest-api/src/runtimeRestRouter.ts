@@ -21,6 +21,15 @@ import {
 } from "./openapi.js";
 import { isBullmqJobWaitTimeoutError } from "./bullmqJobWaitTimeout.js";
 import { mapEngineErrorToHttp } from "./engineErrorHttp.js";
+import {
+  continueInputsFromState,
+  emptyRunStatusSummary,
+  historyWithResumeTimeline,
+  lastWaitReason,
+  loadRunsForSession,
+  parseQueryFlag,
+  resumeInputsFromState,
+} from "./runInspect.js";
 import { summarizeEngineRun, summarizeRunListEntry } from "./summarizeRun.js";
 
 /** BullMQ enqueue path — same payload shape as **`examples/dynamic-runtime-rest`** (`addRun` / `addResume` / `addContinue`). */
@@ -1105,6 +1114,65 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
     }
   });
 
+  r.get("/sessions/:sessionId/status", async (req, res) => {
+    if (!runStore) {
+      res.status(501).json({ error: "runStore is required" });
+      return;
+    }
+
+    const sessionId = req.params.sessionId?.trim() ?? "";
+    if (!sessionId) {
+      res.status(400).json({ error: "sessionId is required" });
+      return;
+    }
+
+    const projectId = getRuntimeRestProjectId(res);
+    const light = parseQueryFlag(req.query.light);
+
+    try {
+      const agentIds = agentsListedForProject(projectId);
+      const runs = await loadRunsForSession(runStore, { sessionId, projectId, agentIds });
+      const byStatus = emptyRunStatusSummary();
+      for (const r of runs) {
+        byStatus[r.status] += 1;
+      }
+
+      res.json({
+        sessionId,
+        projectId,
+        runs: runs.map((r) => {
+          const merged = historyWithResumeTimeline(r);
+          const userInput = typeof r.state.userInput === "string" ? r.state.userInput : undefined;
+          const resumeInputs = resumeInputsFromState(r);
+          const continueInputs = continueInputsFromState(r);
+          const base = {
+            runId: r.runId,
+            agentId: r.agentId,
+            ...(r.sessionId !== undefined ? { sessionId: r.sessionId } : {}),
+            ...(r.projectId !== undefined ? { projectId: r.projectId } : {}),
+            status: r.status,
+            ...(userInput !== undefined ? { userInput } : {}),
+            ...(resumeInputs ? { resumeInputs } : {}),
+            ...(continueInputs ? { continueInputs } : {}),
+            historyStepCount: merged.length,
+            reply: resultText(r),
+            ...(r.status === "waiting" ? { waitReason: lastWaitReason(r) } : {}),
+            iteration: r.state.iteration,
+          };
+          return light ? base : { ...base, history: merged };
+        }),
+        summary: { total: runs.length, byStatus },
+      });
+    } catch (e) {
+      const mapped = mapEngineErrorToHttp(e);
+      if (mapped) {
+        res.status(mapped.status).json(mapped.body);
+        return;
+      }
+      res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
   r.get("/runs/:runId/history", async (req, res) => {
     if (!runStore) {
       res.status(501).json({ error: "runStore is required" });
@@ -1120,6 +1188,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
     }
 
     const projectId = getRuntimeRestProjectId(res);
+    const wantTimeline = parseQueryFlag(req.query.timeline);
 
     try {
       const loaded = await loadRunForTenantScopedRead(runStore, runId, sessionId, projectId);
@@ -1128,13 +1197,14 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         return;
       }
       const run = loaded.run;
+      const history = wantTimeline ? historyWithResumeTimeline(run) : run.history;
       res.json({
         runId: run.runId,
         agentId: run.agentId,
         ...(run.sessionId !== undefined ? { sessionId: run.sessionId } : {}),
         ...(run.projectId !== undefined ? { projectId: run.projectId } : {}),
         status: run.status,
-        history: run.history,
+        history,
       });
     } catch (e) {
       const mapped = mapEngineErrorToHttp(e);
@@ -1172,6 +1242,10 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
 
       const userInput =
         typeof run.state.userInput === "string" ? run.state.userInput : undefined;
+      const wantTimeline = parseQueryFlag(req.query.timeline);
+      const merged = wantTimeline ? historyWithResumeTimeline(run) : null;
+      const resumeInputs = resumeInputsFromState(run);
+      const continueInputs = continueInputsFromState(run);
 
       res.json({
         runId: run.runId,
@@ -1180,9 +1254,13 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         ...(run.projectId !== undefined ? { projectId: run.projectId } : {}),
         status: run.status,
         ...(userInput !== undefined ? { userInput } : {}),
+        ...(resumeInputs ? { resumeInputs } : {}),
+        ...(continueInputs ? { continueInputs } : {}),
+        ...(run.status === "waiting" ? { waitReason: lastWaitReason(run) } : {}),
         reply: resultText(run),
         iteration: run.state.iteration,
-        historyStepCount: run.history.length,
+        historyStepCount: merged ? merged.length : run.history.length,
+        ...(wantTimeline && merged ? { history: merged } : {}),
       });
     } catch (e) {
       const mapped = mapEngineErrorToHttp(e);

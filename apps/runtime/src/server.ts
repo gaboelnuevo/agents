@@ -270,7 +270,7 @@ async function main(): Promise<void> {
         : "";
     const sseNote = runEventsStreamRedis ? "  GET /v1/runs/:runId/stream?sessionId= (SSE run events)" : "";
     console.log(
-      `[opencoreagents-runtime] routes: GET /ui (playground)  GET /health (?details=1 for projectId+queue)  GET|POST plan REST + /openapi.json + /docs  /v1/definitions …${chatNote}${chatSseNote}${sseNote}`,
+      `[opencoreagents-runtime] routes: GET /ui (playground)  GET /health (?details=1 for projectId+queue)  GET|POST plan REST + /openapi.json + /docs  GET /sessions/:sessionId/status (?light=1)  GET /runs/:id?timeline=1  /v1/definitions …${chatNote}${chatSseNote}${sseNote}`,
     );
     console.log(`[opencoreagents-runtime] start worker: pnpm start:worker (same RUNTIME_CONFIG / stack file)`);
   });

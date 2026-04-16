@@ -49,12 +49,29 @@ export class ContextBuilder {
       messages.push({ role: "user", content: userText });
     }
 
+    const continueList = (run.state.continueInputs ?? []).filter(
+      (t): t is string => typeof t === "string" && Boolean(t.trim()),
+    );
+    const resumeList = (run.state.resumeInputs ?? []).filter(
+      (t): t is string => typeof t === "string" && Boolean(t.trim()),
+    );
+    let continueIdx = 0;
+    let resumeIdx = 0;
+
     for (const m of run.history) {
       if (m.type === "thought" || m.type === "result") {
         messages.push({
           role: "assistant",
           content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
         });
+        /**
+         * Interleave **`continueInputs`** after each completed **`result`** so the transcript reads
+         * user₁ → assistant₁ → user₂ → assistant₂ … instead of all assistant turns followed by a
+         * stack of user lines (which confused models into mega-recaps on later turns).
+         */
+        if (m.type === "result" && continueIdx < continueList.length) {
+          messages.push({ role: "user", content: continueList[continueIdx++]! });
+        }
       } else if (m.type === "action") {
         const c = m.content as { tool?: string; input?: unknown };
         messages.push({
@@ -80,24 +97,27 @@ export class ContextBuilder {
             details: wc.details,
           }),
         });
+        /**
+         * Resume text is stored on **`run.state.resumeInputs`**, not as normal history rows — splice
+         * the next line after each **`wait`** so it mirrors the real conversation order.
+         */
+        if (resumeIdx < resumeList.length) {
+          messages.push({ role: "user", content: resumeList[resumeIdx++]! });
+        }
       }
     }
 
     /**
      * `executeRun` only passes `resumeMessages` on the **first** `contextBuilder.build` call. If the
      * model returns `thought` or `action` before `result`, later iterations would drop the new user
-     * turn. `continueInputs` / `resumeInputs` are populated at execute start from the same prefixes —
-     * replay them here on **every** build so multi-step turns still see the latest user text.
+     * turn. Any **`continueInputs` / `resumeInputs`** not yet spliced (e.g. store skew) are appended so
+     * multi-step turns still see the latest user text.
      */
-    for (const text of run.state.continueInputs ?? []) {
-      if (typeof text === "string" && text.trim()) {
-        messages.push({ role: "user", content: text });
-      }
+    while (continueIdx < continueList.length) {
+      messages.push({ role: "user", content: continueList[continueIdx++]! });
     }
-    for (const text of run.state.resumeInputs ?? []) {
-      if (typeof text === "string" && text.trim()) {
-        messages.push({ role: "user", content: text });
-      }
+    while (resumeIdx < resumeList.length) {
+      messages.push({ role: "user", content: resumeList[resumeIdx++]! });
     }
 
     if (resumeMessages?.length) {

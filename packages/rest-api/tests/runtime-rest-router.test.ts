@@ -496,6 +496,23 @@ describe("createRuntimeRestRouter", () => {
 
     expect(resumed.body.status).toBe("completed");
     expect(resumed.body.reply).toBe("after-resume");
+
+    const snapTimeline = await request(app)
+      .get(`/runs/${runId}`)
+      .query({ sessionId, timeline: "1" })
+      .expect(200);
+    expect(Array.isArray(snapTimeline.body.history)).toBe(true);
+    expect(snapTimeline.body.resumeInputs).toEqual(["go"]);
+    expect(snapTimeline.body.historyStepCount).toBe(snapTimeline.body.history.length);
+    const kinds = snapTimeline.body.history.map((h: { type: string }) => h.type);
+    expect(kinds.some((t: string) => t === "observation")).toBe(true);
+
+    const sess = await request(app).get("/sessions/sess-r1/status").query({ light: "1" }).expect(200);
+    expect(sess.body.sessionId).toBe("sess-r1");
+    expect(sess.body.projectId).toBe("p1");
+    expect(sess.body.summary.total).toBeGreaterThanOrEqual(1);
+    expect(sess.body.runs.some((row: { runId: string }) => row.runId === runId)).toBe(true);
+    expect(sess.body.runs[0].history).toBeUndefined();
   });
 
   it("GET /runs/:runId and GET /agents/:agentId/runs return 501 without runStore", async () => {
@@ -525,6 +542,7 @@ describe("createRuntimeRestRouter", () => {
     await request(app).get("/runs/some-id").query({ sessionId: "s" }).expect(501);
     await request(app).get("/runs/some-id/history").query({ sessionId: "s" }).expect(501);
     await request(app).get("/agents/greeter/runs").expect(501);
+    await request(app).get("/sessions/some-sid/status").expect(501);
   });
 
   it("GET /agents/:agentId/runs lists, filters by status and sessionId, respects limit", async () => {

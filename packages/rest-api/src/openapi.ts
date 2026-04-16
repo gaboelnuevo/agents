@@ -681,6 +681,62 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
         }),
       },
     };
+    paths["/sessions/{sessionId}/status"] = {
+      get: {
+        summary: "List all persisted runs for a session (dashboard / playground)",
+        description:
+          "Unions **`RunStore.listByAgent`** across agents registered for this **`projectId`**, filtered by **`sessionId`**. Use **`?light=1`** to omit per-run **`history`** (still returns **`historyStepCount`** from the resume-aware timeline). Each run’s **`history`** includes synthetic **`observation`** rows after **`wait`** when **`resumeInputs`** exist (same merge as **`?timeline=1`** on **`GET /runs/{runId}`**).",
+        tags: ["Sessions"],
+        parameters: [
+          { name: "sessionId", in: "path", required: true, schema: { type: "string" } },
+          {
+            name: "light",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["0", "1", "true", "false", "yes"] },
+            description: "If `1` / `true` / `yes`, omit per-run `history` (smaller payload).",
+          },
+          ...tenantParams,
+        ],
+        responses: compactResponses({
+          "200": {
+            description: "Session id, project id, run rows, and status counts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["sessionId", "projectId", "runs", "summary"],
+                  properties: {
+                    sessionId: { type: "string" },
+                    projectId: { type: "string" },
+                    runs: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        description:
+                          "Each row includes **`run.sessionId`** (engine session for that run — planner runs differ from the chat `sessionId` in the path).",
+                        additionalProperties: true,
+                      },
+                    },
+                    summary: {
+                      type: "object",
+                      properties: {
+                        total: { type: "integer" },
+                        byStatus: { type: "object", additionalProperties: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": jsonErr("Missing sessionId"),
+          "401": hasApiKey ? jsonErr("Unauthorized") : undefined,
+          "500": jsonErr("RunStore or internal error"),
+          "501": jsonErr("runStore not configured on router"),
+        }),
+      },
+    };
     paths["/runs/{runId}"] = {
       get: {
         summary: "Get run snapshot from RunStore",
@@ -692,6 +748,14 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
             in: "query",
             required: true,
             schema: { type: "string" },
+          },
+          {
+            name: "timeline",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["0", "1", "true", "false", "yes"] },
+            description:
+              "If `1` / `true` / `yes`, include merged `history` (resume text as synthetic observations after each `wait`) and set `historyStepCount` to that timeline length. Also exposes `resumeInputs` / `continueInputs` / `waitReason` when applicable.",
           },
           ...tenantParams,
         ],
@@ -709,9 +773,13 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
                     projectId: { type: "string" },
                     status: { type: "string" },
                     userInput: { type: "string" },
+                    resumeInputs: { type: "array", items: { type: "string" } },
+                    continueInputs: { type: "array", items: { type: "string" } },
+                    waitReason: { type: "string" },
                     reply: { type: "string" },
                     iteration: { type: "number" },
                     historyStepCount: { type: "number" },
+                    history: { type: "array", items: { type: "object", additionalProperties: true } },
                   },
                 },
               },
@@ -738,7 +806,7 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
       get: {
         summary: "Get run history (Run.history ProtocolMessage[])",
         description:
-          "Full step log from **`RunStore`** — same **`?sessionId=`** and **`run.projectId`** vs effective tenant rules as **`GET /runs/{runId}`**.",
+          "Full step log from **`RunStore`** — same **`?sessionId=`** and **`run.projectId`** vs effective tenant rules as **`GET /runs/{runId}`**. Optional **`?timeline=1`** returns the same resume-aware merge as **`GET /runs/{runId}?timeline=1`** (synthetic observations after each **`wait`**).",
         tags: ["Runs"],
         parameters: [
           { name: "runId", in: "path", required: true, schema: { type: "string" } },
@@ -747,6 +815,13 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
             in: "query",
             required: true,
             schema: { type: "string" },
+          },
+          {
+            name: "timeline",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["0", "1", "true", "false", "yes"] },
+            description: "If `1` / `true` / `yes`, splice resume text into `history` after each `wait`.",
           },
           ...tenantParams,
         ],
@@ -825,6 +900,9 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
         ? [{ name: "Messaging", description: "MessageBus (requires router `runtime`; 501 without `messageBus`)" }]
         : []),
       { name: "Runs", description: "Run, resume (after wait), and continue (after completed)" },
+      ...(hasRunStore
+        ? [{ name: "Sessions", description: "Session-scoped run listings (`GET /sessions/{sessionId}/status`)" }]
+        : []),
       ...(hasDispatch ? [{ name: "Jobs", description: "BullMQ job polling" }] : []),
     ],
     paths,

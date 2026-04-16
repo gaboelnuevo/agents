@@ -98,6 +98,18 @@ describe("buildRuntimeRestOpenApiSpec", () => {
     expect((spec.paths as Record<string, unknown>)["/runs/{runId}/history"]).toBeDefined();
   });
 
+  it("includes GET /sessions/{sessionId}/status and Sessions tag when hasRunStore", () => {
+    const spec = buildRuntimeRestOpenApiSpec({
+      hasDispatch: false,
+      hasRunStore: true,
+      multiProject: false,
+      hasApiKey: false,
+    });
+    expect((spec.paths as Record<string, unknown>)["/sessions/{sessionId}/status"]).toBeDefined();
+    const tags = spec.tags as Array<{ name: string }>;
+    expect(tags.some((t) => t.name === "Sessions")).toBe(true);
+  });
+
   it("includes POST /agents/{fromAgentId}/send when hasInterAgentSend", () => {
     const spec = buildRuntimeRestOpenApiSpec({
       hasDispatch: false,
