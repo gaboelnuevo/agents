@@ -3,6 +3,8 @@ export {
   type DynamicPlannerToolsConfig,
   type PlannerEnqueueOptions,
   type PlannerEnqueueRun,
+  type ResolveAvailableModels,
+  type ResolveAvailableModelsArgs,
 } from "./registerDynamicPlannerTools.js";
 export {
   DEFAULT_PLANNER_MODEL_CATALOG,

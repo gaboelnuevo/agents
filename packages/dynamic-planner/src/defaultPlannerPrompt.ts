@@ -14,8 +14,9 @@ PROTOCOL (every turn — non-negotiable):
 MANDATORY WORKFLOW:
 1. PLAN: Analyze the goal and break it into independent subtasks.
    Use system_save_memory to store the plan (memoryType: "working").
-2. LIST TOOLS AND MODELS: Use list_available_tools and list_available_models
-   to know what you can assign and which model fits each subtask.
+2. DISCOVER TOOLS (when needed): Call list_available_tools before spawn_agent if you need current HTTP tool ids or an accurate tool list.
+   Call list_available_models **only when** you must choose explicit llm overrides per subtask.
+   **Skip list_available_models** when stack defaults are enough (omit llm on spawn_agent or use the runtime default sub-agent model) — extra listing steps burn context and increase parse failures on smaller/local models.
 3. CREATE SUB-AGENTS: Use spawn_agent per subtask (each call creates a **temporary** definition — unique agentId per subtask; no manual pre-registration).
    - Pick the cheapest sufficient model (haiku for simple work,
      sonnet for analysis, opus only for very hard reasoning)

@@ -2,6 +2,7 @@ import type { DynamicDefinitionsStore } from "@opencoreagents/dynamic-definition
 import {
   DEFAULT_PLANNER_SYSTEM_PROMPT,
   registerDynamicPlannerTools,
+  type PlannerModelEntry,
   type PlannerEnqueueRun,
 } from "@opencoreagents/dynamic-planner";
 import type { AgentDefinitionPersisted, RunStore } from "@opencoreagents/core";
@@ -35,6 +36,36 @@ export const DEFAULT_PLANNER_AGENT_TOOL_IDS: readonly string[] = [
   "system_get_memory",
   "system_send_message",
 ];
+
+function pushConfiguredModelEntry(
+  entries: PlannerModelEntry[],
+  seen: Set<string>,
+  entry: PlannerModelEntry,
+): void {
+  const key = `${entry.provider}\u0000${entry.model}`;
+  if (seen.has(key)) {
+    const existing = entries.find((item) => item.provider === entry.provider && item.model === entry.model);
+    if (existing && entry.sourceRoles?.length) {
+      const merged = new Set([...(existing.sourceRoles ?? []), ...entry.sourceRoles]);
+      existing.sourceRoles = [...merged];
+    }
+    return;
+  }
+  seen.add(key);
+  entries.push(entry);
+}
+
+function aliasFromModel(model: string): string {
+  return model.trim() || "configured-model";
+}
+
+function openaiBaseUrl(config: ResolvedRuntimeStackConfig): string {
+  return (config.llm.openai.baseUrl.trim() || "https://api.openai.com/v1").replace(/\/$/, "");
+}
+
+function anthropicBaseUrl(config: ResolvedRuntimeStackConfig): string {
+  return (config.llm.anthropic.baseUrl.trim() || "https://api.anthropic.com/v1").replace(/\/$/, "");
+}
 
 function hasProviderApiKey(llm: ResolvedLlmStackConfig, provider: LlmDriverKind): boolean {
   const key = provider === "openai" ? llm.openai.apiKey : llm.anthropic.apiKey;
@@ -183,6 +214,191 @@ export function resolveDefaultPlannerOrchestratorLlm(
   };
 }
 
+/**
+ * Runtime-backed catalog for `list_available_models`.
+ *
+ * This reflects models actually configured or inferred by the current stack instead of assuming
+ * public provider catalogs. It is safe for OpenAI-compatible proxies and custom endpoints because
+ * every returned id comes from local runtime config/env resolution.
+ */
+export function resolveRuntimeAvailablePlannerModels(
+  config: ResolvedRuntimeStackConfig,
+): PlannerModelEntry[] {
+  const out: PlannerModelEntry[] = [];
+  const seen = new Set<string>();
+
+  const planner = resolveDefaultPlannerOrchestratorLlm(config);
+  pushConfiguredModelEntry(out, seen, {
+    provider: planner.provider,
+    model: planner.model,
+    alias: aliasFromModel(planner.model),
+    tier: "flagship",
+    costRelative: "high",
+    contextWindow: 0,
+    strengths: ["planner default", "configured runtime model"],
+    recommended: ["planner orchestration", "hardest evaluation steps"],
+    avoid: [],
+    sourceRoles: ["planner"],
+  });
+
+  const subAgent = resolvePlannerSubAgentDefaultLlm(config);
+  pushConfiguredModelEntry(out, seen, {
+    provider: subAgent.provider,
+    model: subAgent.model,
+    alias: aliasFromModel(subAgent.model),
+    tier: "balanced",
+    costRelative: "medium",
+    contextWindow: 0,
+    strengths: ["sub-agent default", "configured runtime model"],
+    recommended: ["default explicit override for spawned agents"],
+    avoid: [],
+    sourceRoles: ["sub-agent"],
+  });
+
+  const chat = config.chat.defaultAgent.llm;
+  if (chat.provider && chat.model) {
+    pushConfiguredModelEntry(out, seen, {
+      provider: chat.provider,
+      model: chat.model,
+      alias: aliasFromModel(chat.model),
+      tier: "balanced",
+      costRelative: "medium",
+      contextWindow: 0,
+      strengths: ["chat default", "configured runtime model"],
+      recommended: ["chat-oriented orchestration flows"],
+      avoid: [],
+      sourceRoles: ["chat"],
+    });
+  }
+
+  return out;
+}
+
+async function discoverOpenAiModels(config: ResolvedRuntimeStackConfig): Promise<PlannerModelEntry[]> {
+  const apiKey = config.llm.openai.apiKey.trim();
+  if (!apiKey) return [];
+
+  const res = await fetch(`${openaiBaseUrl(config)}/models`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) {
+    throw new Error(`OpenAI model discovery failed with HTTP ${res.status}`);
+  }
+
+  const body = (await res.json()) as {
+    data?: Array<{ id?: unknown; created?: unknown }>;
+  };
+  const out: PlannerModelEntry[] = [];
+  for (const item of body.data ?? []) {
+    const model = typeof item.id === "string" ? item.id.trim() : "";
+    if (!model) continue;
+    out.push({
+      provider: "openai",
+      model,
+      alias: aliasFromModel(model),
+      tier: "balanced",
+      costRelative: "medium",
+      contextWindow: 0,
+      strengths: ["runtime-discovered", "provider catalog"],
+      recommended: [],
+      avoid: [],
+    });
+  }
+  return out;
+}
+
+async function discoverAnthropicModels(
+  config: ResolvedRuntimeStackConfig,
+): Promise<PlannerModelEntry[]> {
+  const apiKey = config.llm.anthropic.apiKey.trim();
+  if (!apiKey) return [];
+
+  const res = await fetch(`${anthropicBaseUrl(config)}/models`, {
+    method: "GET",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Anthropic model discovery failed with HTTP ${res.status}`);
+  }
+
+  const body = (await res.json()) as {
+    data?: Array<{ id?: unknown; display_name?: unknown }>;
+  };
+  const out: PlannerModelEntry[] = [];
+  for (const item of body.data ?? []) {
+    const model = typeof item.id === "string" ? item.id.trim() : "";
+    if (!model) continue;
+    const displayName =
+      typeof item.display_name === "string" && item.display_name.trim()
+        ? item.display_name.trim()
+        : model;
+    out.push({
+      provider: "anthropic",
+      model,
+      alias: aliasFromModel(displayName),
+      tier: "balanced",
+      costRelative: "medium",
+      contextWindow: 0,
+      strengths: ["runtime-discovered", "provider catalog"],
+      recommended: [],
+      avoid: [],
+    });
+  }
+  return out;
+}
+
+function mergeDiscoveredAndConfiguredModels(
+  configured: readonly PlannerModelEntry[],
+  discovered: readonly PlannerModelEntry[],
+): PlannerModelEntry[] {
+  const out: PlannerModelEntry[] = [];
+  const seen = new Set<string>();
+  for (const entry of configured) {
+    pushConfiguredModelEntry(out, seen, { ...entry, sourceRoles: [...(entry.sourceRoles ?? [])] });
+  }
+  for (const entry of discovered) {
+    pushConfiguredModelEntry(out, seen, { ...entry, sourceRoles: [...(entry.sourceRoles ?? [])] });
+  }
+  return out;
+}
+
+export async function discoverRuntimeAvailablePlannerModels(
+  config: ResolvedRuntimeStackConfig,
+  provider?: string,
+): Promise<PlannerModelEntry[]> {
+  const normalized = provider?.trim().toLowerCase();
+  const configured = resolveRuntimeAvailablePlannerModels(config);
+  const wantOpenai = !normalized || normalized === "all" || normalized === "openai";
+  const wantAnthropic = !normalized || normalized === "all" || normalized === "anthropic";
+
+  const discovered: PlannerModelEntry[] = [];
+  try {
+    if (wantOpenai) {
+      discovered.push(...(await discoverOpenAiModels(config)));
+    }
+  } catch {
+    // Fall back to locally resolved models when the endpoint does not expose /models or rejects listing.
+  }
+  try {
+    if (wantAnthropic) {
+      discovered.push(...(await discoverAnthropicModels(config)));
+    }
+  } catch {
+    // Fall back to locally resolved models when the endpoint does not expose /models or rejects listing.
+  }
+
+  const filteredConfigured =
+    !normalized || normalized === "all"
+      ? configured
+      : configured.filter((entry) => entry.provider.toLowerCase() === normalized);
+
+  return mergeDiscoveredAndConfiguredModels(filteredConfigured, discovered);
+}
+
 /** Writes the stack's default planner row (same shape as boot seed). Does not check if it already exists. */
 export async function writeDefaultPlannerAgentToStore(
   store: DynamicDefinitionsStore,
@@ -287,5 +503,8 @@ export async function registerRuntimeDynamicPlanner(options: {
     runStore: options.runStore,
     enqueueRun: options.enqueueRun,
     defaultSubAgentLlm: resolvePlannerSubAgentDefaultLlm(options.config),
+    resolveAvailableModels: async ({ provider }) => {
+      return discoverRuntimeAvailablePlannerModels(options.config, provider);
+    },
   });
 }

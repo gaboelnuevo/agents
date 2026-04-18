@@ -21,6 +21,13 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+function progressReply(status: "running" | "waiting"): string {
+  if (status === "running") {
+    return "The current run is still in progress. I have not finished the answer yet.";
+  }
+  return "The current run is waiting for external input or a resume step. It has not finished yet.";
+}
+
 function parseWait(req: Request): boolean {
   return (
     req.query.wait === "1" ||
@@ -243,22 +250,28 @@ export function createChatRouter(opts: {
       }
 
       if (run.status === "running") {
-        res.status(409).json({
-          error: "run_in_progress",
+        res.status(200).json({
+          status: "running",
+          inProgress: true,
           sessionId,
           projectId,
           runId: binding.runId,
+          agentId: chatAgentId,
+          reply: progressReply("running"),
           hint: "Wait for the current job or poll GET /runs/:runId",
         });
         return;
       }
 
       if (run.status === "waiting") {
-        res.status(409).json({
-          error: "run_waiting",
+        res.status(200).json({
+          status: "waiting",
+          inProgress: true,
           sessionId,
           projectId,
           runId: binding.runId,
+          agentId: chatAgentId,
+          reply: progressReply("waiting"),
           hint: "Use POST /agents/:id/resume with resumeInput, or open a new chat session",
         });
         return;

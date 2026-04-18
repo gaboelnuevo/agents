@@ -35,7 +35,7 @@ export function extendOpenApiWithChat(
     post: {
       summary: "Send a chat message",
       description:
-        "Creates or continues a session-bound run. Omit **`sessionId`** to start a new session (response includes one). Follow-up messages use **`continue`** on the same **`runId`** when the stored run is **`completed`** or **`failed`** (failed runs resume with full prior context). Use **`wait`** in the JSON body or **`?wait=1`** to block until the job completes; otherwise the server responds **202** with **`jobId`** and **`pollUrl`**.",
+        "Creates or continues a session-bound run. Omit **`sessionId`** to start a new session (response includes one). Follow-up messages use **`continue`** on the same **`runId`** when the stored run is **`completed`** or **`failed`** (failed runs resume with full prior context). Use **`wait`** in the JSON body or **`?wait=1`** to block until the **entire** chat job completes (all model tool rounds); omit **`wait`** for **202** + **`jobId`** / **`pollUrl`**. If a previous chat job for this session is still **running** or **waiting**, the endpoint returns **200** with an inline progress reply instead of enqueueing another job.",
       tags: ["Chat"],
       parameters: [
         {
@@ -112,7 +112,6 @@ export function extendOpenApiWithChat(
         },
         "400": jsonErr("Missing **`message`** or validation error"),
         "401": jsonErr("Missing or invalid API key"),
-        "409": jsonErr("Run in progress or run waiting for resume"),
         "500": jsonErr("Server or enqueue error"),
         "502": jsonErr("Job failed while waiting"),
         "503": jsonErr("Chat disabled or dependency error"),

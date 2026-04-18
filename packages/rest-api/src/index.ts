@@ -24,6 +24,7 @@ export { isBullmqJobWaitTimeoutError } from "./bullmqJobWaitTimeout.js";
 export {
   summarizeEngineRun,
   summarizeRunListEntry,
+  type EngineRunSummary,
   type RuntimeRestRunListItem,
 } from "./summarizeRun.js";
 export {

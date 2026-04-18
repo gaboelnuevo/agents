@@ -34,17 +34,35 @@ function resolvedMaxParseRecovery(): number {
 }
 
 /**
+ * Cap on **successful** parsed **`thought`** / **`action`** steps per run (see core **`executeRun`**).
+ * Planner-style jobs with many **`spawn_agent`** / tool rounds need headroom. Default **40**.
+ */
+function resolvedMaxIterations(): number {
+  const raw = process.env.RUNTIME_ENGINE_MAX_ITERATIONS?.trim();
+  if (raw === undefined || raw === "") {
+    return 40;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n)) {
+    return 40;
+  }
+  return Math.max(1, Math.min(200, Math.floor(n)));
+}
+
+/**
  * Same {@link AgentRuntime} limits as the worker. Keeps tuning in one place if the API ever runs dispatch in-process.
  *
  * **`maxParseRecovery`:** default **4** (vs core library **1**) so orchestrators and chat survive occasional
  * non-JSON turns from real models. Override with **`RUNTIME_ENGINE_MAX_PARSE_RECOVERY`** (integer **0–20**).
+ *
+ * **`maxIterations`:** default **40**. Override with **`RUNTIME_ENGINE_MAX_ITERATIONS`** (integer **1–200**).
  */
 export const RUNTIME_AGENT_ENGINE_DEFAULTS: {
   maxIterations: number;
   toolTimeoutMs: number;
   maxParseRecovery: number;
 } = {
-  maxIterations: 10,
+  maxIterations: resolvedMaxIterations(),
   toolTimeoutMs: 15_000,
   maxParseRecovery: resolvedMaxParseRecovery(),
 };

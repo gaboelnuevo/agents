@@ -14,13 +14,28 @@ function scopeFromContext(ctx: ToolContext): MemoryScope {
 const saveMemory: ToolAdapter = {
   name: "system_save_memory",
   description: "Persists content in the agent memory store.",
-  validate(input: unknown): boolean {
-    if (!input || typeof input !== "object") return false;
+  validate(input: unknown) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return { ok: false, reason: "input must be an object" };
+    }
     const o = input as Record<string, unknown>;
-    return (
-      typeof o.memoryType === "string" &&
-      o.content !== undefined
-    );
+    if (typeof o.memoryType !== "string") {
+      return { ok: false, reason: "memoryType must be a string" };
+    }
+    if (
+      o.memoryType !== "shortTerm" &&
+      o.memoryType !== "longTerm" &&
+      o.memoryType !== "working"
+    ) {
+      return {
+        ok: false,
+        reason: "memoryType must be one of shortTerm, longTerm, working",
+      };
+    }
+    if (o.content === undefined) {
+      return { ok: false, reason: "content is required" };
+    }
+    return { ok: true };
   },
   async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as { memoryType: string; content: unknown };
@@ -32,10 +47,15 @@ const saveMemory: ToolAdapter = {
 const getMemory: ToolAdapter = {
   name: "system_get_memory",
   description: "Queries stored memory fragments.",
-  validate(input: unknown): boolean {
-    if (!input || typeof input !== "object") return false;
+  validate(input: unknown) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return { ok: false, reason: "input must be an object" };
+    }
     const o = input as Record<string, unknown>;
-    return typeof o.memoryType === "string";
+    if (typeof o.memoryType !== "string") {
+      return { ok: false, reason: "memoryType must be a string" };
+    }
+    return { ok: true };
   },
   async execute(input: unknown, ctx: ToolContext): Promise<unknown> {
     const o = input as { memoryType: string; filter?: unknown };

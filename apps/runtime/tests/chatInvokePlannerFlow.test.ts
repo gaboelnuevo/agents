@@ -60,9 +60,18 @@ function chatToolCtx(over: Partial<ToolContext> & Pick<ToolContext, "runId" | "s
 function makeRunStore(runs: Map<string, Run>): RunStore {
   return {
     load: async (runId: string) => runs.get(runId) ?? null,
-    save: vi.fn(),
-    saveIfStatus: vi.fn(),
-    delete: vi.fn(),
+    save: async (run: Run) => {
+      runs.set(run.runId, run);
+    },
+    saveIfStatus: async (run: Run, expectedStatus: Run["status"]) => {
+      const cur = runs.get(run.runId);
+      if (!cur || cur.status !== expectedStatus) return false;
+      runs.set(run.runId, run);
+      return true;
+    },
+    delete: async (runId: string) => {
+      runs.delete(runId);
+    },
     listByAgent: vi.fn(),
   } as unknown as RunStore;
 }
@@ -94,6 +103,7 @@ async function registerChatPlannerTools(options: {
   await registerRuntimeInvokePlannerTool({
     definitionsStore: options.store,
     config: options.config,
+    runStore: options.runStore,
     enqueueRun: options.enqueueRun,
     defaultPlannerAgentId: options.config.planner.defaultAgent.id,
   });
@@ -139,6 +149,10 @@ describe("chat + invoke_planner + runtime_fetch_run flow", () => {
     const plannerRunId = String(queued.runId);
     expect(plannerRunId).toMatch(/^run-invoke-planner-/);
 
+    const stub = runs.get(plannerRunId);
+    expect(stub?.status).toBe("running");
+    expect(stub?.agentId).toBe("planner");
+
     const [payload] = enqueueRun.mock.calls[0] as [Record<string, unknown>];
     expect(payload.sessionContext).toEqual({
       invokedByAgentId: "chat",
@@ -164,6 +178,59 @@ describe("chat + invoke_planner + runtime_fetch_run flow", () => {
     expect(fetched.agentId).toBe("planner");
   });
 
+  it("fetch_run without runId resolves last invoke_planner from persisted caller history", async () => {
+    const runs = new Map<string, Run>();
+    const runStore = makeRunStore(runs);
+    const store = mockStoreWithAgents(["planner", "chat"]);
+    await registerChatPlannerTools({ store, config, enqueueRun, runStore });
+
+    const plannerRunId = "run-invoke-planner-from-stored-history";
+    const chatRunId = "run-chat-with-stored-invoke";
+    runs.set(chatRunId, {
+      runId: chatRunId,
+      agentId: "chat",
+      projectId: PROJECT,
+      sessionId: "sess-stored-invoke",
+      status: "running",
+      history: [
+        {
+          type: "action",
+          content: { tool: RUNTIME_INVOKE_PLANNER_TOOL_ID, input: { goal: "delegated" } },
+          meta: { ts: "1", source: "llm" },
+        },
+        {
+          type: "observation",
+          content: {
+            jobId: "job-x",
+            runId: plannerRunId,
+            sessionId: "planner-invoke-x",
+            plannerAgentId: "planner",
+            status: "queued",
+          },
+          meta: { ts: "2", source: "tool" },
+        },
+      ],
+      state: { iteration: 0, pending: null },
+    });
+    runs.set(plannerRunId, plannerRun(plannerRunId, { status: "completed" }));
+
+    const runner = new ToolRunner(
+      resolveToolRegistry(PROJECT),
+      new Set([RUNTIME_FETCH_RUN_TOOL_ID]),
+    );
+
+    const fetched = (await runner.execute(
+      RUNTIME_FETCH_RUN_TOOL_ID,
+      {},
+      chatToolCtx({ runId: chatRunId, sessionId: "sess-stored-invoke" }),
+    )) as Record<string, unknown>;
+
+    expect(fetched.ok).toBe(true);
+    expect(fetched.runId).toBe(plannerRunId);
+    expect(fetched.status).toBe("completed");
+    expect(fetched.reply).toBe("Planner done: subtasks outlined.");
+  });
+
   it("fetch_run on follow-up turn sees running planner until worker persists completion", async () => {
     const runs = new Map<string, Run>();
     const runStore = makeRunStore(runs);
@@ -183,7 +250,7 @@ describe("chat + invoke_planner + runtime_fetch_run flow", () => {
     )) as Record<string, unknown>;
     const plannerRunId = String(queued.runId);
 
-    runs.set(plannerRunId, plannerRun(plannerRunId, { status: "running", history: [] }));
+    expect(runs.get(plannerRunId)?.status).toBe("running");
 
     const mid = (await runner.execute(
       RUNTIME_FETCH_RUN_TOOL_ID,

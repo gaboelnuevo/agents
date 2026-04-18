@@ -12,7 +12,7 @@ The Planner delegates execution; sub-agents use normal tools and definitions.
 | `wait_for_agents` | Polls `runStore.load(runId)` until completed, failed, or per-run timeout. |
 | `reflect_and_retry` | Re-enqueues the same sub-agent with a corrective user message (retry budget in-tool). |
 | `list_available_tools` | Project snapshot HTTP tools plus a fixed list of common builtins. |
-| `list_available_models` | Declarative model catalog (override via config). |
+| `list_available_models` | Optional model catalog or runtime-discovered models for explicit `llm` overrides. |
 
 The **`@opencoreagents/runtime`** app additionally registers **`invoke_planner`**: enqueue the default orchestrator agent from another agent’s tool list. It returns **`runId`** immediately; the **calling run blocks only if** that agent also calls **`wait_for_agents`** on that id. See [`apps/runtime/docs/chat-runs-and-planner.md`](../../apps/runtime/docs/chat-runs-and-planner.md).
 
@@ -29,6 +29,10 @@ Sub-agent tool lists are checked against a built-in denylist (`spawn_agent`, `wa
 3. **`enqueueRun`** — typically `createEngineQueue(...).addRun` from `@opencoreagents/adapters-bullmq`. Payloads omit `kind`; the queue adds `kind: "run"`.
 
 `@opencoreagents/core` supports optional **`runId`** on run jobs so the Planner can correlate jobs with `RunStore` rows (see `EngineRunJobPayload`).
+
+`list_available_models` is intentionally conservative by default: if you do not provide `modelCatalog` or `resolveAvailableModels`, it returns deployment defaults and an empty `models` list rather than guessing public model ids that may not exist behind your configured adapters.
+
+When model entries include `sourceRoles`, `list_available_models` also returns a `roles` map keyed by `provider:model` so operators can see whether a model came from the planner default, sub-agent default, chat default, or a custom resolver.
 
 ## Install
 
@@ -56,6 +60,7 @@ await registerDynamicPlannerTools({
   // maxPlannerDepth: 2,
   // forbiddenToolsForSubAgents: ["system_vector_delete"],
   // modelCatalog: myCatalog,
+  // resolveAvailableModels: async ({ provider, ctx }) => myGateway.listModels({ provider, projectId: ctx.projectId }),
   // getQueuedJobCounts: () => engine.queue.getJobCounts("active", "waiting"),
   // maxConcurrentQueuedJobs: 20,
 });
@@ -71,7 +76,7 @@ Use **`DEFAULT_PLANNER_SYSTEM_PROMPT`** from this package as a starting `systemP
 
 - **`registerDynamicPlannerTools`**, **`DynamicPlannerToolsConfig`**, **`PlannerEnqueueRun`**, **`PlannerEnqueueOptions`**
 - **`DEFAULT_PLANNER_SYSTEM_PROMPT`**
-- **`DEFAULT_PLANNER_MODEL_CATALOG`**, **`DEFAULT_MODEL_SELECTION_GUIDE`**, **`filterPlannerModelsByProvider`**, model types
+- **`DEFAULT_PLANNER_MODEL_CATALOG`** (example only), **`DEFAULT_MODEL_SELECTION_GUIDE`**, **`filterPlannerModelsByProvider`**, model types
 - **`DEFAULT_BUILTIN_TOOLS_FOR_LISTING`** (what `list_available_tools` merges with HTTP tools from the snapshot)
 
 ## Related packages

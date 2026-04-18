@@ -6,6 +6,11 @@ import {
   ToolValidationError,
 } from "../errors/index.js";
 
+function validationFailureMessage(toolName: string, reason?: string): string {
+  const base = `Validation failed for tool: ${toolName}`;
+  return reason && reason.trim() ? `${base}: ${reason.trim()}` : base;
+}
+
 export interface ToolRunnerOptions {
   /** When set (> 0), `execute` rejects with {@link ToolTimeoutError} if the tool does not settle in time. */
   toolTimeoutMs?: number;
@@ -34,8 +39,17 @@ export class ToolRunner {
     if (!tool) {
       throw new ToolExecutionError(`Unknown tool: ${name}`);
     }
-    if (tool.validate && !tool.validate(input)) {
-      throw new ToolValidationError(`Validation failed for tool: ${name}`);
+    if (tool.validate) {
+      const validation = tool.validate(input);
+      const ok =
+        typeof validation === "boolean" ? validation : Boolean(validation && validation.ok);
+      if (!ok) {
+        const reason =
+          validation && typeof validation === "object" && !Array.isArray(validation)
+            ? validation.reason
+            : undefined;
+        throw new ToolValidationError(validationFailureMessage(name, reason), reason);
+      }
     }
     const run = tool.execute(input, context);
     const bounded =

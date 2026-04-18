@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ToolRunner } from "../src/tools/ToolRunner.js";
 import type { ToolAdapter, ToolContext } from "../src/adapters/tool/ToolAdapter.js";
-import { ToolTimeoutError } from "../src/errors/index.js";
+import { ToolTimeoutError, ToolValidationError } from "../src/errors/index.js";
 import { InMemoryMemoryAdapter } from "../src/adapters/memory/InMemoryMemoryAdapter.js";
 
 const ctxBase = (): ToolContext => ({
@@ -45,5 +45,22 @@ describe("ToolRunner", () => {
       toolTimeoutMs: 30,
     });
     await expect(runner.execute("slow", {}, ctxBase())).rejects.toThrow(ToolTimeoutError);
+  });
+
+  it("includes validation reason when a tool returns structured validation failure", async () => {
+    const tool: ToolAdapter = {
+      name: "mem",
+      validate() {
+        return { ok: false, reason: "memoryType must be one of shortTerm, longTerm, working" };
+      },
+      async execute() {
+        return { ok: true };
+      },
+    };
+    const runner = new ToolRunner(new Map([["mem", tool]]), new Set(["mem"]));
+    await expect(runner.execute("mem", {}, ctxBase())).rejects.toThrow(
+      /memoryType must be one of shortTerm, longTerm, working/,
+    );
+    await expect(runner.execute("mem", {}, ctxBase())).rejects.toBeInstanceOf(ToolValidationError);
   });
 });

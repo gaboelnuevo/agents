@@ -8,7 +8,7 @@ import type { EngineHooks, LLMResponseMeta, LLMParseOutcome } from "../engine/ty
 import { createRun, executeRun } from "../engine/Engine.js";
 import { buildEngineDeps } from "../engine/buildEngineDeps.js";
 import type { AgentRuntime } from "../runtime/AgentRuntime.js";
-import { RunInvalidStateError, SessionExpiredError } from "../errors/index.js";
+import { EngineError, RunInvalidStateError, SessionExpiredError } from "../errors/index.js";
 
 function throwIfSessionExpired(session: Session): void {
   if (session.isExpired()) {
@@ -17,6 +17,10 @@ function throwIfSessionExpired(session: Session): void {
 }
 
 function attachPersistedExecuteFailureReason(run: Run, error: unknown): void {
+  if (error instanceof EngineError) {
+    run.state.failedReason = `[${error.code}] ${error.message}`;
+    return;
+  }
   run.state.failedReason = error instanceof Error ? error.message : String(error);
 }
 

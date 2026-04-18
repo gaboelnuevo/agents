@@ -1,7 +1,7 @@
 /**
  * Aligns with `docs/chat-runs-and-planner.md` — convenience **`POST /v1/chat`**:
  * binding key, first message → **`addRun`**, **`completed`** / **`failed`** → **`addContinue`** (same **`runId`**),
- * **`running`** / **`waiting`** → **409**, disabled chat → **503**.
+ * **`running`** / **`waiting`** → inline progress reply (**200**), disabled chat → **503**.
  */
 import type { RedisDynamicDefinitionsStore } from "@opencoreagents/adapters-redis";
 import type { EngineQueue } from "@opencoreagents/adapters-bullmq";
@@ -216,7 +216,7 @@ describe("POST /v1/chat (docs/chat-runs-and-planner.md)", () => {
     );
   });
 
-  it("409 run_in_progress when binding run is still running", async () => {
+  it("returns inline progress reply when binding run is still running", async () => {
     const redis = makeRedis();
     const runs = new Map<string, Run>();
     const addRun = vi.fn().mockReturnValue(mockJob("j1"));
@@ -238,13 +238,15 @@ describe("POST /v1/chat (docs/chat-runs-and-planner.md)", () => {
     const res = await request(app)
       .post("/v1/chat")
       .send({ message: "overlap", sessionId })
-      .expect(409);
+      .expect(200);
 
-    expect(res.body.error).toBe("run_in_progress");
+    expect(res.body.status).toBe("running");
+    expect(res.body.inProgress).toBe(true);
     expect(res.body.runId).toBe(first.body.runId);
+    expect(res.body.reply).toMatch(/still in progress/i);
   });
 
-  it("409 run_waiting when binding run is waiting", async () => {
+  it("returns inline progress reply when binding run is waiting", async () => {
     const redis = makeRedis();
     const runs = new Map<string, Run>();
     const addRun = vi.fn().mockReturnValue(mockJob("j1"));
@@ -266,9 +268,11 @@ describe("POST /v1/chat (docs/chat-runs-and-planner.md)", () => {
     const res = await request(app)
       .post("/v1/chat")
       .send({ message: "nope", sessionId })
-      .expect(409);
+      .expect(200);
 
-    expect(res.body.error).toBe("run_waiting");
+    expect(res.body.status).toBe("waiting");
+    expect(res.body.inProgress).toBe(true);
+    expect(res.body.reply).toMatch(/waiting for external input|has not finished/i);
   });
 
   it("after failed run, next message enqueues addContinue on the same runId", async () => {

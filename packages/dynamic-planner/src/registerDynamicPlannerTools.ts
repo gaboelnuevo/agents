@@ -10,7 +10,6 @@ import {
 import { DEFAULT_BUILTIN_TOOLS_FOR_LISTING } from "./builtinToolsSummary.js";
 import {
   DEFAULT_MODEL_SELECTION_GUIDE,
-  DEFAULT_PLANNER_MODEL_CATALOG,
   filterPlannerModelsByProvider,
 } from "./modelCatalog.js";
 
@@ -18,6 +17,15 @@ export type PlannerEnqueueRun = (
   payload: Omit<EngineRunJobPayload, "kind">,
   opts?: PlannerEnqueueOptions,
 ) => Promise<{ id?: string }>;
+
+export interface ResolveAvailableModelsArgs {
+  provider?: string;
+  ctx: ToolContext;
+}
+
+export type ResolveAvailableModels = (
+  args: ResolveAvailableModelsArgs,
+) => Promise<readonly import("./modelCatalog.js").PlannerModelEntry[]>;
 
 /** Subset of BullMQ {@link JobsOptions} commonly used for sub-agent jobs. */
 export interface PlannerEnqueueOptions {
@@ -41,6 +49,12 @@ export interface DynamicPlannerToolsConfig {
   forbiddenToolsForSubAgents?: readonly string[];
   /** Optional model catalog override for `list_available_models`. */
   modelCatalog?: readonly import("./modelCatalog.js").PlannerModelEntry[];
+  /**
+   * Optional runtime resolver for `list_available_models`.
+   * Use this when your deployment can discover models from a proxy/custom endpoint instead of
+   * returning a static catalog baked into the package.
+   */
+  resolveAvailableModels?: ResolveAvailableModels;
   /** Optional selection guide override. */
   modelSelectionGuide?: Readonly<Record<string, string>>;
   /**
@@ -137,7 +151,7 @@ export async function registerDynamicPlannerTools(
     ...DEFAULT_FORBIDDEN,
     ...(config.forbiddenToolsForSubAgents ?? []),
   ]);
-  const catalog = config.modelCatalog ?? DEFAULT_PLANNER_MODEL_CATALOG;
+  const catalog = config.modelCatalog ?? [];
   const selectionGuide = config.modelSelectionGuide ?? DEFAULT_MODEL_SELECTION_GUIDE;
 
   await Tool.define({
@@ -472,28 +486,53 @@ export async function registerDynamicPlannerTools(
     scope: "global",
     description:
       "Lists available LLM models with provider, relative cost, and capabilities. " +
-      "Call before spawn_agent to match model to subtask.",
+      "**Optional** — call only when you need explicit llm overrides on spawn_agent; omit when stack defaults suffice (fewer turns, fewer parse errors on small models).",
     inputSchema: {
       type: "object",
       properties: {
         provider: {
           type: "string",
-          enum: ["anthropic", "openai", "all"],
-          description: "Filter by provider. Default: all.",
+          description:
+            "Optional provider filter. Use `all` or omit to return every configured/discovered model. " +
+            "Custom provider ids are allowed.",
           default: "all",
         },
       },
       required: [],
     },
-    execute: async (input) => {
+    execute: async (input, ctx) => {
       const args = asRecord(input);
-      const provider = (args.provider as "anthropic" | "openai" | "all" | undefined) ?? "all";
-      const filtered = filterPlannerModelsByProvider(catalog, provider);
+      const raw = args.provider;
+      const provider = typeof raw === "string" && raw.trim() ? raw.trim() : "all";
+      const available = config.resolveAvailableModels
+        ? await config.resolveAvailableModels({ provider, ctx })
+        : catalog;
+      const filtered = filterPlannerModelsByProvider(available, provider);
+      const configuredProviders = Array.from(
+        new Set([
+          config.defaultSubAgentLlm.provider,
+          ...available.map((m) => m.provider),
+        ]),
+      );
       return {
         models: filtered,
         total: filtered.length,
+        configuredProviders,
+        defaultSubAgentLlm: config.defaultSubAgentLlm,
         selectionGuide,
-        note: "Prefer the cheapest model that is sufficient. Reserve Opus 4.6 / GPT-5.4 for the Planner and the hardest evaluation steps.",
+        roles:
+          filtered.length > 0
+            ? Object.fromEntries(
+                filtered.map((model) => [
+                  `${model.provider}:${model.model}`,
+                  [...(model.sourceRoles ?? [])],
+                ]),
+              )
+            : {},
+        note:
+          filtered.length > 0
+            ? "Prefer the cheapest model that is sufficient. Omit llm on spawn_agent when the runtime default is enough. Use sourceRoles to see which runtime role configured each model."
+            : "No explicit model catalog is registered for this deployment. Omit llm on spawn_agent to use the runtime default, or pass an exact provider/model supported by your configured adapters.",
       };
     },
   });

@@ -22,9 +22,13 @@ describe("observationForToolFailure", () => {
     expect(na.code).toBe("TOOL_NOT_ALLOWED");
     expect(na.error).toContain("not allowed");
 
-    const tv = observationForToolFailure(new ToolValidationError("Validation failed for tool: t"));
+    const tv = observationForToolFailure(
+      new ToolValidationError(
+        "Validation failed for tool: t: memoryType must be one of shortTerm, longTerm, working",
+      ),
+    );
     expect(tv.code).toBe("TOOL_VALIDATION_ERROR");
-    expect(tv.error).toContain("Validation");
+    expect(tv.error).toContain("memoryType must be one of shortTerm, longTerm, working");
   });
 
   it("uses generic timeout text for ToolTimeoutError", () => {

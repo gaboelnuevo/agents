@@ -30,11 +30,18 @@ export interface ToolContext {
   ragFileCatalog?: ReadonlyArray<RagFileSourceEntry>;
 }
 
+export type ToolValidationResult =
+  | boolean
+  | {
+      ok: boolean;
+      reason?: string;
+    };
+
 export interface ToolAdapter {
   name: string;
   description?: string;
   execute(input: unknown, context: ToolContext): Promise<unknown>;
-  validate?(input: unknown): boolean;
+  validate?(input: unknown): ToolValidationResult;
 }
 
 export interface ObservationContent {

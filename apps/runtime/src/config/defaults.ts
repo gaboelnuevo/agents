@@ -36,13 +36,6 @@ function normalizeDefaultChatAgentId(v: unknown): string {
   return s;
 }
 
-function mergeRunEventsRedis(raw: RuntimeStackFileConfig): boolean {
-  const v = process.env.RUNTIME_RUN_EVENTS_REDIS?.trim().toLowerCase();
-  if (v === "1" || v === "true" || v === "yes") return true;
-  if (v === "0" || v === "false" || v === "no") return false;
-  return raw.runEvents?.redis === true;
-}
-
 export const defaultStackConfig: ResolvedRuntimeStackConfig = {
   environment: "local",
   server: { port: 3010, host: "0.0.0.0" },
@@ -75,6 +68,14 @@ export const defaultStackConfig: ResolvedRuntimeStackConfig = {
     },
   },
 };
+
+function mergeRunEventsRedis(raw: RuntimeStackFileConfig): boolean {
+  const v = process.env.RUNTIME_RUN_EVENTS_REDIS?.trim().toLowerCase();
+  if (v === "1" || v === "true" || v === "yes") return true;
+  if (v === "0" || v === "false" || v === "no") return false;
+  // Omit runEvents.redis in YAML → default on (matches defaultStackConfig; Redis stacks get SSE without extra keys).
+  return raw.runEvents?.redis ?? defaultStackConfig.runEvents.redis;
+}
 
 export function mergeWithDefaults(raw: RuntimeStackFileConfig): ResolvedRuntimeStackConfig {
   return {

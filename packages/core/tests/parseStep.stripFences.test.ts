@@ -45,4 +45,73 @@ describe("parseStep with chatty wrappers", () => {
     const raw = '[{"type":"thought","content":"from array"}]';
     expect(parseStep(raw)).toEqual({ type: "thought", content: "from array" });
   });
+
+  it("normalizes nested action { name, params } (common LLM shape)", () => {
+    const raw = JSON.stringify({
+      type: "action",
+      action: { name: "invoke_planner", params: { goal: "research Honduras" } },
+    });
+    expect(parseStep(raw)).toEqual({
+      type: "action",
+      tool: "invoke_planner",
+      input: { goal: "research Honduras" },
+    });
+  });
+
+  it("normalizes top-level name + params", () => {
+    const raw = JSON.stringify({
+      type: "action",
+      name: "runtime_fetch_run",
+      params: { runId: "run-1" },
+    });
+    expect(parseStep(raw)).toEqual({
+      type: "action",
+      tool: "runtime_fetch_run",
+      input: { runId: "run-1" },
+    });
+  });
+
+  it("normalizes function_call with JSON string arguments", () => {
+    const raw = JSON.stringify({
+      type: "action",
+      function_call: { name: "invoke_planner", arguments: '{"goal":"x"}' },
+    });
+    expect(parseStep(raw)).toEqual({
+      type: "action",
+      tool: "invoke_planner",
+      input: { goal: "x" },
+    });
+  });
+
+  it("coerces result.content object to string (common LLM mistake)", () => {
+    const raw = JSON.stringify({
+      type: "result",
+      content: { message: "hello", n: 1 },
+    });
+    expect(parseStep(raw)).toEqual({
+      type: "result",
+      content: '{"message":"hello","n":1}',
+    });
+  });
+
+  it("coerces thought.content array to string", () => {
+    const raw = JSON.stringify({ type: "thought", content: ["a", "b"] });
+    expect(parseStep(raw)).toEqual({ type: "thought", content: '["a","b"]' });
+  });
+
+  it("maps result.message to content (chat-style JSON)", () => {
+    const raw = JSON.stringify({
+      type: "result",
+      message: "¡Hola! ¿En qué puedo ayudarte?",
+    });
+    expect(parseStep(raw)).toEqual({
+      type: "result",
+      content: "¡Hola! ¿En qué puedo ayudarte?",
+    });
+  });
+
+  it("maps thought.text to content when content is absent", () => {
+    const raw = JSON.stringify({ type: "thought", text: "planning…" });
+    expect(parseStep(raw)).toEqual({ type: "thought", content: "planning…" });
+  });
 });

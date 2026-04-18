@@ -1,7 +1,7 @@
 export abstract class EngineError extends Error {
   abstract readonly code: string;
   constructor(message?: string) {
-    super(message ?? "EngineError");
+    super(message ?? "Unspecified engine error");
     this.name = new.target.name;
   }
 }
@@ -20,15 +20,26 @@ export class ToolExecutionError extends EngineError {
 }
 export class ToolValidationError extends EngineError {
   readonly code = "TOOL_VALIDATION_ERROR";
+  readonly details?: string;
+  constructor(message?: string, details?: string) {
+    super(message);
+    this.details = details;
+  }
 }
 export class ToolTimeoutError extends EngineError {
   readonly code = "TOOL_TIMEOUT";
 }
 export class MaxIterationsError extends EngineError {
   readonly code = "MAX_ITERATIONS_EXCEEDED";
+  constructor(message?: string) {
+    super(message ?? "Exceeded maximum engine iterations");
+  }
 }
 export class RunTimeoutError extends EngineError {
   readonly code = "RUN_TIMEOUT";
+  constructor(message?: string) {
+    super(message ?? "Run exceeded the configured time limit");
+  }
 }
 export class LLMTransportError extends EngineError {
   readonly code = "LLM_TRANSPORT_ERROR";
@@ -41,6 +52,9 @@ export class LLMClientError extends EngineError {
 }
 export class RunCancelledError extends EngineError {
   readonly code = "RUN_CANCELLED";
+  constructor(message?: string) {
+    super(message ?? "Run was cancelled");
+  }
 }
 export class SecurityError extends EngineError {
   readonly code = "SECURITY_DENIED";

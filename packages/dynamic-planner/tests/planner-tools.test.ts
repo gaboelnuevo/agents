@@ -174,4 +174,72 @@ describe("registerDynamicPlannerTools", () => {
       ),
     ).rejects.toThrow(/not allowed for sub-agents/);
   });
+
+  it("list_available_models returns deployment defaults when no catalog is registered", async () => {
+    await registerDynamicPlannerTools({
+      definitionsStore: new InMemoryDynamicDefinitionsStore(),
+      runStore: new InMemoryRunStore(),
+      enqueueRun: vi.fn(),
+      defaultSubAgentLlm: { provider: "openai", model: "my-proxy-default" },
+    });
+
+    const tool = resolveToolRegistry("p1").get("list_available_models")!;
+    const out = (await tool.execute({}, baseToolContext())) as {
+      models: unknown[];
+      total: number;
+      configuredProviders: string[];
+      defaultSubAgentLlm: { provider: string; model: string };
+      note: string;
+    };
+
+    expect(out.models).toEqual([]);
+    expect(out.total).toBe(0);
+    expect(out.configuredProviders).toEqual(["openai"]);
+    expect(out.defaultSubAgentLlm).toEqual({ provider: "openai", model: "my-proxy-default" });
+    expect(out.note).toMatch(/No explicit model catalog is registered/);
+  });
+
+  it("list_available_models supports custom providers through a resolver", async () => {
+    const resolveAvailableModels = vi.fn().mockResolvedValue([
+      {
+        provider: "gateway",
+        model: "acme-pro",
+        alias: "pro",
+        tier: "flagship",
+        costRelative: "high",
+        contextWindow: 128_000,
+        strengths: ["reasoning"],
+        recommended: ["hard tasks"],
+        avoid: ["cheap fan-out"],
+      },
+    ]);
+
+    await registerDynamicPlannerTools({
+      definitionsStore: new InMemoryDynamicDefinitionsStore(),
+      runStore: new InMemoryRunStore(),
+      enqueueRun: vi.fn(),
+      defaultSubAgentLlm: { provider: "gateway", model: "acme-default" },
+      resolveAvailableModels,
+    });
+
+    const tool = resolveToolRegistry("p1").get("list_available_models")!;
+    const out = (await tool.execute(
+      { provider: "gateway" },
+      baseToolContext(),
+    )) as {
+      models: Array<{ provider: string; model: string; sourceRoles?: string[] }>;
+      total: number;
+      configuredProviders: string[];
+      roles: Record<string, string[]>;
+    };
+
+    expect(resolveAvailableModels).toHaveBeenCalledWith({
+      provider: "gateway",
+      ctx: expect.objectContaining({ projectId: "p1", runId: "planner-run" }),
+    });
+    expect(out.total).toBe(1);
+    expect(out.models[0]).toMatchObject({ provider: "gateway", model: "acme-pro" });
+    expect(out.configuredProviders).toEqual(["gateway"]);
+    expect(out.roles).toEqual({ "gateway:acme-pro": [] });
+  });
 });

@@ -107,6 +107,130 @@ function unwrapSingleElementArray(parsed: unknown): Record<string, unknown> | un
   return parsed as Record<string, unknown>;
 }
 
+function coerceArgumentsField(argumentsField: unknown): unknown {
+  if (typeof argumentsField === "string") {
+    try {
+      return JSON.parse(argumentsField) as unknown;
+    } catch {
+      return { _rawArguments: argumentsField };
+    }
+  }
+  if (argumentsField != null && typeof argumentsField === "object" && !Array.isArray(argumentsField)) {
+    return argumentsField;
+  }
+  return {};
+}
+
+/** Prefer **`params`**, **`parameters`**, **`input`**, then string/object **`arguments`** (OpenAI tool style). */
+function pickActionInputFromRecord(r: Record<string, unknown>): unknown {
+  if ("params" in r && r.params != null && typeof r.params === "object" && !Array.isArray(r.params)) {
+    return r.params;
+  }
+  if (
+    "parameters" in r &&
+    r.parameters != null &&
+    typeof r.parameters === "object" &&
+    !Array.isArray(r.parameters)
+  ) {
+    return r.parameters;
+  }
+  if ("input" in r) return r.input ?? {};
+  if ("arguments" in r) return coerceArgumentsField(r.arguments);
+  return {};
+}
+
+/**
+ * Some models emit tool-style JSON in **content** (no native **`toolCalls`**), e.g.
+ * `{ "type": "action", "action": { "name": "invoke_planner", "params": { … } } }` or
+ * `{ "type": "action", "name": "…", "params": { … } }`. Map to **`{ type: "action", tool, input }`**.
+ */
+function normalizeAlternateActionShape(obj: Record<string, unknown>): Record<string, unknown> {
+  if (obj.type !== "action") return obj;
+
+  if (typeof obj.tool === "string") {
+    if (!("input" in obj)) return { ...obj, input: {} };
+    return obj;
+  }
+
+  const nested = obj.action;
+  if (nested != null && typeof nested === "object" && !Array.isArray(nested)) {
+    const a = nested as Record<string, unknown>;
+    const toolName =
+      (typeof a.name === "string" && a.name) || (typeof a.tool === "string" && a.tool) || "";
+    if (toolName) {
+      const input = pickActionInputFromRecord(a);
+      const { action: _nested, ...rest } = obj;
+      return { ...rest, type: "action", tool: toolName, input };
+    }
+  }
+
+  const fc = obj.function_call;
+  if (fc != null && typeof fc === "object" && !Array.isArray(fc)) {
+    const f = fc as Record<string, unknown>;
+    if (typeof f.name === "string" && f.name) {
+      const input = pickActionInputFromRecord(f);
+      const { function_call: _fc, ...rest } = obj;
+      return { ...rest, type: "action", tool: f.name, input };
+    }
+  }
+
+  if (typeof obj.name === "string" && obj.name) {
+    const input = pickActionInputFromRecord(obj);
+    const rest = { ...obj };
+    delete rest.name;
+    delete rest.params;
+    delete rest.parameters;
+    delete rest.input;
+    delete rest.action;
+    delete rest.function_call;
+    delete rest.tool;
+    return { ...rest, type: "action", tool: obj.name, input };
+  }
+
+  return obj;
+}
+
+/**
+ * Chat-style models emit **`message`** or **`text`** instead of **`content`** for **`thought`/`result`**.
+ * Only fills **`content`** when it is missing or nullish; non-string **`content`** (object/array) is left for
+ * {@link coerceThoughtResultContentToString}.
+ */
+function normalizeThoughtResultMessageToContent(obj: Record<string, unknown>): Record<string, unknown> {
+  if (obj.type !== "thought" && obj.type !== "result") return obj;
+  const c = obj.content;
+  if (typeof c === "string") return obj;
+  if (c != null && typeof c === "object") return obj;
+
+  const alt =
+    typeof obj.message === "string"
+      ? obj.message
+      : typeof obj.text === "string"
+        ? obj.text
+        : undefined;
+  if (alt === undefined) return obj;
+  const rest = { ...obj };
+  delete rest.message;
+  delete rest.text;
+  return { ...rest, content: alt };
+}
+
+/**
+ * Models often emit **`result`** / **`thought`** with **`content`** as an object or array; the engine protocol
+ * requires **`content`: string**. Coerce with **`JSON.stringify`** (empty string for nullish).
+ */
+function coerceThoughtResultContentToString(obj: Record<string, unknown>): Record<string, unknown> {
+  if (obj.type !== "thought" && obj.type !== "result") return obj;
+  if (!("content" in obj)) return obj;
+  const c = obj.content;
+  if (typeof c === "string") return obj;
+  if (c === null || c === undefined) return { ...obj, content: "" };
+  try {
+    return { ...obj, content: JSON.stringify(c) };
+  } catch {
+    return { ...obj, content: String(c) };
+  }
+}
+
 function validateStepShape(obj: Record<string, unknown>): Step {
   const t = obj.type;
   if (typeof t !== "string" || !["thought", "action", "wait", "result"].includes(t)) {
@@ -134,6 +258,9 @@ function validateStepShape(obj: Record<string, unknown>): Step {
  * - Markdown fences (full message or embedded), with or without `json` tag
  * - Leading / trailing prose; first balanced `{ … }` JSON object
  * - A single-element JSON array wrapping the step object
+ * - Alternate **action** shapes: nested **`{ action: { name, params } }`**, top-level **`name`/`params`**, or **`function_call`**
+ * - **`thought`** / **`result`** with **`message`** or **`text`** instead of **`content`** (when **`content`** is absent/nullish)
+ * - **`thought`** / **`result`** with **`content`** as JSON object or array → stringified
  */
 export function parseStep(raw: string): Step {
   const candidates = buildParseCandidates(raw);
@@ -148,7 +275,11 @@ export function parseStep(raw: string): Step {
     const obj = unwrapSingleElementArray(parsed);
     if (!obj) continue;
     try {
-      return validateStepShape(obj);
+      return validateStepShape(
+        coerceThoughtResultContentToString(
+          normalizeThoughtResultMessageToContent(normalizeAlternateActionShape(obj)),
+        ),
+      );
     } catch (e) {
       if (e instanceof StepSchemaError) lastSchema = e;
     }

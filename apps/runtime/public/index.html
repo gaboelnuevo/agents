@@ -543,6 +543,43 @@
         text-align: center;
         padding: 0.35rem 0.55rem;
       }
+      .chat-msg-system .chat-bubble.chat-bubble-obs {
+        text-align: left;
+        max-width: min(100%, 44rem);
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .chat-obs-details {
+        margin-top: 0.2rem;
+        text-align: left;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        padding: 0.25rem 0.45rem 0.45rem;
+      }
+      .chat-obs-summary {
+        cursor: pointer;
+        font-size: 0.76rem;
+        color: var(--text);
+        list-style-position: outside;
+      }
+      .chat-obs-summary::-webkit-details-marker {
+        color: var(--muted);
+      }
+      .chat-obs-pre {
+        margin: 0.4rem 0 0;
+        max-height: 22rem;
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--text);
+        background: var(--bg);
+        border-radius: 4px;
+        padding: 0.4rem 0.45rem;
+      }
       .chat-bubble-pending {
         border-style: dashed;
         opacity: 0.85;
@@ -839,7 +876,7 @@
         <div class="row">
           <label class="check">
             <input type="checkbox" id="wait" />
-            Wait until the reply is ready (simplest for trying the UI). Turn off if you prefer a quick response with a job ID and background processing.
+            Wait until the reply is ready (blocks until this chat job finishes, including all tool steps). Turn off for a quick 202 + job id, or when asking “how is my planner run?” — the assistant should answer as soon as it sees <strong>running</strong> from <code>runtime_fetch_run</code>, not after the planner completes.
           </label>
         </div>
       </div>
@@ -900,8 +937,8 @@
             <input type="checkbox" id="agentLiveSse" checked style="margin-top: 0.2rem" />
             <span style="font-size: 0.78rem; color: var(--muted); line-height: 1.35">
               Stream live engine steps (thoughts, tools, LLM) over SSE. Needs
-              <code>runEvents.redis: true</code> in the stack, worker running, and API key in the field above (sent as
-              <code>?apiKey=</code> for EventSource).
+              <code>runEvents.redis: true</code> in the stack, worker running, and the API key in the field above.
+              The UI streams with <code>Authorization</code> headers and falls back to <code>?apiKey=</code> only when needed.
             </span>
           </label>
           <div id="agentRunLiveLog" class="live-event-log" aria-live="polite"></div>
@@ -1038,6 +1075,15 @@
               <code>sessionStorage</code>.
             </p>
           </div>
+          <div class="row" style="margin-top: 1rem; flex-wrap: wrap; gap: 0.5rem; align-items: center">
+            <button type="button" class="secondary" id="cleanLocalChatAndSessions">
+              Clear saved chats &amp; run sessions
+            </button>
+          </div>
+          <p class="help-text" style="margin-top: 0.35rem; margin-bottom: 0">
+            Deletes all locally saved chat threads and agent run sessions from this browser (<code>localStorage</code>
+            only). Does not remove the API key above (<code>sessionStorage</code>). Server-side runs are unchanged.
+          </p>
         </div>
       </div>
 
@@ -1519,6 +1565,141 @@
           return k ? "&apiKey=" + encodeURIComponent(k) : "";
         }
 
+        function sseHeaders() {
+          const h = { Accept: "text/event-stream" };
+          const k = el.apiKey.value.trim();
+          if (k) h.Authorization = "Bearer " + k;
+          return h;
+        }
+
+        function decodeSsePayload(block) {
+          const lines = String(block || "").split(/\r?\n/);
+          var eventName = "message";
+          var dataLines = [];
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (!line || line[0] === ":") continue;
+            if (line.indexOf("event:") === 0) {
+              eventName = line.slice(6).trim() || "message";
+              continue;
+            }
+            if (line.indexOf("data:") === 0) {
+              dataLines.push(line.slice(5).replace(/^\s/, ""));
+            }
+          }
+          return { event: eventName, data: dataLines.join("\n") };
+        }
+
+        async function openSseStream(url, handlers) {
+          const onEvent = handlers && handlers.onEvent ? handlers.onEvent : function () {};
+          const onError = handlers && handlers.onError ? handlers.onError : function () {};
+          const onClose = handlers && handlers.onClose ? handlers.onClose : function () {};
+          const onRetry = handlers && handlers.onRetry ? handlers.onRetry : function () {};
+          const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+          const maxInitial404Retries =
+            handlers && typeof handlers.maxInitial404Retries === "number"
+              ? handlers.maxInitial404Retries
+              : 8;
+          const initial404RetryDelayMs =
+            handlers && typeof handlers.initial404RetryDelayMs === "number"
+              ? handlers.initial404RetryDelayMs
+              : 350;
+          var closed = false;
+          var initial404Retries = 0;
+          var cleanup = function () {
+            if (closed) return;
+            closed = true;
+            onClose();
+          };
+          var close = function () {
+            if (controller) controller.abort();
+            cleanup();
+          };
+
+          if (typeof fetch !== "function" || typeof ReadableStream === "undefined") {
+            if (typeof EventSource === "undefined") {
+              onError("SSE is not supported in this browser.");
+              cleanup();
+              return { close: close };
+            }
+            var es = new EventSource(url + sseApiKeyQuery());
+            es.addEventListener("run", function (ev) {
+              onEvent("run", ev.data);
+            });
+            es.addEventListener("chat", function (ev) {
+              onEvent("chat", ev.data);
+            });
+            es.onerror = function () {
+              es.close();
+              onError("Live stream disconnected.");
+              cleanup();
+            };
+            return {
+              close: function () {
+                es.close();
+                cleanup();
+              },
+            };
+          }
+
+          try {
+            var res;
+            while (!closed) {
+              res = await fetch(url, {
+                method: "GET",
+                headers: sseHeaders(),
+                signal: controller ? controller.signal : undefined,
+              });
+              if (res.status !== 404 || initial404Retries >= maxInitial404Retries) {
+                break;
+              }
+              initial404Retries += 1;
+              onRetry(initial404Retries, res.status);
+              await new Promise(function (resolve) {
+                setTimeout(resolve, initial404RetryDelayMs);
+              });
+            }
+            if (!res.ok) {
+              onError("Live stream failed with HTTP " + res.status + ".");
+              cleanup();
+              return { close: close };
+            }
+            if (!res.body || typeof res.body.getReader !== "function") {
+              onError("Readable SSE stream not available in this browser.");
+              cleanup();
+              return { close: close };
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            var buffer = "";
+            while (!closed) {
+              const chunk = await reader.read();
+              if (chunk.done) break;
+              buffer += decoder.decode(chunk.value, { stream: true });
+              var boundary = buffer.indexOf("\n\n");
+              while (boundary !== -1) {
+                const rawBlock = buffer.slice(0, boundary);
+                buffer = buffer.slice(boundary + 2);
+                const parsed = decodeSsePayload(rawBlock);
+                if (parsed.data) {
+                  onEvent(parsed.event, parsed.data);
+                }
+                boundary = buffer.indexOf("\n\n");
+              }
+            }
+            if (!closed) {
+              onError("Live stream disconnected.");
+            }
+          } catch (e) {
+            if (!closed) onError(String((e && e.message) || e));
+          } finally {
+            cleanup();
+          }
+
+          return { close: close };
+        }
+
         function formatRunEventPayload(obj) {
           if (!obj || typeof obj !== "object") return String(obj);
           const kind = obj.kind;
@@ -1594,21 +1775,12 @@
         function startAgentRunEventStream(runId, sessionId) {
           closeAgentRunEventStream();
           if (!el.agentLiveSse || !el.agentLiveSse.checked) return;
-          if (!runId || !sessionId || typeof EventSource === "undefined") return;
+          if (!runId || !sessionId) return;
           const url =
             "/v1/runs/" +
             encodeURIComponent(runId) +
             "/stream?sessionId=" +
-            encodeURIComponent(sessionId) +
-            sseApiKeyQuery();
-          var es;
-          try {
-            es = new EventSource(url);
-          } catch (e) {
-            appendAgentRunLiveLine("Could not open EventSource: " + String(e.message || e));
-            return;
-          }
-          agentRunEventSource = es;
+            encodeURIComponent(sessionId);
           var closed = false;
           var finalize = function () {
             if (closed) return;
@@ -1616,73 +1788,99 @@
             closeAgentRunEventStream();
           };
           var errOnce = false;
-          es.addEventListener("run", function (ev) {
+          openSseStream(url, {
+            onRetry: function (attempt, status) {
+              if (attempt === 1) {
+                appendAgentRunLiveLine(
+                  "Live stream waiting for run registration (" + status + "); retrying…",
+                );
+              }
+            },
+            onEvent: function (_eventName, data) {
             var o = null;
             try {
-              o = JSON.parse(ev.data);
+                o = JSON.parse(data);
               appendAgentRunLiveLine(formatRunEventPayload(o));
             } catch (_) {
-              appendAgentRunLiveLine(String(ev.data));
+                appendAgentRunLiveLine(String(data));
             }
             if (o && (o.kind === "dispatch_done" || o.kind === "dispatch_error")) {
               finalize();
             }
+            },
+            onError: function (message) {
+              if (errOnce) return;
+              errOnce = true;
+              appendAgentRunLiveLine(
+                "Live stream disconnected: " +
+                  String(message || "enable runEvents.redis, set API key, or check network."),
+              );
+              finalize();
+            },
+            onClose: function () {
+              agentRunEventSource = null;
+            },
+          }).then(function (stream) {
+            if (closed) {
+              stream.close();
+              return;
+            }
+            agentRunEventSource = stream;
           });
-          es.onerror = function () {
-            if (errOnce) return;
-            errOnce = true;
-            appendAgentRunLiveLine(
-              "SSE disconnected (enable runEvents.redis in stack, set API key, or check network).",
-            );
-            finalize();
-          };
         }
 
         function startChatRunEventStream(runId, sessionId) {
           closeChatRunEventStream();
           if (!el.chatLiveSse || !el.chatLiveSse.checked) return;
-          if (!runId || !sessionId || typeof EventSource === "undefined") return;
+          if (!runId || !sessionId) return;
           const url =
             "/v1/runs/" +
             encodeURIComponent(runId) +
             "/stream?sessionId=" +
-            encodeURIComponent(sessionId) +
-            sseApiKeyQuery();
-          var es;
-          try {
-            es = new EventSource(url);
-          } catch (e) {
-            appendChatBubble("system", "[engine] " + String(e.message || e));
-            return;
-          }
-          chatRunEventSource = es;
+            encodeURIComponent(sessionId);
           var errOnce = false;
-          es.addEventListener("run", function (ev) {
+          var closed = false;
+          openSseStream(url, {
+            onRetry: function (_attempt, _status) {},
+            onEvent: function (_eventName, data) {
             var o = null;
             try {
-              o = JSON.parse(ev.data);
-              appendChatBubble("system", "[engine] " + formatRunEventPayload(o));
+                o = JSON.parse(data);
+              if (o && o.kind === "observation") {
+                appendChatEngineExpandableBubble("observation", o.observation);
+              } else if (o && (o.kind === "llm_response" || o.kind === "llm_parse")) {
+                var llmLabel = o.kind === "llm_parse" ? "llm_parse" : "llm";
+                appendChatEngineExpandableBubble(llmLabel, o);
+              } else {
+                appendChatBubble("system", "[engine] " + formatRunEventPayload(o));
+              }
               scrollChatToBottom();
             } catch (_) {
-              appendChatBubble("system", "[engine] " + String(ev.data));
+                appendChatBubble("system", "[engine] " + String(data));
               scrollChatToBottom();
             }
             if (o && (o.kind === "dispatch_done" || o.kind === "dispatch_error")) {
-              es.close();
-              chatRunEventSource = null;
+                closed = true;
+                closeChatRunEventStream();
             }
+            },
+            onError: function (message) {
+              if (closed || errOnce) return;
+              errOnce = true;
+              appendChatBubble("system", "[engine] Live stream disconnected: " + String(message));
+              scrollChatToBottom();
+              closeChatRunEventStream();
+            },
+            onClose: function () {
+              chatRunEventSource = null;
+            },
+          }).then(function (stream) {
+            if (closed) {
+              stream.close();
+              return;
+            }
+            chatRunEventSource = stream;
           });
-          es.onerror = function () {
-            if (errOnce) return;
-            errOnce = true;
-            appendChatBubble(
-              "system",
-              "[engine] Live stream disconnected (runEvents.redis + API key, or blocked by browser).",
-            );
-            scrollChatToBottom();
-            es.close();
-            chatRunEventSource = null;
-          };
         }
 
         function setStatus(text, isErr) {
@@ -1754,6 +1952,56 @@
         function scrollChatToBottom() {
           if (!el.chatThread) return;
           el.chatThread.scrollTop = el.chatThread.scrollHeight;
+        }
+
+        /**
+         * Chat SSE payloads with rich JSON (observation, llm, …): collapsible `details` + full `pre`.
+         * @param {string} label Short label for the summary line (e.g. "observation", "llm", "llm_parse").
+         * @param {unknown} payload Serializable object shown in the expanded body.
+         */
+        function appendChatEngineExpandableBubble(label, payload) {
+          const wrap = document.createElement("div");
+          wrap.className = "chat-msg chat-msg-system";
+          const bub = document.createElement("div");
+          bub.className = "chat-bubble chat-bubble-obs";
+          let jsonFull = "";
+          try {
+            jsonFull = JSON.stringify(payload ?? null, null, 2);
+          } catch (_) {
+            jsonFull = String(payload);
+          }
+          const oneLine = truncateText(jsonFull.replace(/\s+/g, " "), 140);
+          const details = document.createElement("details");
+          details.className = "chat-obs-details";
+          const summary = document.createElement("summary");
+          summary.className = "chat-obs-summary";
+          summary.textContent = "[engine] " + String(label || "event") + " · " + oneLine;
+          const pre = document.createElement("pre");
+          pre.className = "chat-obs-pre";
+          pre.textContent = jsonFull.length <= 200000 ? jsonFull : truncateText(jsonFull, 200000);
+          details.appendChild(summary);
+          details.appendChild(pre);
+          if (isDevMode()) {
+            const ts = document.createElement("time");
+            ts.className = "chat-bubble-ts";
+            const now = new Date();
+            ts.dateTime = now.toISOString();
+            ts.textContent = now.toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+            const bodyEl = document.createElement("div");
+            bodyEl.className = "chat-bubble-body";
+            bodyEl.appendChild(details);
+            bub.appendChild(ts);
+            bub.appendChild(bodyEl);
+          } else {
+            bub.appendChild(details);
+          }
+          wrap.appendChild(bub);
+          el.chatThread.appendChild(wrap);
+          scrollChatToBottom();
         }
 
         function appendChatBubble(role, text) {
@@ -2307,19 +2555,35 @@
               li.appendChild(meta);
             }
             li.appendChild(document.createElement("br"));
-            var pre = document.createElement("pre");
-            pre.style.margin = "0.25rem 0 0";
-            pre.style.whiteSpace = "pre-wrap";
-            pre.style.wordBreak = "break-word";
-            pre.style.fontSize = "0.75rem";
             var blob;
             try {
               blob = JSON.stringify(step.content, null, 2);
             } catch (_) {
               blob = String(step.content);
             }
-            pre.textContent = truncateText(blob, 8000);
-            li.appendChild(pre);
+            if (step.type === "observation") {
+              var od = document.createElement("details");
+              od.className = "chat-obs-details";
+              od.style.marginTop = "0.25rem";
+              var os = document.createElement("summary");
+              os.className = "chat-obs-summary";
+              os.textContent = "Show full observation · " + truncateText(blob.replace(/\s+/g, " "), 100);
+              var opre = document.createElement("pre");
+              opre.className = "chat-obs-pre";
+              opre.style.maxHeight = "min(50vh, 28rem)";
+              opre.textContent = blob.length <= 120000 ? blob : truncateText(blob, 120000);
+              od.appendChild(os);
+              od.appendChild(opre);
+              li.appendChild(od);
+            } else {
+              var pre = document.createElement("pre");
+              pre.style.margin = "0.25rem 0 0";
+              pre.style.whiteSpace = "pre-wrap";
+              pre.style.wordBreak = "break-word";
+              pre.style.fontSize = "0.75rem";
+              pre.textContent = truncateText(blob, 8000);
+              li.appendChild(pre);
+            }
             ul.appendChild(li);
           });
           container.appendChild(ul);
@@ -2713,6 +2977,36 @@
           el.apiKey.value = "";
           sessionStorage.removeItem(KEY_STORAGE);
           setStatus("Key cleared.");
+        };
+        document.getElementById("cleanLocalChatAndSessions").onclick = function () {
+          if (
+            !window.confirm(
+              "Remove all saved chats and run sessions from this browser? This cannot be undone.",
+            )
+          ) {
+            return;
+          }
+          try {
+            localStorage.removeItem(CHAT_SESSIONS_KEY);
+            localStorage.removeItem(AGENT_SESSIONS_KEY);
+          } catch (_) {}
+          closeChatRunEventStream();
+          closeAgentRunEventStream();
+          clearAgentRunLiveLog();
+          try {
+            newSession();
+          } catch (_) {}
+          try {
+            newChatSession();
+          } catch (_) {}
+          try {
+            el.inspectSessionId.value = el.chatSessionId.value.trim();
+            el.inspectRunId.value = "";
+            el.inspectSessionOut.innerHTML = "";
+            el.inspectSessionOut.hidden = true;
+            el.inspectRunOut.textContent = "";
+          } catch (_) {}
+          setStatus("Saved chats and run sessions cleared on this device.");
         };
         document.getElementById("reloadAgents").onclick = reloadAgents;
         document.getElementById("newSession").onclick = newSession;

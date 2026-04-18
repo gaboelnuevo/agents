@@ -12,12 +12,15 @@ export interface PlannerModelEntry {
   strengths: string[];
   recommended: string[];
   avoid: string[];
+  sourceRoles?: string[];
 }
 
 /**
- * Default catalog for `list_available_models`. **Ids are API `model` strings** — verify against
- * [Anthropic](https://docs.anthropic.com/en/docs/about-claude/models) and
- * [OpenAI](https://platform.openai.com/docs/models) when upgrading; providers add dated snapshots over time.
+ * Optional example catalog for `list_available_models`.
+ *
+ * This package does not assume these ids exist in your deployment. If you use a custom endpoint,
+ * proxy, or self-hosted adapter, prefer `registerDynamicPlannerTools({ resolveAvailableModels })`
+ * or pass your own `modelCatalog`.
  */
 export const DEFAULT_PLANNER_MODEL_CATALOG: readonly PlannerModelEntry[] = [
   {
@@ -98,8 +101,9 @@ export const DEFAULT_MODEL_SELECTION_GUIDE: Readonly<Record<string, string>> = {
 
 export function filterPlannerModelsByProvider(
   catalog: readonly PlannerModelEntry[],
-  provider: "anthropic" | "openai" | "all",
+  provider?: string,
 ): PlannerModelEntry[] {
-  if (provider === "all") return [...catalog];
-  return catalog.filter((m) => m.provider === provider);
+  const normalized = provider?.trim().toLowerCase();
+  if (!normalized || normalized === "all") return [...catalog];
+  return catalog.filter((m) => m.provider.trim().toLowerCase() === normalized);
 }

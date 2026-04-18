@@ -1,5 +1,18 @@
 import type { Run } from "@opencoreagents/core";
 
+/** Compact summary of a **`Run`** for job payloads, tools, and HTTP JSON. */
+export interface EngineRunSummary {
+  status: Run["status"];
+  runId: string;
+  /** Last **`result`** step **`content`** in **`run.history`**, if any. */
+  reply: string | undefined;
+  /**
+   * Copy of **`run.state.failedReason`** when set (trimmed), else **`undefined`**.
+   * Always present on the object so callers can read **`summary.failedReason`** without optional chaining quirks.
+   */
+  failedReason: string | undefined;
+}
+
 /**
  * Narrow full **`Run`** history for job **`returnvalue`** and HTTP responses.
  *
@@ -9,13 +22,11 @@ import type { Run } from "@opencoreagents/core";
  * is normally the assistant text for the latest user turn. If you need a stable view after a queued
  * job finishes, prefer loading the run from **`RunStore`** (authoritative after the worker persists)
  * before calling this helper.
+ *
+ * **`failedReason`** is taken from **`run.state.failedReason`** (typically when **`status`** is **`failed`**).
+ * A **`failed`** run may still have a **`reply`** if the history contains an earlier **`result`** before failure.
  */
-export function summarizeEngineRun(run: Run): {
-  status: Run["status"];
-  runId: string;
-  reply: string | undefined;
-  failedReason?: string;
-} {
+export function summarizeEngineRun(run: Run): EngineRunSummary {
   const result = run.history.filter((h) => h.type === "result").pop();
   const failedReason =
     typeof run.state.failedReason === "string" && run.state.failedReason.trim()
@@ -25,7 +36,7 @@ export function summarizeEngineRun(run: Run): {
     status: run.status,
     runId: run.runId,
     reply: result && typeof result.content === "string" ? result.content : undefined,
-    ...(failedReason !== undefined ? { failedReason } : {}),
+    failedReason,
   };
 }
 

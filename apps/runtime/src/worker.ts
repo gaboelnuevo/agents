@@ -84,6 +84,7 @@ async function main(): Promise<void> {
   await registerRuntimeInvokePlannerTool({
     definitionsStore: store,
     config,
+    runStore,
     enqueueRun,
     defaultPlannerAgentId: config.planner.defaultAgent.id,
   });
