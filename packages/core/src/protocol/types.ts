@@ -42,6 +42,10 @@ export interface Run {
      * Text from each **`continue`** (new user turn on a **`completed`** run), in order — not duplicated in **`history`**.
      */
     continueInputs?: string[];
+    /**
+     * Last engine error message when **`status`** was persisted as **`failed`** (set in {@link RunBuilder} catch).
+     */
+    failedReason?: string;
     [key: string]: unknown;
   };
 }

@@ -21,7 +21,7 @@ export async function registerRuntimeFetchRunTool(options: { runStore: RunStore 
     scope: "global",
     description:
       "Read a persisted engine **run** by **`runId`** (same **`projectId`** as the caller). " +
-      "Use on a **later chat turn** after **`invoke_planner`** returned a **`runId`**: returns **`status`**, **`reply`** (last protocol result text), and **`historyStepCount`**. " +
+      "Use on a **later chat turn** after **`invoke_planner`** returned a **`runId`**: returns **`status`**, **`reply`** (last protocol result text), **`historyStepCount`**, and **`failedReason`** when the run ended in **`failed`**. " +
       "If the run is still **running** or **waiting**, say so and suggest the user wait or call this tool again.",
     inputSchema: {
       type: "object",
@@ -57,6 +57,7 @@ export async function registerRuntimeFetchRunTool(options: { runStore: RunStore 
         sessionId: run.sessionId,
         status: summary.status,
         reply: summary.reply,
+        ...(summary.failedReason !== undefined ? { failedReason: summary.failedReason } : {}),
         historyStepCount: run.history.length,
       };
     },

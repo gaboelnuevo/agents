@@ -14,12 +14,18 @@ export function summarizeEngineRun(run: Run): {
   status: Run["status"];
   runId: string;
   reply: string | undefined;
+  failedReason?: string;
 } {
   const result = run.history.filter((h) => h.type === "result").pop();
+  const failedReason =
+    typeof run.state.failedReason === "string" && run.state.failedReason.trim()
+      ? run.state.failedReason.trim()
+      : undefined;
   return {
     status: run.status,
     runId: run.runId,
     reply: result && typeof result.content === "string" ? result.content : undefined,
+    ...(failedReason !== undefined ? { failedReason } : {}),
   };
 }
 
@@ -34,10 +40,11 @@ export interface RuntimeRestRunListItem {
   historyStepCount: number;
   userInput?: string;
   reply?: string;
+  failedReason?: string;
 }
 
 export function summarizeRunListEntry(run: Run): RuntimeRestRunListItem {
-  const { reply } = summarizeEngineRun(run);
+  const { reply, failedReason } = summarizeEngineRun(run);
   const userInput =
     typeof run.state.userInput === "string" ? run.state.userInput : undefined;
   const row: RuntimeRestRunListItem = {
@@ -51,5 +58,6 @@ export function summarizeRunListEntry(run: Run): RuntimeRestRunListItem {
   if (run.projectId !== undefined) row.projectId = run.projectId;
   if (userInput !== undefined) row.userInput = userInput;
   if (reply !== undefined) row.reply = reply;
+  if (failedReason !== undefined) row.failedReason = failedReason;
   return row;
 }

@@ -16,6 +16,10 @@ function throwIfSessionExpired(session: Session): void {
   }
 }
 
+function attachPersistedExecuteFailureReason(run: Run, error: unknown): void {
+  run.state.failedReason = error instanceof Error ? error.message : String(error);
+}
+
 function lastWaitStepFromRun(run: Run): Extract<Step, { type: "wait" }> | undefined {
   for (let i = run.history.length - 1; i >= 0; i--) {
     const m = run.history[i]!;
@@ -260,6 +264,7 @@ export class RunBuilder implements PromiseLike<Run> {
       run.state.pending = null;
       run.state.iteration = 0;
       run.state.parseAttempts = 0;
+      delete run.state.failedReason;
       resumeMessages = [
         {
           role: "user",
@@ -346,6 +351,7 @@ export class RunBuilder implements PromiseLike<Run> {
       });
     } catch (e) {
       if (cfg.runStore) {
+        attachPersistedExecuteFailureReason(run, e);
         await this.persistExecuteFailure(cfg.runStore, run, failureCasForPrimaryExecute());
       }
       throw e;
@@ -386,12 +392,13 @@ export class RunBuilder implements PromiseLike<Run> {
             },
           ],
         });
-      } catch (e) {
-        if (cfg.runStore) {
-          await this.persistExecuteFailure(cfg.runStore, result, "waiting");
-        }
-        throw e;
+    } catch (e) {
+      if (cfg.runStore) {
+        attachPersistedExecuteFailureReason(result, e);
+        await this.persistExecuteFailure(cfg.runStore, result, "waiting");
       }
+      throw e;
+    }
 
       if (cfg.runStore) {
         await this.persistAfterExecute(cfg.runStore, result, {

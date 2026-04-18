@@ -8,7 +8,7 @@
 
 1. **`cd apps/runtime`** — copy **`config/docker.stack.example.yaml`** → **`config/docker.stack.yaml`** and edit **`project.id`**, **`llm`**, etc. Keep **`redis.url: redis://redis:6379`** on the bundled network.
 
-2. **Secrets before first `up`:** copy **`.env.example`** → **`.env`** and set **`OPENAI_API_KEY`** / **`ANTHROPIC_API_KEY`** (and optionally **`REST_API_KEY`**). Compose loads **`.env`** into **`api`** and **`worker`** (`env_file`, optional). See [security.md](./security.md).
+2. **Secrets before first `up`:** copy **`.env.example`** → **`.env`** and set **`OPENAI_API_KEY`** / **`ANTHROPIC_API_KEY`** (and optionally **`REST_API_KEY`**). For OpenAI-compatible gateways (Ollama, proxies), set **`llm.openai.baseUrl`** in **`docker.stack.yaml`** and, if needed, one model id via **`RUNTIME_DEFAULT_LLM_MODEL`** or the per-role **`RUNTIME_*_MODEL`** vars (see [configuration.md](./configuration.md#default-llm-model-environment)). Compose loads **`.env`** into **`api`** and **`worker`** (`env_file`, optional). See [security.md](./security.md).
 
 3. From the **repository root**:
 

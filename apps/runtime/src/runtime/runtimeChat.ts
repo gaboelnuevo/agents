@@ -1,6 +1,7 @@
 import type { DynamicDefinitionsStore } from "@opencoreagents/dynamic-definitions";
 import type { AgentDefinitionPersisted } from "@opencoreagents/core";
 import type { LlmDriverKind, ResolvedRuntimeStackConfig } from "../config/types.js";
+import { readRuntimeDefaultLlmModelEnv } from "./runtimeDefaultLlmModelEnv.js";
 import { resolvePlannerSubAgentProvider } from "./runtimePlanner.js";
 import { RUNTIME_FETCH_RUN_TOOL_ID } from "./fetchRunTool.js";
 import { RUNTIME_INVOKE_PLANNER_TOOL_ID } from "./invokePlannerTool.js";
@@ -32,7 +33,7 @@ function isDefaultChatAgentDisabledByEnv(): boolean {
 }
 
 /**
- * LLM row for the default **chat** agent. Env: **`RUNTIME_CHAT_AGENT_PROVIDER`**, **`RUNTIME_CHAT_AGENT_MODEL`**, **`RUNTIME_CHAT_AGENT_TEMPERATURE`** (same **`auto`** rules as the planner orchestrator).
+ * LLM row for the default **chat** agent. Env: **`RUNTIME_CHAT_AGENT_PROVIDER`**, **`RUNTIME_CHAT_AGENT_MODEL`**, **`RUNTIME_CHAT_AGENT_TEMPERATURE`** (same **`auto`** rules as the planner orchestrator). **`RUNTIME_DEFAULT_LLM_MODEL`** applies when the chat model env is unset/`auto` and YAML has no model.
  */
 export function resolveDefaultChatAgentLlm(config: ResolvedRuntimeStackConfig): {
   provider: LlmDriverKind;
@@ -57,8 +58,10 @@ export function resolveDefaultChatAgentLlm(config: ResolvedRuntimeStackConfig): 
     envModelRaw && envModelRaw.length > 0 && envModelRaw.toLowerCase() !== "auto"
       ? envModelRaw
       : undefined;
+  const defaultModelEnv = readRuntimeDefaultLlmModelEnv();
   const model =
     envModel ??
+    defaultModelEnv ??
     (d.model && d.model.length > 0 ? d.model : undefined) ??
     FALLBACK_CHAT_AGENT_MODEL[provider];
 

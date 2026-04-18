@@ -50,6 +50,33 @@ For Docker Compose in this repo: **`cp config/docker.stack.example.yaml config/d
 
 Agents pick **`llm.provider`** from stored JSON. If `config/local.yaml` is missing, the loader suggests copying **`config/local.example.yaml`**.
 
+### Default LLM model environment
+
+Model ids for the **default seeded agents** can come from the stack (**`planner.defaultAgent.llm`**, **`planner.subAgent`**, **`chat.defaultAgent.llm`**) or from process env. **`pnpm config:env`** does **not** print these — they are ordinary **`process.env`** reads in the worker/API when building or lazy-seeding agent rows.
+
+| Variable | Role |
+|----------|------|
+| **`RUNTIME_DEFAULT_LLM_MODEL`** | Single fallback for **all three** roles below when that role’s specific env is unset or **`auto`** and YAML does **not** set a model for that role. |
+| **`RUNTIME_PLANNER_AGENT_MODEL`** | Orchestrator **`planner`** row (boot seed). |
+| **`RUNTIME_PLANNER_SUB_AGENT_MODEL`** | Default **`llm.model`** for **`spawn_agent`** when the tool omits **`llm`**. |
+| **`RUNTIME_CHAT_AGENT_MODEL`** | Default **`chat`** row (**`POST /v1/chat`**, lazy seed). |
+
+**Precedence per role:** role-specific env (if set and not **`auto`**) → **`RUNTIME_DEFAULT_LLM_MODEL`** (if set and not **`auto`**) → YAML model for that role → built-in conservative defaults (`gpt-4o` / `gpt-4o-mini`, etc., depending on role and provider).
+
+Matching **`RUNTIME_*_PROVIDER`** / **`RUNTIME_*_TEMPERATURE`** vars follow the same “specific overrides global YAML” pattern; see **`.env.example`** in **`apps/runtime`**.
+
+**Redis:** changing env or YAML does **not** rewrite an agent definition that **already exists** in Redis. Update **`PUT /v1/agents/:id`**, delete the row and restart, or use your own migration if you need existing **`planner`** / **`chat`** rows to pick up a new default model.
+
+### Planner / engine: `Exceeded parse recovery attempts`
+
+The worker’s agent engine expects **each** LLM turn to be **one JSON object** with **`type`**: `thought` \| `action` \| `wait` \| `result` (see the default planner system prompt). If the model returns plain prose, invalid JSON, or only partial markdown, the engine retries with a repair prompt; after **`maxParseRecovery`** failures the run ends with **`failedReason`: `"Exceeded parse recovery attempts"`**.
+
+Mitigations:
+
+1. **`RUNTIME_ENGINE_MAX_PARSE_RECOVERY`** — integer **0–20** (default **4**). Raise it (e.g. **`10`**) if the model is slow to comply but eventually outputs valid steps. Set in **`.env`** for both API and worker when using Compose.
+2. **Model / gateway** — Some OpenAI-compatible endpoints (including cloud models via Ollama) are chatty or wrap the step in Markdown fences. The core **`parseStep`** path tries several extracts: full/embedded **```** blocks (with or without a newline after **`json`**), the first **brace-balanced** `{ … }` object (ignores `{` / `}` inside JSON strings), and a **single-element JSON array** wrapping the step. If failures persist, try a stronger instruction-following model or lower **temperature** (**`planner.defaultAgent.llm.temperature`** / **`RUNTIME_PLANNER_AGENT_TEMPERATURE`**). Reserved default ids **`planner`** / **`chat`** are tuned via the stack and env, not **`PUT /v1/agents`**.
+3. **Inspect output** — Check the run **`history`** / worker logs for the assistant **`content`** on the last turns to see what the model actually returned.
+
 ## OpenClaw (`openclaw` in stack file)
 
 If you omit the whole **`openclaw`** block, the merge defaults are **`enabled: true`** and **`skillsDirs: ["./skills"]`** (paths resolve from the stack file’s directory). For **`config/local.yaml`**, **`../skills`** points at **`apps/runtime/skills`** in this repo.

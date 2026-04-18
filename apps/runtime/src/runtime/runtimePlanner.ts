@@ -6,6 +6,7 @@ import {
 } from "@opencoreagents/dynamic-planner";
 import type { AgentDefinitionPersisted, RunStore } from "@opencoreagents/core";
 import type { LlmDriverKind, ResolvedLlmStackConfig, ResolvedRuntimeStackConfig } from "../config/types.js";
+import { readRuntimeDefaultLlmModelEnv } from "./runtimeDefaultLlmModelEnv.js";
 
 /**
  * When `spawn_agent` does not pass `llm`, these ids are used. Kept **conservative** so they work on
@@ -68,7 +69,7 @@ export function resolvePlannerSubAgentProvider(
  * Resolves `defaultSubAgentLlm` for {@link registerDynamicPlannerTools}.
  *
  * - **Provider:** YAML `planner.subAgent.provider`, or env `RUNTIME_PLANNER_SUB_AGENT_PROVIDER`. Use **`auto`** or omit to infer from API keys + `llm.defaultProvider`.
- * - **Model:** env `RUNTIME_PLANNER_SUB_AGENT_MODEL`, else YAML `planner.subAgent.model`. Use **`auto`** or omit to use {@link FALLBACK_SUB_AGENT_MODEL} for the resolved provider.
+ * - **Model:** env `RUNTIME_PLANNER_SUB_AGENT_MODEL`, else `RUNTIME_DEFAULT_LLM_MODEL`, else YAML `planner.subAgent.model`. Use **`auto`** or omit (after those) to use {@link FALLBACK_SUB_AGENT_MODEL} for the resolved provider.
  * - **Temperature:** env `RUNTIME_PLANNER_SUB_AGENT_TEMPERATURE` (number), else YAML `planner.subAgent.temperature`, else `0.2`.
  *
  * **Custom endpoint:** `llm.openai.baseUrl` / `llm.anthropic.baseUrl` are applied in **`buildLlmStackFromConfig`**
@@ -102,8 +103,10 @@ export function resolvePlannerSubAgentDefaultLlm(
     envModelRaw && envModelRaw.length > 0 && envModelRaw.toLowerCase() !== "auto"
       ? envModelRaw
       : undefined;
+  const defaultModelEnv = readRuntimeDefaultLlmModelEnv();
   const model =
     envModel ??
+    defaultModelEnv ??
     (sub.model && sub.model.length > 0 ? sub.model : undefined) ??
     FALLBACK_SUB_AGENT_MODEL[provider];
 
@@ -130,7 +133,7 @@ function isDefaultPlannerAgentDisabledByEnv(): boolean {
 
 /**
  * LLM for the **orchestrator** agent row (`planner.defaultAgent`), not sub-agents.
- * Env: `RUNTIME_PLANNER_AGENT_PROVIDER`, `RUNTIME_PLANNER_AGENT_MODEL`, `RUNTIME_PLANNER_AGENT_TEMPERATURE` (same `auto` rules as sub-agent envs).
+ * Env: `RUNTIME_PLANNER_AGENT_PROVIDER`, `RUNTIME_PLANNER_AGENT_MODEL`, `RUNTIME_PLANNER_AGENT_TEMPERATURE` (same `auto` rules as sub-agent envs). Model also falls back to `RUNTIME_DEFAULT_LLM_MODEL` when the planner-specific model env is unset/`auto` and YAML has no model.
  */
 export function resolveDefaultPlannerOrchestratorLlm(
   config: ResolvedRuntimeStackConfig,
@@ -157,8 +160,10 @@ export function resolveDefaultPlannerOrchestratorLlm(
     envModelRaw && envModelRaw.length > 0 && envModelRaw.toLowerCase() !== "auto"
       ? envModelRaw
       : undefined;
+  const defaultModelEnv = readRuntimeDefaultLlmModelEnv();
   const model =
     envModel ??
+    defaultModelEnv ??
     (d.model && d.model.length > 0 ? d.model : undefined) ??
     FALLBACK_PLANNER_ORCHESTRATOR_MODEL[provider];
 

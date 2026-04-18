@@ -606,6 +606,7 @@ describe("engine", () => {
     await expect(agent.continueRun(first.runId, "follow up")).rejects.toThrow(StepSchemaError);
     const stored = await store.load(first.runId);
     expect(stored?.status).toBe("failed");
+    expect(String(stored?.state.failedReason ?? "")).toContain("Exceeded parse recovery");
   });
 
   it("continueRun after failed keeps same runId and history for the next turn", async () => {
@@ -686,6 +687,7 @@ describe("engine", () => {
     ).rejects.toThrow(StepSchemaError);
     const stored = await store.load(waiting.runId);
     expect(stored?.status).toBe("failed");
+    expect(String(stored?.state.failedReason ?? "")).toContain("Exceeded parse recovery");
   });
 
   it("resume rejects when sessionId does not match stored run", async () => {

@@ -45,4 +45,16 @@ describe("resolveDefaultChatAgentLlm", () => {
     };
     expect(resolveDefaultChatAgentLlm(config).model).toBe("gpt-custom");
   });
+
+  it("uses RUNTIME_DEFAULT_LLM_MODEL when chat env model is unset", () => {
+    vi.stubEnv("RUNTIME_DEFAULT_LLM_MODEL", "kimi-k2.5:cloud");
+    const config: ResolvedRuntimeStackConfig = {
+      ...defaultStackConfig,
+      llm: {
+        ...defaultStackConfig.llm,
+        openai: { apiKey: "k", baseUrl: "" },
+      },
+    };
+    expect(resolveDefaultChatAgentLlm(config).model).toBe("kimi-k2.5:cloud");
+  });
 });

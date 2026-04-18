@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { resolvePlannerSubAgentProvider } from "../src/runtime/runtimePlanner.js";
-import type { ResolvedLlmStackConfig } from "../src/config/types.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { defaultStackConfig } from "../src/config/defaults.js";
+import type { ResolvedLlmStackConfig, ResolvedRuntimeStackConfig } from "../src/config/types.js";
+import {
+  resolveDefaultPlannerOrchestratorLlm,
+  resolvePlannerSubAgentDefaultLlm,
+  resolvePlannerSubAgentProvider,
+} from "../src/runtime/runtimePlanner.js";
 
 function llm(partial: Partial<ResolvedLlmStackConfig>): ResolvedLlmStackConfig {
   return {
@@ -58,5 +63,37 @@ describe("resolvePlannerSubAgentProvider", () => {
       anthropic: { apiKey: "", baseUrl: "" },
     });
     expect(resolvePlannerSubAgentProvider(cfg)).toBe("anthropic");
+  });
+});
+
+describe("RUNTIME_DEFAULT_LLM_MODEL", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function baseConfig(): ResolvedRuntimeStackConfig {
+    return {
+      ...defaultStackConfig,
+      llm: {
+        ...defaultStackConfig.llm,
+        openai: { apiKey: "k", baseUrl: "" },
+      },
+    };
+  }
+
+  it("applies to planner orchestrator when planner model env is unset", () => {
+    vi.stubEnv("RUNTIME_DEFAULT_LLM_MODEL", "kimi-k2.5:cloud");
+    expect(resolveDefaultPlannerOrchestratorLlm(baseConfig()).model).toBe("kimi-k2.5:cloud");
+  });
+
+  it("does not override explicit RUNTIME_PLANNER_AGENT_MODEL", () => {
+    vi.stubEnv("RUNTIME_DEFAULT_LLM_MODEL", "kimi-k2.5:cloud");
+    vi.stubEnv("RUNTIME_PLANNER_AGENT_MODEL", "gpt-4o");
+    expect(resolveDefaultPlannerOrchestratorLlm(baseConfig()).model).toBe("gpt-4o");
+  });
+
+  it("applies to sub-agent defaults when RUNTIME_PLANNER_SUB_AGENT_MODEL is unset", () => {
+    vi.stubEnv("RUNTIME_DEFAULT_LLM_MODEL", "kimi-k2.5:cloud");
+    expect(resolvePlannerSubAgentDefaultLlm(baseConfig()).model).toBe("kimi-k2.5:cloud");
   });
 });

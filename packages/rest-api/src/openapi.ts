@@ -165,14 +165,16 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
         },
       },
       "202": {
-        description: "Job accepted — poll `GET /jobs/{jobId}`",
+        description:
+          "Job accepted — poll `GET /jobs/{jobId}`. **`runId`** is pre-assigned so clients can subscribe to **`GET /v1/runs/{runId}/stream`** while the worker runs.",
         content: {
           "application/json": {
             schema: {
               type: "object",
-              required: ["jobId", "sessionId", "projectId", "statusUrl"],
+              required: ["jobId", "runId", "sessionId", "projectId", "statusUrl"],
               properties: {
                 jobId: { type: "string" },
+                runId: { type: "string" },
                 sessionId: { type: "string" },
                 projectId: { type: "string" },
                 statusUrl: { type: "string" },
@@ -777,6 +779,10 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
                     continueInputs: { type: "array", items: { type: "string" } },
                     waitReason: { type: "string" },
                     reply: { type: "string" },
+                    failedReason: {
+                      type: "string",
+                      description: "Engine error message when `status` is `failed` (persisted on the run).",
+                    },
                     iteration: { type: "number" },
                     historyStepCount: { type: "number" },
                     history: { type: "array", items: { type: "object", additionalProperties: true } },

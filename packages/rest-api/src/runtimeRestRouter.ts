@@ -169,7 +169,9 @@ function optionalApiKeyAuth(config: {
     }
     const bearer = req.header("authorization")?.replace(/^Bearer\s+/i, "")?.trim();
     const headerKey = req.header("x-api-key")?.trim();
-    const key = bearer || headerKey || "";
+    const qKey =
+      typeof req.query.apiKey === "string" && req.query.apiKey.trim() ? req.query.apiKey.trim() : "";
+    const key = bearer || headerKey || qKey || "";
     if (key !== expected) {
       res.status(401).json({ error: "unauthorized" });
       return;
@@ -180,6 +182,7 @@ function optionalApiKeyAuth(config: {
 
 /**
  * Same **`Authorization: Bearer …`** / **`X-Api-Key`** checks as {@link createRuntimeRestRouter}’s internal middleware.
+ * Also accepts **`?apiKey=`** (same value) so browser **`EventSource`** can authenticate SSE routes that cannot send headers.
  * Use to protect routes **outside** that router (e.g. admin mounts) with the same secret.
  */
 export function createOptionalRuntimeRestApiKeyMiddleware(options: {
@@ -612,10 +615,12 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       const wait = parseWait(req);
       let jobId = "";
       try {
+        const runId = randomUUID();
         const job = await dispatch.engine.addRun({
           projectId,
           agentId,
           sessionId,
+          runId,
           userInput: body.message.trim(),
         });
         jobId = job.id ?? "";
@@ -628,6 +633,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
           const url = statusUrl(req, jobId);
           res.status(202).json({
             jobId,
+            runId,
             sessionId,
             projectId,
             statusUrl: url,
@@ -1145,6 +1151,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
           const userInput = typeof r.state.userInput === "string" ? r.state.userInput : undefined;
           const resumeInputs = resumeInputsFromState(r);
           const continueInputs = continueInputsFromState(r);
+          const sum = summarizeEngineRun(r);
           const base = {
             runId: r.runId,
             agentId: r.agentId,
@@ -1155,7 +1162,8 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             ...(resumeInputs ? { resumeInputs } : {}),
             ...(continueInputs ? { continueInputs } : {}),
             historyStepCount: merged.length,
-            reply: resultText(r),
+            reply: sum.reply,
+            ...(sum.failedReason !== undefined ? { failedReason: sum.failedReason } : {}),
             ...(r.status === "waiting" ? { waitReason: lastWaitReason(r) } : {}),
             iteration: r.state.iteration,
           };
@@ -1246,6 +1254,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       const merged = wantTimeline ? historyWithResumeTimeline(run) : null;
       const resumeInputs = resumeInputsFromState(run);
       const continueInputs = continueInputsFromState(run);
+      const sum = summarizeEngineRun(run);
 
       res.json({
         runId: run.runId,
@@ -1257,7 +1266,8 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         ...(resumeInputs ? { resumeInputs } : {}),
         ...(continueInputs ? { continueInputs } : {}),
         ...(run.status === "waiting" ? { waitReason: lastWaitReason(run) } : {}),
-        reply: resultText(run),
+        reply: sum.reply,
+        ...(sum.failedReason !== undefined ? { failedReason: sum.failedReason } : {}),
         iteration: run.state.iteration,
         historyStepCount: merged ? merged.length : run.history.length,
         ...(wantTimeline && merged ? { history: merged } : {}),

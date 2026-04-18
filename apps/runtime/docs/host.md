@@ -50,6 +50,7 @@ pnpm --filter @opencoreagents/runtime start:worker
 The stack file is merged, then **`${VAR}`** placeholders are expanded from **`process.env`** (see [configuration.md](./configuration.md)).
 
 - **LLM:** export **`OPENAI_API_KEY`** / **`ANTHROPIC_API_KEY`** (or whatever names you used in **`llm.*.apiKey`** in YAML). **`pnpm config:env` does not print these keys** — it only helps with wire settings like port and Redis URL.
+- **Default model ids:** optional **`RUNTIME_DEFAULT_LLM_MODEL`** (one id for default **`planner`**, **`spawn_agent`** sub-agent defaults, and **`chat`**) or per-role **`RUNTIME_PLANNER_AGENT_MODEL`**, **`RUNTIME_PLANNER_SUB_AGENT_MODEL`**, **`RUNTIME_CHAT_AGENT_MODEL`**. Precedence and Redis caveats: [configuration.md](./configuration.md#default-llm-model-environment).
 - **HTTP API:** **`REST_API_KEY`** — if **unset or empty**, the server binds **`127.0.0.1`** only (good for local dev). If **set**, the server uses **`server.host`** from the stack (often **`0.0.0.0`**). Unlike Compose, nothing sets a default key on the host — you choose. Details: [security.md](./security.md).
 
 Use the **same** env in **both** terminals (server and worker) for LLM and shared settings.

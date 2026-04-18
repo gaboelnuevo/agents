@@ -548,6 +548,29 @@
         opacity: 0.85;
         font-style: italic;
       }
+      .live-event-log {
+        margin-top: 0.45rem;
+        max-height: 11rem;
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        line-height: 1.35;
+        color: var(--muted);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.4rem 0.55rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .live-event-log:empty {
+        display: none;
+      }
+      .live-event-line + .live-event-line {
+        margin-top: 0.2rem;
+        padding-top: 0.2rem;
+        border-top: 1px dashed var(--border);
+      }
       .chat-composer {
         display: flex;
         gap: 0.65rem;
@@ -873,6 +896,15 @@
           <p style="margin: 0.75rem 0 0; font-size: 0.8rem; color: var(--muted)">
             <strong>Last run ID:</strong> <span id="runIdLabel">—</span>
           </p>
+          <label class="row" style="margin-top: 0.65rem; align-items: flex-start; gap: 0.45rem">
+            <input type="checkbox" id="agentLiveSse" checked style="margin-top: 0.2rem" />
+            <span style="font-size: 0.78rem; color: var(--muted); line-height: 1.35">
+              Stream live engine steps (thoughts, tools, LLM) over SSE. Needs
+              <code>runEvents.redis: true</code> in the stack, worker running, and API key in the field above (sent as
+              <code>?apiKey=</code> for EventSource).
+            </span>
+          </label>
+          <div id="agentRunLiveLog" class="live-event-log" aria-live="polite"></div>
         </div>
       </div>
 
@@ -892,7 +924,11 @@
               Remove
             </button>
           </div>
-          <div class="row chat-toolbar">
+          <div class="row chat-toolbar" style="flex-wrap: wrap; align-items: center; gap: 0.5rem">
+            <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--muted)">
+              <input type="checkbox" id="chatLiveSse" checked />
+              Live steps (SSE)
+            </label>
             <button type="button" class="secondary" id="newChatSession" title="Start a new thread with a new ID">
               New conversation
             </button>
@@ -1056,12 +1092,18 @@
           sidebarConversationsRoot: document.getElementById("sidebarConversationsRoot"),
           sidebarChatList: document.getElementById("sidebarChatList"),
           sidebarAgentList: document.getElementById("sidebarAgentList"),
+          agentLiveSse: document.getElementById("agentLiveSse"),
+          chatLiveSse: document.getElementById("chatLiveSse"),
+          agentRunLiveLog: document.getElementById("agentRunLiveLog"),
         };
 
         let lastRunId = "";
         let lastAgentId = "";
         let lastChatRunId = "";
         let chatPendingNode = null;
+        /** Browser SSE for `/v1/runs/:runId/stream` (engine hooks). */
+        let agentRunEventSource = null;
+        let chatRunEventSource = null;
 
         const CHAT_SESSIONS_KEY = "opencore-runtime-ui-chat-sessions-v1";
         const AGENT_SESSIONS_KEY = "opencore-runtime-ui-agent-sessions-v1";
@@ -1472,6 +1514,177 @@
           return h;
         }
 
+        function sseApiKeyQuery() {
+          const k = el.apiKey.value.trim();
+          return k ? "&apiKey=" + encodeURIComponent(k) : "";
+        }
+
+        function formatRunEventPayload(obj) {
+          if (!obj || typeof obj !== "object") return String(obj);
+          const kind = obj.kind;
+          if (kind === "thought" && obj.step && typeof obj.step.content === "string") {
+            return "thought · " + truncateText(obj.step.content, 200);
+          }
+          if (kind === "action" && obj.step && typeof obj.step.tool === "string") {
+            return "action · " + obj.step.tool;
+          }
+          if (kind === "observation") {
+            try {
+              return "observation · " + truncateText(JSON.stringify(obj.observation), 160);
+            } catch (_) {
+              return "observation";
+            }
+          }
+          if (kind === "wait" && obj.step && typeof obj.step.reason === "string") {
+            return "wait · " + truncateText(obj.step.reason, 120);
+          }
+          if (kind === "llm_parse") {
+            return "llm_parse · " + String(obj.outcome || "");
+          }
+          if (kind === "llm_response") {
+            const prev = obj.contentPreview ? String(obj.contentPreview) : "";
+            return "llm · " + (prev ? truncateText(prev, 120) : "…");
+          }
+          if (kind === "dispatch_done") {
+            return "dispatch_done · " + String(obj.status || "");
+          }
+          if (kind === "dispatch_error") {
+            return "dispatch_error · " + String(obj.error || "");
+          }
+          if (kind === "stream_error") {
+            return "stream_error · " + String(obj.error || "");
+          }
+          return kind ? String(kind) : truncateText(JSON.stringify(obj), 160);
+        }
+
+        function clearAgentRunLiveLog() {
+          if (el.agentRunLiveLog) el.agentRunLiveLog.textContent = "";
+        }
+
+        function appendAgentRunLiveLine(text) {
+          if (!el.agentRunLiveLog) return;
+          const line = document.createElement("div");
+          line.className = "live-event-line";
+          line.textContent =
+            new Date().toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }) +
+            " " +
+            text;
+          el.agentRunLiveLog.appendChild(line);
+          el.agentRunLiveLog.scrollTop = el.agentRunLiveLog.scrollHeight;
+        }
+
+        function closeAgentRunEventStream() {
+          if (agentRunEventSource) {
+            agentRunEventSource.close();
+            agentRunEventSource = null;
+          }
+        }
+
+        function closeChatRunEventStream() {
+          if (chatRunEventSource) {
+            chatRunEventSource.close();
+            chatRunEventSource = null;
+          }
+        }
+
+        function startAgentRunEventStream(runId, sessionId) {
+          closeAgentRunEventStream();
+          if (!el.agentLiveSse || !el.agentLiveSse.checked) return;
+          if (!runId || !sessionId || typeof EventSource === "undefined") return;
+          const url =
+            "/v1/runs/" +
+            encodeURIComponent(runId) +
+            "/stream?sessionId=" +
+            encodeURIComponent(sessionId) +
+            sseApiKeyQuery();
+          var es;
+          try {
+            es = new EventSource(url);
+          } catch (e) {
+            appendAgentRunLiveLine("Could not open EventSource: " + String(e.message || e));
+            return;
+          }
+          agentRunEventSource = es;
+          var closed = false;
+          var finalize = function () {
+            if (closed) return;
+            closed = true;
+            closeAgentRunEventStream();
+          };
+          var errOnce = false;
+          es.addEventListener("run", function (ev) {
+            var o = null;
+            try {
+              o = JSON.parse(ev.data);
+              appendAgentRunLiveLine(formatRunEventPayload(o));
+            } catch (_) {
+              appendAgentRunLiveLine(String(ev.data));
+            }
+            if (o && (o.kind === "dispatch_done" || o.kind === "dispatch_error")) {
+              finalize();
+            }
+          });
+          es.onerror = function () {
+            if (errOnce) return;
+            errOnce = true;
+            appendAgentRunLiveLine(
+              "SSE disconnected (enable runEvents.redis in stack, set API key, or check network).",
+            );
+            finalize();
+          };
+        }
+
+        function startChatRunEventStream(runId, sessionId) {
+          closeChatRunEventStream();
+          if (!el.chatLiveSse || !el.chatLiveSse.checked) return;
+          if (!runId || !sessionId || typeof EventSource === "undefined") return;
+          const url =
+            "/v1/runs/" +
+            encodeURIComponent(runId) +
+            "/stream?sessionId=" +
+            encodeURIComponent(sessionId) +
+            sseApiKeyQuery();
+          var es;
+          try {
+            es = new EventSource(url);
+          } catch (e) {
+            appendChatBubble("system", "[engine] " + String(e.message || e));
+            return;
+          }
+          chatRunEventSource = es;
+          var errOnce = false;
+          es.addEventListener("run", function (ev) {
+            var o = null;
+            try {
+              o = JSON.parse(ev.data);
+              appendChatBubble("system", "[engine] " + formatRunEventPayload(o));
+              scrollChatToBottom();
+            } catch (_) {
+              appendChatBubble("system", "[engine] " + String(ev.data));
+              scrollChatToBottom();
+            }
+            if (o && (o.kind === "dispatch_done" || o.kind === "dispatch_error")) {
+              es.close();
+              chatRunEventSource = null;
+            }
+          });
+          es.onerror = function () {
+            if (errOnce) return;
+            errOnce = true;
+            appendChatBubble(
+              "system",
+              "[engine] Live stream disconnected (runEvents.redis + API key, or blocked by browser).",
+            );
+            scrollChatToBottom();
+            es.close();
+            chatRunEventSource = null;
+          };
+        }
+
         function setStatus(text, isErr) {
           el.status.textContent = text || "";
           el.status.classList.toggle("err", Boolean(isErr));
@@ -1609,6 +1822,21 @@
           }
         }
 
+        /** UUID v4; falls back when `crypto.randomUUID` is missing (non-secure HTTP, e.g. http://LAN:3010). */
+        function generateConversationId() {
+          try {
+            if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+              return crypto.randomUUID();
+            }
+          } catch (_) {}
+          var tpl = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+          return tpl.replace(/[xy]/g, function (c) {
+            var r = (Math.random() * 16) | 0;
+            var v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+        }
+
         async function reloadAgents() {
           setStatus("Loading agent list…");
           try {
@@ -1652,7 +1880,13 @@
         }
 
         function newSession() {
-          const id = crypto.randomUUID();
+          if (!el.sessionId) {
+            setStatus("Conversation ID field is missing from the page.", true);
+            return;
+          }
+          closeAgentRunEventStream();
+          clearAgentRunLiveLog();
+          const id = generateConversationId();
           el.sessionId.value = id;
           lastRunId = "";
           el.runIdLabel.textContent = "—";
@@ -1673,7 +1907,12 @@
         }
 
         function newChatSession() {
-          const id = crypto.randomUUID();
+          if (!el.chatSessionId) {
+            setStatus("Chat conversation ID field is missing from the page.", true);
+            return;
+          }
+          closeChatRunEventStream();
+          const id = generateConversationId();
           el.chatSessionId.value = id;
           lastChatRunId = "";
           el.chatRunIdLabel.textContent = "Last run: —";
@@ -1746,6 +1985,9 @@
             return;
           }
 
+          closeAgentRunEventStream();
+          clearAgentRunLiveLog();
+
           let agStore = readAgentStore();
           if (!findAgentSession(agStore, sessionId)) {
             agStore.sessions.unshift({
@@ -1788,8 +2030,13 @@
             showJson(data);
 
             if (res.status === 202 && data.jobId && !el.wait.checked) {
+              if (typeof data.runId === "string" && data.runId.trim()) {
+                setRunId(data.runId.trim(), agentId);
+                startAgentRunEventStream(data.runId.trim(), sessionId);
+              }
               setStatus("Job queued, waiting for result…");
               const job = await pollJob(data.jobId);
+              closeAgentRunEventStream();
               if (job && job.run) {
                 setRunId(job.run.runId, agentId);
                 showReply(job.run.reply);
@@ -1852,6 +2099,7 @@
           el.chatMessage.value = "";
           setStatus("Sending…");
           showReply("");
+          closeChatRunEventStream();
 
           const wait = el.wait.checked;
           const qs = wait ? "?wait=1" : "";
@@ -1874,8 +2122,12 @@
             }
 
             if (res.status === 202 && data.jobId && !wait) {
+              if (typeof data.runId === "string" && data.runId.trim()) {
+                startChatRunEventStream(data.runId.trim(), sessionId);
+              }
               setStatus("Waiting for assistant…");
               const job = await pollJob(data.jobId);
+              closeChatRunEventStream();
               removeChatPending();
               if (job && job.run) {
                 if (job.run.runId) setChatRunId(job.run.runId);
@@ -1983,6 +2235,7 @@
           if (data.agentId) parts.push("agent: " + data.agentId);
           if (data.status) parts.push("status: " + data.status);
           if (data.historyStepCount != null) parts.push("steps: " + data.historyStepCount);
+          if (data.failedReason) parts.push("failed: " + truncateText(String(data.failedReason), 160));
           head.textContent = parts.join(" · ");
           container.appendChild(head);
 
@@ -2092,7 +2345,7 @@
           table.className = "inspect";
           var thead = document.createElement("thead");
           var hr = document.createElement("tr");
-          ["Run ID", "Session", "Agent", "Status", "Steps", "Reply preview"].forEach(function (h) {
+          ["Run ID", "Session", "Agent", "Status", "Steps", "Reply / failure"].forEach(function (h) {
             var th = document.createElement("th");
             th.textContent = h;
             hr.appendChild(th);
@@ -2142,7 +2395,13 @@
             tr.appendChild(td3);
 
             var td4 = document.createElement("td");
-            td4.textContent = truncateText(r.reply != null ? String(r.reply) : "", 200);
+            var prevText =
+              r.status === "failed" && r.failedReason
+                ? String(r.failedReason)
+                : r.reply != null
+                  ? String(r.reply)
+                  : "";
+            td4.textContent = truncateText(prevText, 200);
             tr.appendChild(td4);
 
             tb.appendChild(tr);
@@ -2233,7 +2492,10 @@
               return;
             }
             const st = data.status || "?";
-            const lineSt = "Refreshed run — status: " + st;
+            var lineSt = "Refreshed run — status: " + st;
+            if (st === "failed" && data.failedReason) {
+              lineSt += " — " + data.failedReason;
+            }
             appendChatBubble("system", lineSt);
             persistChatMessage(sessionId, "system", lineSt);
             if (typeof data.reply === "string" && data.reply.length) {
@@ -2290,6 +2552,9 @@
             return;
           }
 
+          closeAgentRunEventStream();
+          clearAgentRunLiveLog();
+
           let agStoreCont = readAgentStore();
           if (!findAgentSession(agStoreCont, sessionId)) {
             agStoreCont.sessions.unshift({
@@ -2333,8 +2598,11 @@
             showJson(data);
 
             if (res.status === 202 && data.jobId && !el.wait.checked) {
+              const rid = typeof data.runId === "string" && data.runId.trim() ? data.runId.trim() : runId;
+              startAgentRunEventStream(rid, sessionId);
               setStatus("Continue job queued, waiting…");
               const job = await pollJob(data.jobId);
+              closeAgentRunEventStream();
               if (job && job.run) {
                 setRunId(job.run.runId, agentId);
                 showReply(job.run.reply);
@@ -2382,7 +2650,11 @@
               return;
             }
             showReply(typeof data.reply === "string" ? data.reply : "");
-            setStatus("Status: " + (data.status || "?"));
+            var stLine = "Status: " + (data.status || "?");
+            if (data.status === "failed" && data.failedReason) {
+              stLine += " — " + data.failedReason;
+            }
+            setStatus(stLine);
           } catch (e) {
             setStatus(String(e.message || e), true);
           }

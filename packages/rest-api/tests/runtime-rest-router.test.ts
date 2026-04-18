@@ -988,11 +988,14 @@ describe("createRuntimeRestRouter", () => {
 
     expect(run.body.jobId).toBe("job-xyz");
     expect(run.body.projectId).toBe("pq");
+    expect(typeof run.body.runId).toBe("string");
+    expect(run.body.runId.length).toBeGreaterThan(10);
     expect(run.body.statusUrl).toBe("/api/jobs/job-xyz");
     expect(addRun).toHaveBeenCalledWith({
       projectId: "pq",
       agentId: "qagent",
       sessionId: expect.any(String),
+      runId: run.body.runId,
       userInput: "hi",
     });
 

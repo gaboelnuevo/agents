@@ -74,6 +74,40 @@ describe("registerRuntimeFetchRunTool", () => {
     expect(runStore.load).toHaveBeenCalledWith(run.runId);
   });
 
+  it("includes failedReason when run failed with persisted engine message", async () => {
+    const run = minimalRun({
+      projectId: "p1",
+      status: "failed",
+      history: [],
+      state: {
+        iteration: 0,
+        pending: null,
+        failedReason: "Exceeded parse recovery attempts",
+      },
+    });
+    const runStore = {
+      load: vi.fn().mockResolvedValue(run),
+      save: vi.fn(),
+      saveIfStatus: vi.fn(),
+      delete: vi.fn(),
+      listByAgent: vi.fn(),
+    } as unknown as RunStore;
+
+    await registerRuntimeFetchRunTool({ runStore });
+    const runner = new ToolRunner(resolveToolRegistry("p1"), new Set([RUNTIME_FETCH_RUN_TOOL_ID]));
+
+    const out = (await runner.execute(
+      RUNTIME_FETCH_RUN_TOOL_ID,
+      { runId: run.runId },
+      ctx("p1"),
+    )) as Record<string, unknown>;
+
+    expect(out.ok).toBe(true);
+    expect(out.status).toBe("failed");
+    expect(out.failedReason).toBe("Exceeded parse recovery attempts");
+    expect(out.historyStepCount).toBe(0);
+  });
+
   it("returns ok when run has no projectId (legacy rows)", async () => {
     const run = minimalRun({ projectId: undefined });
     const runStore = {
