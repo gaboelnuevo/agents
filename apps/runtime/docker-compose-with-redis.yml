@@ -35,6 +35,7 @@ services:
     volumes:
       - ./config/docker.stack.yaml:/app/apps/runtime/config/docker.stack.yaml:ro
       - ./skills:/app/apps/runtime/config/skills:ro
+      - ./artifacts:/app/apps/runtime/config/artifacts
     depends_on:
       redis:
         condition: service_healthy
@@ -50,6 +51,7 @@ services:
     volumes:
       - ./config/docker.stack.yaml:/app/apps/runtime/config/docker.stack.yaml:ro
       - ./skills:/app/apps/runtime/config/skills:ro
+      - ./artifacts:/app/apps/runtime/config/artifacts
     depends_on:
       redis:
         condition: service_healthy

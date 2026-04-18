@@ -27,6 +27,7 @@ import { createChatRouter } from "./http/chatRouter.js";
 import { createChatSessionStreamRouter } from "./http/chatSessionStreamRouter.js";
 import { createRunEventsStreamRouter } from "./http/runEventsStreamRouter.js";
 import { buildLlmStackFromConfig } from "./runtime/llmResolver.js";
+import { registerRuntimeArtifactTool } from "./runtime/artifactTool.js";
 import { registerRuntimeFetchRunTool } from "./runtime/fetchRunTool.js";
 import { registerRuntimeInvokePlannerTool } from "./runtime/invokePlannerTool.js";
 import { ensureDefaultPlannerAgent, registerRuntimeDynamicPlanner } from "./runtime/runtimePlanner.js";
@@ -109,6 +110,7 @@ async function main(): Promise<void> {
     enqueueRun,
     config,
   });
+  await registerRuntimeArtifactTool(config.artifacts);
 
   await registerRuntimeInvokePlannerTool({
     definitionsStore: store,
@@ -166,6 +168,15 @@ async function main(): Promise<void> {
   });
 
   app.use("/ui", express.static(runtimePublicDir, { index: "index.html", extensions: ["html"] }));
+  if (config.artifacts.enabled) {
+    app.use(
+      "/artifacts",
+      express.static(config.artifacts.rootDir, {
+        index: false,
+        fallthrough: true,
+      }),
+    );
+  }
 
   app.use(
     "/v1",
@@ -270,8 +281,9 @@ async function main(): Promise<void> {
         ? "  GET /v1/chat/stream?sessionId= (SSE planner notify)"
         : "";
     const sseNote = runEventsStreamRedis ? "  GET /v1/runs/:runId/stream?sessionId= (SSE run events)" : "";
+    const artifactNote = config.artifacts.enabled ? "  GET /artifacts/* (generated artifacts)" : "";
     console.log(
-      `[opencoreagents-runtime] routes: GET /ui (playground)  GET /health (?details=1 for projectId+queue)  GET|POST plan REST + /openapi.json + /docs  GET /sessions/:sessionId/status (?light=1)  GET /runs/:id?timeline=1  /v1/definitions …${chatNote}${chatSseNote}${sseNote}`,
+      `[opencoreagents-runtime] routes: GET /ui (playground)  GET /health (?details=1 for projectId+queue)  GET|POST plan REST + /openapi.json + /docs  GET /sessions/:sessionId/status (?light=1)  GET /runs/:id?timeline=1  /v1/definitions …${chatNote}${chatSseNote}${sseNote}${artifactNote}`,
     );
     console.log(`[opencoreagents-runtime] start worker: pnpm start:worker (same RUNTIME_CONFIG / stack file)`);
   });

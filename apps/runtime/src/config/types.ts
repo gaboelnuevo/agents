@@ -71,6 +71,13 @@ export interface RuntimeStackFileConfig {
     /** Relative paths resolve from the config file’s directory. */
     skillsDirs?: string[];
   };
+  artifacts?: {
+    enabled?: boolean;
+    /** Relative paths resolve from the config file’s directory. */
+    rootDir?: string;
+    /** Optional public base URL prepended to the saved relative path. */
+    publicBaseUrl?: string;
+  };
   llm?: RuntimeLlmFileConfig;
   /**
    * Dynamic planner (`spawn_agent` default LLM when the tool omits `llm`).
@@ -135,6 +142,7 @@ export interface ResolvedRuntimeStackConfig {
   definitions: { keyPrefix: string };
   run: { waitTimeoutMs: number };
   openclaw: { enabled: boolean; skillsDirs: string[] };
+  artifacts: { enabled: boolean; rootDir: string; publicBaseUrl: string };
   llm: ResolvedLlmStackConfig;
   planner: {
     defaultAgent: {

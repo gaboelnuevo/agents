@@ -3,7 +3,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { mergeWithDefaults } from "./defaults.js";
 import { expandDeep } from "./expandPlaceholders.js";
-import { resolveSkillDirs } from "./paths.js";
+import { resolveSkillDirs, resolveStackPath } from "./paths.js";
 import { resolveStackWireSettings } from "./stackWire.js";
 import type { ResolvedRuntimeStackConfig, RuntimeStackFileConfig } from "./types.js";
 
@@ -46,7 +46,14 @@ export function loadRuntimeConfig(configPath?: string): {
   const expanded = expandDeep(merged);
   const skillsDirs = resolveSkillDirs(configFile, expanded.openclaw.skillsDirs);
   return {
-    config: { ...expanded, openclaw: { ...expanded.openclaw, skillsDirs } },
+    config: {
+      ...expanded,
+      openclaw: { ...expanded.openclaw, skillsDirs },
+      artifacts: {
+        ...expanded.artifacts,
+        rootDir: resolveStackPath(configFile, expanded.artifacts.rootDir),
+      },
+    },
     configFile,
   };
 }

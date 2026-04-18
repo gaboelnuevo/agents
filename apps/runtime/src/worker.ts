@@ -17,6 +17,7 @@ import {
 } from "@opencoreagents/core";
 import type { PlannerEnqueueOptions } from "@opencoreagents/dynamic-planner";
 import { loadStackRuntime } from "./config/stackSettings.js";
+import { registerRuntimeArtifactTool } from "./runtime/artifactTool.js";
 import { buildLlmStackFromConfig } from "./runtime/llmResolver.js";
 import { registerRuntimeFetchRunTool } from "./runtime/fetchRunTool.js";
 import { registerRuntimeInvokePlannerTool } from "./runtime/invokePlannerTool.js";
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
     enqueueRun,
     config,
   });
+  await registerRuntimeArtifactTool(config.artifacts);
 
   await registerRuntimeInvokePlannerTool({
     definitionsStore: store,

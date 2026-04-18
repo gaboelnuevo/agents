@@ -7,3 +7,5 @@ config/*.json
 .env
 .env.runtime
 .env.stack
+artifacts/
+!artifacts/.gitkeep

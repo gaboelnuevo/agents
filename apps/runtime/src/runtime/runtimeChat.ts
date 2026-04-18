@@ -20,6 +20,12 @@ export const DEFAULT_CHAT_AGENT_TOOL_IDS: readonly string[] = [
   "system_send_message",
 ];
 
+export function chatAgentToolIds(config: ResolvedRuntimeStackConfig): string[] {
+  return config.artifacts.enabled
+    ? [...DEFAULT_CHAT_AGENT_TOOL_IDS, "system_write_artifact"]
+    : [...DEFAULT_CHAT_AGENT_TOOL_IDS];
+}
+
 export const DEFAULT_CHAT_SYSTEM_PROMPT = `You are a helpful assistant for end users.
 
 - Answer directly when you can.
@@ -102,7 +108,7 @@ export async function writeDefaultChatAgentToStore(
     id,
     projectId,
     systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT + busNote,
-    tools: [...DEFAULT_CHAT_AGENT_TOOL_IDS],
+    tools: chatAgentToolIds(config),
     llm: { provider, model, temperature },
     memoryConfig: {
       shortTerm: { maxTurns: 40 },

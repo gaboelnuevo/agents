@@ -46,3 +46,10 @@ openclaw:
   enabled: true
   skillsDirs:
     - ./skills
+
+# Optional local artifact storage for planner/chat outputs.
+# Docker Compose mounts ./artifacts from the host into this relative path.
+# artifacts:
+#   enabled: true
+#   rootDir: ./artifacts
+#   publicBaseUrl: /artifacts

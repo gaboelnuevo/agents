@@ -37,6 +37,12 @@ export const DEFAULT_PLANNER_AGENT_TOOL_IDS: readonly string[] = [
   "system_send_message",
 ];
 
+export function plannerAgentToolIds(config: ResolvedRuntimeStackConfig): string[] {
+  return config.artifacts.enabled
+    ? [...DEFAULT_PLANNER_AGENT_TOOL_IDS, "system_write_artifact"]
+    : [...DEFAULT_PLANNER_AGENT_TOOL_IDS];
+}
+
 function pushConfiguredModelEntry(
   entries: PlannerModelEntry[],
   seen: Set<string>,
@@ -417,7 +423,7 @@ export async function writeDefaultPlannerAgentToStore(
     id,
     projectId,
     systemPrompt: DEFAULT_PLANNER_SYSTEM_PROMPT + busNote,
-    tools: [...DEFAULT_PLANNER_AGENT_TOOL_IDS],
+    tools: plannerAgentToolIds(config),
     llm: { provider, model, temperature },
     memoryConfig: {
       shortTerm: { maxTurns: 60 },

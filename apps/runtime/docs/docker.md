@@ -10,7 +10,17 @@
 
 2. **Secrets before first `up`:** copy **`.env.example`** → **`.env`** and set **`OPENAI_API_KEY`** / **`ANTHROPIC_API_KEY`** (and optionally **`REST_API_KEY`**). For OpenAI-compatible gateways (Ollama, proxies), set **`llm.openai.baseUrl`** in **`docker.stack.yaml`** and, if needed, one model id via **`RUNTIME_DEFAULT_LLM_MODEL`** or the per-role **`RUNTIME_*_MODEL`** vars (see [configuration.md](./configuration.md#default-llm-model-environment)). Compose loads **`.env`** into **`api`** and **`worker`** (`env_file`, optional). See [security.md](./security.md).
 
-3. From the **repository root**:
+3. **Optional artifact storage:** to let planner/chat write files through **`system_write_artifact`**, enable:
+
+```yaml
+artifacts:
+  enabled: true
+  rootDir: ./artifacts
+```
+
+Compose already mounts **`apps/runtime/artifacts/`** into both containers at that relative path, so generated files persist on the host.
+
+4. From the **repository root**:
 
 ```bash
 docker compose -f apps/runtime/docker-compose-with-redis.yml up --build
@@ -30,3 +40,34 @@ After changing **`.env`**, recreate containers: **`docker compose … up -d --fo
 - Binds **`./config/docker.stack.yaml`** (relative to the compose file in **`apps/runtime`**) into the containers.
 - Binds **`./skills`** → **`/app/apps/runtime/config/skills`** on **api** and **worker** (read-only) so OpenClaw **`skillsDirs: [./skills]`** in **`docker.stack.yaml`** resolves inside the container. See [`skills/readme.txt`](../skills/readme.txt).
 - Repo-root [`.dockerignore`](../../../.dockerignore).
+
+## Rebuild without data loss
+
+In this repo, the safe way to rebuild without touching Redis is to rebuild only `api` and `worker`, not bring down the whole stack.
+
+Use this from the root:
+
+```
+docker compose -f apps/runtime/docker-compose-with-redis.yml up -d --build --no-deps api worker
+```
+
+That:
+
+* rebuilds the images for `api` and `worker`
+* recreates those containers
+* does not touch the Redis container
+
+If you prefer doing it in two steps:
+
+```
+docker compose -f apps/runtime/docker-compose-with-redis.yml build api worker
+docker compose -f apps/runtime/docker-compose-with-redis.yml up -d --no-deps api worker
+```
+
+Important:
+
+Do not use `down -v`.
+`down` without `-v` does not delete named volumes, but in this compose file (`apps/runtime/docker-compose-with-redis.yml`) Redis doesn’t even have a volume declared. That means if you destroy the Redis container, its data is not persisted in a Compose volume.
+
+If you want real Redis persistence between `down`/`up`, you would need to add a volume to the Redis service.
+

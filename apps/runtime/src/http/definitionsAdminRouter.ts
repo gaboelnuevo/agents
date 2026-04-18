@@ -33,6 +33,7 @@ const DYNAMIC_PLANNER_TOOL_IDS = [
   "reflect_and_retry",
   "list_available_tools",
   "list_available_models",
+  "system_write_artifact",
   /** Runtime global — `registerRuntimeInvokePlannerTool` (`invokePlannerTool.ts`). */
   "invoke_planner",
   /** Runtime global — `registerRuntimeFetchRunTool` (`fetchRunTool.ts`). */

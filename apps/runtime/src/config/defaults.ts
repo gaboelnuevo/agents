@@ -46,6 +46,7 @@ export const defaultStackConfig: ResolvedRuntimeStackConfig = {
   run: { waitTimeoutMs: 60_000 },
   /** Default on: scan `./skills` relative to the stack file (use `../skills` in config/*.yaml when skills live in `apps/runtime/skills`). */
   openclaw: { enabled: true, skillsDirs: ["./skills"] },
+  artifacts: { enabled: true, rootDir: "./artifacts", publicBaseUrl: "/artifacts" },
   llm: {
     defaultProvider: "openai",
     openai: { apiKey: "", baseUrl: "" },
@@ -107,6 +108,12 @@ export function mergeWithDefaults(raw: RuntimeStackFileConfig): ResolvedRuntimeS
     openclaw: {
       enabled: raw.openclaw?.enabled ?? defaultStackConfig.openclaw.enabled,
       skillsDirs: raw.openclaw?.skillsDirs ?? defaultStackConfig.openclaw.skillsDirs,
+    },
+    artifacts: {
+      enabled: raw.artifacts?.enabled ?? defaultStackConfig.artifacts.enabled,
+      rootDir: raw.artifacts?.rootDir ?? defaultStackConfig.artifacts.rootDir,
+      publicBaseUrl:
+        raw.artifacts?.publicBaseUrl ?? defaultStackConfig.artifacts.publicBaseUrl,
     },
     llm: {
       defaultProvider: raw.llm?.defaultProvider ?? defaultStackConfig.llm.defaultProvider,
