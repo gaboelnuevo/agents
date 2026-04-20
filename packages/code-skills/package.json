@@ -13,14 +13,17 @@
       "import": "./dist/index.js"
     }
   },
+  "bin": {
+    "opencoreagents-skills": "./dist/cli.js"
+  },
   "files": ["dist", "README.md"],
   "scripts": {
-    "build": "tsup && node ./scripts/copy-pack.mjs",
+    "build": "tsup \u0026\u0026 node ./scripts/copy-pack.mjs",
     "dev": "tsup --watch",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "clean": "rm -rf dist && node ./scripts/clean-skill-docs.mjs"
+    "clean": "rm -rf dist \u0026\u0026 node ./scripts/clean-skill-docs.mjs"
   },
   "dependencies": {},
   "publishConfig": {

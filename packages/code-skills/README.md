@@ -1,32 +1,66 @@
 # `@opencoreagents/code-skills`
 
-**Agent-oriented skill packs** for coding assistants (Cursor, Claude Code, Codex, etc.): each folder under `skills/<id>/` contains a **`SKILL.md`** with YAML frontmatter (`name`, `description`) plus instructions grounded in this monorepo’s real packages and docs.
+Install OpenCore Agents skills for coding assistants.
 
-This package does **not** register engine `Skill.define` entries at runtime—it ships **documentation** for humans and for tools that load skill markdown.
+## Install
 
-## Layout
+```bash
+npx @opencoreagents/code-skills add opencoreagents-engine
+```
 
-| Skill id | Use when |
-|----------|-----------|
+Installs `SKILL.md` packs to `./.skills/` in your current repository, so Claude Code, Codex, Cursor, and other assistants can load project-local skills.
+
+## Usage
+
+```bash
+# Install a specific skill
+npx @opencoreagents/code-skills add opencoreagents-engine
+
+# Install in a custom assistant directory
+npx @opencoreagents/code-skills add opencoreagents-engine --dir .claude/skills
+
+# Install all four skills
+npx @opencoreagents/code-skills add opencoreagents-workspace
+npx @opencoreagents/code-skills add opencoreagents-engine
+npx @opencoreagents/code-skills add opencoreagents-rest-workers
+npx @opencoreagents/code-skills add opencoreagents-rag-dynamic
+
+# List available skills
+npx @opencoreagents/code-skills list
+
+# Show help
+npx @opencoreagents/code-skills --help
+```
+
+## Available Skills
+
+| Skill | Use when |
+|-------|----------|
 | `opencoreagents-workspace` | Repo map, Turbo/pnpm, where docs live |
 | `opencoreagents-engine` | `@opencoreagents/core`, adapters, run loop |
 | `opencoreagents-rest-workers` | `rest-api`, BullMQ, dynamic-runtime patterns |
 | `opencoreagents-rag-dynamic` | `@opencoreagents/rag`, catalogs, file/vector tools |
 
-Each skill folder is self-contained after **`pnpm build`**:
+Each skill contains a `SKILL.md` with YAML frontmatter (`name`, `description`) plus focused instructions and bundled docs from this monorepo.
 
-- **`docs/`** — markdown copied from monorepo `docs/` (per-skill subset, or full `core/` + `planning/` for the workspace skill).
-- **`packages/`** — sibling folder with a small set of `packages/*/README.md` files so links like `../../packages/rest-api/README.md` from bundled `core/*.md` still work.
+## What is this?
 
-Generated `docs/` and `packages/` are **gitignored**; `scripts/copy-pack.mjs` fills them before copying `skills/` → `dist/skills/` for publish.
+This package ships **documentation skills** (not runtime `Skill.define` entries) for AI coding assistants. After installing via `npx add`, the skills live in your repository and provide context about:
 
-## Use in Cursor / Claude / Codex
+- The OpenCore Agents monorepo layout
+- The core engine (`AgentRuntime`, `Agent.load`, `RunBuilder`)
+- REST API and BullMQ worker patterns
+- RAG and dynamic catalog tools
 
-1. **From a clone:** point at `packages/code-skills/skills/<id>/` (run **`pnpm build --filter=@opencoreagents/code-skills`** so `docs/` and `packages/` exist), or use the published tarball under `node_modules/.../dist/skills/<id>/`.
+## Layout (per skill)
 
-2. **From npm / GitHub Packages:** everything ships under **`dist/skills/<id>/`** (`SKILL.md`, `docs/`, `packages/`).
+- **`SKILL.md`** — Entry point with skill metadata and instructions
+- **`docs/`** — Markdown docs from the monorepo
+- **`packages/`** — README stubs for cross-references
 
-## API
+Skills ship under `dist/skills/<id>/` in the npm package.
+
+## API (programmatic)
 
 ```typescript
 import {
@@ -36,14 +70,18 @@ import {
   skillPackagesDirectory,
 } from "@opencoreagents/code-skills";
 
-skillDocsDirectory("opencoreagents-engine"); // …/skills/opencoreagents-engine/docs
-skillPackagesDirectory("opencoreagents-engine"); // …/skills/opencoreagents-engine/packages
+skillDocsDirectory("opencoreagents-engine");      // → .../skills/opencoreagents-engine/docs
+skillPackagesDirectory("opencoreagents-engine");  // → .../skills/opencoreagents-engine/packages
 ```
 
-## Build
+## Development
 
-`pnpm build` runs `tsup` then `node ./scripts/copy-pack.mjs`, which hydrates each skill’s **`docs/`** and **`packages/`**, then copies the full **`skills/`** tree into **`dist/skills/`**.
+```bash
+# Build the package (generates docs/ and packages/ for each skill)
+pnpm build --filter=@opencoreagents/code-skills
 
-## Clean
+# Clean generated files
+pnpm clean --filter=@opencoreagents/code-skills
+```
 
-`pnpm clean` removes **`dist/`** and generated **`skills/*/docs/`** and **`skills/*/packages/`**.
+Build runs `tsup` then `scripts/copy-pack.mjs`, which hydrates each skill's `docs/` and `packages/` before copying to `dist/skills/`.

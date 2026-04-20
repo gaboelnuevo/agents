@@ -325,8 +325,26 @@ Your **HTTP control plane** (Express or any framework) typically **writes defini
 
 ### Coding assistant skill packs
 
-[`packages/code-skills/README.md`](packages/code-skills/README.md) (**[`@opencoreagents/code-skills`](packages/code-skills/README.md)**) ships **agent-oriented** markdown for IDEs: each `skills/<id>/SKILL.md` bundles focused instructions and a subset of `docs/` (and package README stubs) so assistants stay aligned with **`@opencoreagents/*`**. Skill ids include **`opencoreagents-workspace`**, **`opencoreagents-engine`**, **`opencoreagents-rest-workers`**, and **`opencoreagents-rag-dynamic`**. From a clone, run **`pnpm build --filter=@opencoreagents/code-skills`** so generated `docs/` / `packages/` folders exist next to each skill; from a registry install, use paths under **`node_modules/.../dist/skills/<id>/`**.
+[`packages/code-skills/README.md`](packages/code-skills/README.md) (**[`@opencoreagents/code-skills`](packages/code-skills/README.md)**) ships **agent-oriented** markdown for IDEs: each `skills/<id>/SKILL.md` bundles focused instructions and a subset of `docs/` (and package README stubs) so assistants stay aligned with **`@opencoreagents/*`**.
 
+**Quick install via CLI:**
+
+```bash
+# Install a skill directly (e.g., opencoreagents-engine)
+npx @opencoreagents/code-skills add opencoreagents-engine
+
+# List available skills
+npx @opencoreagents/code-skills list
+
+# Install all four
+npx @opencoreagents/code-skills add opencoreagents-workspace
+npx @opencoreagents/code-skills add opencoreagents-engine
+npx @opencoreagents/code-skills add opencoreagents-rest-workers
+npx @opencoreagents/code-skills add opencoreagents-rag-dynamic
+```
+
+
+Skill ids: **`opencoreagents-workspace`**, **`opencoreagents-engine`**, **`opencoreagents-rest-workers`**, and **`opencoreagents-rag-dynamic`**. From a clone, run **`pnpm build --filter=@opencoreagents/code-skills`** so generated `docs/` / `packages/` folders exist next to each skill; from a registry install, use paths under **`node_modules/.../dist/skills/<id>/`**.
 **APIs and dynamic config**
 
 - [`docs/planning/plan-rest.md`](docs/planning/plan-rest.md) — REST API shape (roadmap + plugin)
