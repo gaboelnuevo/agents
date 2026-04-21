@@ -33,6 +33,17 @@ llm:
     apiKey: "${ANTHROPIC_API_KEY}"
     baseUrl: ""
 
+# Optional — vector tools (`system_vector_*`) on Redis Stack + OpenAI embeddings.
+# Requires Redis Stack/RediSearch (see docker-compose-with-redis.yml).
+# vector:
+#   enabled: true
+#   openai:
+#     embeddingModel: text-embedding-3-small
+#   indexPrefix: vecidx:
+#   keyPrefix: vecdoc:
+#   distanceMetric: COSINE # COSINE | L2 | IP
+#   queryExpansionFactor: 5
+
 # Optional — planner: seed Redis agent `planner` on API/worker boot if missing; sub-agent defaults for spawn_agent.
 # planner:
 #   defaultAgent:

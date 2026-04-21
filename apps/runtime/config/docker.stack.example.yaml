@@ -32,6 +32,17 @@ llm:
     apiKey: "${ANTHROPIC_API_KEY}"
     baseUrl: ""
 
+# Optional — vector tools (`system_vector_*`) on Redis Stack + OpenAI embeddings.
+# The bundled compose file uses redis/redis-stack.
+# vector:
+#   enabled: true
+#   openai:
+#     embeddingModel: text-embedding-3-small
+#   indexPrefix: vecidx:
+#   keyPrefix: vecdoc:
+#   distanceMetric: COSINE # COSINE | L2 | IP
+#   queryExpansionFactor: 5
+
 # Optional — default `planner` agent in Redis on boot + spawn_agent defaults (`enabled: false` to skip seed).
 # planner:
 #   defaultAgent:

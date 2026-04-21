@@ -22,6 +22,7 @@ import { buildLlmStackFromConfig } from "./runtime/llmResolver.js";
 import { registerRuntimeFetchRunTool } from "./runtime/fetchRunTool.js";
 import { registerRuntimeInvokePlannerTool } from "./runtime/invokePlannerTool.js";
 import { ensureDefaultPlannerAgent, registerRuntimeDynamicPlanner } from "./runtime/runtimePlanner.js";
+import { buildVectorStackFromConfig } from "./runtime/vectorResolver.js";
 import { runtimePackageVersion } from "./runtime/runtimeVersion.js";
 import {
   RUNTIME_AGENT_ENGINE_DEFAULTS,
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
   const memoryRedis = redis.duplicate();
   const runStoreRedis = redis.duplicate();
   const producerRedis = redis.duplicate();
+  const vectorRedis = redis.duplicate();
   const runEventsRedis = config.runEvents.redis ? redis.duplicate() : undefined;
   const messageBusRedis = redis.duplicate();
 
@@ -107,6 +109,7 @@ async function main(): Promise<void> {
   const defaultEngineHooks = runEventsRedis
     ? createRedisRunEventHooks(runEventsRedis, stack.defKeyPrefix)
     : undefined;
+  const vectorStack = buildVectorStackFromConfig(config, vectorRedis);
 
   const runtime = new AgentRuntime({
     llmAdapter,
@@ -114,6 +117,7 @@ async function main(): Promise<void> {
     memoryAdapter: new RedisMemoryAdapter(memoryRedis),
     runStore,
     messageBus: new RedisMessageBus(messageBusRedis),
+    ...vectorStack,
     ...RUNTIME_AGENT_ENGINE_DEFAULTS,
     ...openClawForRuntime,
     dynamicDefinitionsStore: store,
@@ -174,6 +178,7 @@ async function main(): Promise<void> {
     await memoryRedis.quit();
     await runStoreRedis.quit();
     await producerRedis.quit();
+    await vectorRedis.quit();
     await runEventsRedis?.quit();
     await messageBusRedis.quit();
     await redis.quit();
@@ -187,7 +192,7 @@ async function main(): Promise<void> {
     ? ` openclawSkills=${openClawForRuntime.defaultSkillIdsGlobal.length}`
     : "";
   console.log(
-    `[opencoreagents-runtime] worker version=${runtimePackageVersion} config=${configFile} queue=${stack.engineQueueName} redis=${redactRedisUrlForLog(stack.redisUrl)} defPrefix=${stack.defKeyPrefix} llm.defaultProvider=${config.llm.defaultProvider}${openclawNote}`,
+    `[opencoreagents-runtime] worker version=${runtimePackageVersion} config=${configFile} queue=${stack.engineQueueName} redis=${redactRedisUrlForLog(stack.redisUrl)} defPrefix=${stack.defKeyPrefix} llm.defaultProvider=${config.llm.defaultProvider} vector.enabled=${config.vector.enabled ? "1" : "0"}${openclawNote}`,
   );
 }
 

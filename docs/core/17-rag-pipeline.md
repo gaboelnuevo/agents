@@ -88,16 +88,112 @@ interface VectorDeleteParams {
 
 This aligns with the `vectorMemory` key patterns in [05-adapters-contracts.md](./05-adapters-contracts.md).
 
-**Reference implementation**: Upstash Vector — serverless, HTTP-based, supports metadata filtering. Same operational model as Upstash Redis for `MemoryAdapter`.
+**Reference implementations**:
+
+- **Upstash Vector** (`@opencoreagents/adapters-upstash`) — serverless, HTTP-based.
+- **Redis Stack Vector** (`@opencoreagents/adapters-redis`) — Redis/RediSearch over TCP (`ioredis`).
 
 ```typescript
 import { UpstashVectorAdapter } from "@opencoreagents/adapters-upstash";
 
-const vectorAdapter = new UpstashVectorAdapter({
-  url: process.env.UPSTASH_VECTOR_URL,
-  token: process.env.UPSTASH_VECTOR_TOKEN,
+const vectorAdapter = new UpstashVectorAdapter(
+  process.env.UPSTASH_VECTOR_URL!,
+  process.env.UPSTASH_VECTOR_TOKEN!,
+);
+```
+
+```typescript
+import Redis from "ioredis";
+import { RedisStackVectorAdapter } from "@opencoreagents/adapters-redis";
+
+const redis = new Redis(process.env.REDIS_URL!);
+const vectorAdapter = new RedisStackVectorAdapter(redis, {
+  indexPrefix: "vecidx:",
+  keyPrefix: "vecdoc:",
+  distanceMetric: "COSINE",
+  queryExpansionFactor: 5,
 });
 ```
+
+### 1.3 Vector wiring examples
+
+#### Example A — Upstash Vector + OpenAI embeddings
+
+```typescript
+import { AgentRuntime } from "@opencoreagents/core";
+import { OpenAIEmbeddingAdapter } from "@opencoreagents/adapters-openai";
+import { UpstashVectorAdapter } from "@opencoreagents/adapters-upstash";
+
+const embeddingAdapter = new OpenAIEmbeddingAdapter(
+  process.env.OPENAI_API_KEY!,
+  "text-embedding-3-small",
+);
+
+const vectorAdapter = new UpstashVectorAdapter(
+  process.env.UPSTASH_VECTOR_URL!,
+  process.env.UPSTASH_VECTOR_TOKEN!,
+);
+
+const runtime = new AgentRuntime({
+  llmAdapter,
+  memoryAdapter,
+  embeddingAdapter,
+  vectorAdapter,
+});
+```
+
+#### Example B — Redis Stack + OpenAI embeddings
+
+```typescript
+import Redis from "ioredis";
+import { AgentRuntime } from "@opencoreagents/core";
+import { OpenAIEmbeddingAdapter } from "@opencoreagents/adapters-openai";
+import { RedisStackVectorAdapter } from "@opencoreagents/adapters-redis";
+
+const redis = new Redis(process.env.REDIS_URL!);
+
+const embeddingAdapter = new OpenAIEmbeddingAdapter(
+  process.env.OPENAI_API_KEY!,
+  "text-embedding-3-small",
+);
+
+const vectorAdapter = new RedisStackVectorAdapter(redis.duplicate(), {
+  indexPrefix: "vecidx:",
+  keyPrefix: "vecdoc:",
+  distanceMetric: "COSINE",
+});
+
+const runtime = new AgentRuntime({
+  llmAdapter,
+  memoryAdapter,
+  embeddingAdapter,
+  vectorAdapter,
+});
+```
+
+#### Example C — `apps/runtime` stack config for Redis Stack vectors
+
+```yaml
+vector:
+  enabled: true
+  openai:
+    embeddingModel: text-embedding-3-small
+  indexPrefix: vecidx:
+  keyPrefix: vecdoc:
+  distanceMetric: COSINE # COSINE | L2 | IP
+  queryExpansionFactor: 5
+```
+
+With this enabled, `apps/runtime` wires:
+
+- `OpenAIEmbeddingAdapter` from `llm.openai.apiKey` + `vector.openai.embeddingModel`
+- `RedisStackVectorAdapter` from `redis.url` + `vector.*` options
+
+If `vector.enabled: true`, ensure:
+
+- Redis Stack / RediSearch vector support is available.
+- `llm.openai.apiKey` is non-empty.
+- Embedding dimensions match existing index dimensions in the same namespace.
 
 ---
 

@@ -16,7 +16,14 @@ This package is a **reference deployment** of the agent stack: [**plan REST**](.
 - **OpenClaw skills (optional)** — Load skills from **`openclaw.skillsDirs`** in the stack file when **`openclaw.enabled`** is on.
 - **Declarative stack config** — One **YAML/JSON** file per environment (**`config/docker.stack.yaml`**, **`config/local.yaml`**, …), env substitution, and CLI helpers **`pnpm config:print`** / **`pnpm config:env`** ([CLI](./docs/cli.md)).
 - **Security defaults** — Optional **`REST_API_KEY`** protects plan REST and **`/v1/*`**; without a key, HTTP listens on **loopback** unless you opt into **`OPENCORE_INSECURE_PUBLIC_HTTP`** ([Security](./docs/security.md)). **`GET /health`** with optional **`?details=1`**.
-- **Docker reference stack** — [**`docker-compose-with-redis.yml`**](./docker-compose-with-redis.yml) runs **Redis**, API, and worker; see [Docker](./docs/docker.md).
+- **Docker reference stack** — [**`docker-compose-with-redis.yml`**](./docker-compose-with-redis.yml) runs **Redis Stack** (RediSearch included), API, and worker; see [Docker](./docs/docker.md).
+
+### Which Redis image should I use?
+
+- **`redis:7-alpine`** if you only need core Redis features (definitions, memory, BullMQ queue, run store, message bus).
+- **`redis/redis-stack:latest`** if you need vector search/indexing via `RedisStackVectorAdapter` (`FT.CREATE` / `FT.SEARCH`), because those commands come from RediSearch modules.
+
+The bundled compose file uses **`redis/redis-stack:latest`** so vector support can be enabled without replacing the Redis container image.
 
 Both **server** and **worker** register **[`@opencoreagents/dynamic-planner`](../../packages/dynamic-planner/README.md)** tools and share **`RedisRunStore`** (same Redis server). On startup they **seed a default orchestrator agent** (`id` **`planner`** by default) in Redis **if it does not exist yet**, using **`DEFAULT_PLANNER_SYSTEM_PROMPT`** and the planner tool ids. Disable with **`planner.defaultAgent.enabled: false`** in the stack or **`RUNTIME_PLANNER_DEFAULT_AGENT=0`**. The default **`planner`** and **`chat`** agent ids are **not** overridable via **`PUT /v1/agents/...`** — change LLM and behavior via stack **`planner.defaultAgent`** / **`chat.defaultAgent`** (and related env vars). Other agent ids can still be upserted through **`PUT /v1/agents/:agentId`**.
 
@@ -118,7 +125,7 @@ From the **repository root** (not inside `apps/runtime` only):
 docker compose -f apps/runtime/docker-compose-with-redis.yml up --build
 ```
 
-Compose starts **Redis**, the **API**, and the **worker**, and mounts **`config/docker.stack.yaml`** into both app containers. The first run can take several minutes while dependencies install and build **inside** the image.
+Compose starts **Redis Stack**, the **API**, and the **worker**, and mounts **`config/docker.stack.yaml`** into both app containers. The first run can take several minutes while dependencies install and build **inside** the image.
 
 If you use [pnpm](https://pnpm.io/installation), you can run **`pnpm docker:up`** / **`pnpm docker:down`** from **`apps/runtime`** instead—the same compose file.
 
@@ -128,7 +135,7 @@ If you use [pnpm](https://pnpm.io/installation), you can run **`pnpm docker:up`*
 - [http://localhost:3010/health](http://localhost:3010/health) — add [`?details=1`](http://localhost:3010/health?details=1) to include `projectId` and queue in the JSON
 - [http://localhost:3010/docs](http://localhost:3010/docs) (OpenAPI UI — use **Authorize** with your **`REST_API_KEY`** for protected routes)
 
-Redis is also on **`localhost:6379`** from your machine if you want to connect with a client.
+Redis is also on **`localhost:6379`** from your machine if you want to connect with a client. RedisInsight UI from Redis Stack is available at **`http://localhost:8001`**.
 
 ### 6. Stop
 

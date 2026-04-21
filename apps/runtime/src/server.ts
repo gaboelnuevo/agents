@@ -31,6 +31,7 @@ import { registerRuntimeArtifactTool } from "./runtime/artifactTool.js";
 import { registerRuntimeFetchRunTool } from "./runtime/fetchRunTool.js";
 import { registerRuntimeInvokePlannerTool } from "./runtime/invokePlannerTool.js";
 import { ensureDefaultPlannerAgent, registerRuntimeDynamicPlanner } from "./runtime/runtimePlanner.js";
+import { buildVectorStackFromConfig } from "./runtime/vectorResolver.js";
 import { runtimePackageVersion } from "./runtime/runtimeVersion.js";
 import {
   RUNTIME_AGENT_ENGINE_DEFAULTS,
@@ -84,16 +85,19 @@ async function main(): Promise<void> {
   const runEventsStreamRedis = config.runEvents.redis ? redis.duplicate() : undefined;
   const apiMemoryRedis = redis.duplicate();
   const apiMessageBusRedis = redis.duplicate();
+  const vectorRedis = redis.duplicate();
 
   const runStore = new RedisRunStore(runStoreRedis);
 
   const { llmAdapter, llmAdaptersByProvider } = buildLlmStackFromConfig(config.llm);
+  const vectorStack = buildVectorStackFromConfig(config, vectorRedis);
   const agentRuntimeForRest = new AgentRuntime({
     llmAdapter,
     llmAdaptersByProvider,
     memoryAdapter: new RedisMemoryAdapter(apiMemoryRedis),
     runStore,
     messageBus: new RedisMessageBus(apiMessageBusRedis),
+    ...vectorStack,
     ...RUNTIME_AGENT_ENGINE_DEFAULTS,
     ...openClawForRuntime,
   });
@@ -272,8 +276,9 @@ async function main(): Promise<void> {
     const openclawNote = openClawForRuntime.defaultSkillIdsGlobal.length
       ? ` openclawSkills=${openClawForRuntime.defaultSkillIdsGlobal.length}`
       : "";
+    const vectorNote = ` vector.enabled=${config.vector.enabled ? "1" : "0"}`;
     console.log(
-      `[opencoreagents-runtime] listening=http://${listenHost}:${port}${bindNote} version=${runtimePackageVersion} projectId=${projectId} queue=${engineQueueName} config=${configFile} ${authMode}${openclawNote}`,
+      `[opencoreagents-runtime] listening=http://${listenHost}:${port}${bindNote} version=${runtimePackageVersion} projectId=${projectId} queue=${engineQueueName} config=${configFile} ${authMode}${vectorNote}${openclawNote}`,
     );
     const chatNote = isChatEndpointAvailable(config) ? "  POST /v1/chat" : "";
     const chatSseNote =
@@ -300,6 +305,7 @@ async function main(): Promise<void> {
     await runEventsStreamRedis?.quit();
     await apiMemoryRedis.quit();
     await apiMessageBusRedis.quit();
+    await vectorRedis.quit();
     await redis.quit();
   };
   process.on("SIGINT", () => void close().then(() => process.exit(0)));

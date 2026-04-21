@@ -1,4 +1,9 @@
-import type { LlmDriverKind, ResolvedRuntimeStackConfig, RuntimeStackFileConfig } from "./types.js";
+import type {
+  LlmDriverKind,
+  ResolvedRuntimeStackConfig,
+  RuntimeStackFileConfig,
+  VectorDistanceMetricKind,
+} from "./types.js";
 
 function isAutoOrEmptyToken(s: string): boolean {
   return s === "" || s.toLowerCase() === "auto";
@@ -52,6 +57,14 @@ export const defaultStackConfig: ResolvedRuntimeStackConfig = {
     openai: { apiKey: "", baseUrl: "" },
     anthropic: { apiKey: "", baseUrl: "" },
   },
+  vector: {
+    enabled: false,
+    openai: { embeddingModel: "text-embedding-3-small" },
+    indexPrefix: "vecidx:",
+    keyPrefix: "vecdoc:",
+    distanceMetric: "COSINE",
+    queryExpansionFactor: 5,
+  },
   planner: {
     defaultAgent: {
       enabled: true,
@@ -69,6 +82,22 @@ export const defaultStackConfig: ResolvedRuntimeStackConfig = {
     },
   },
 };
+
+function normalizeVectorDistanceMetric(v: unknown): VectorDistanceMetricKind {
+  if (v == null) return defaultStackConfig.vector.distanceMetric;
+  const s = String(v).trim().toUpperCase();
+  if (s === "COSINE" || s === "L2" || s === "IP") return s;
+  throw new Error(
+    `Invalid vector.distanceMetric: "${String(v).trim()}" (expected COSINE, L2, or IP)`,
+  );
+}
+
+function normalizePositiveInteger(v: unknown, fallback: number): number {
+  if (v == null) return fallback;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 1 || !Number.isInteger(n)) return fallback;
+  return n;
+}
 
 function mergeRunEventsRedis(raw: RuntimeStackFileConfig): boolean {
   const v = process.env.RUNTIME_RUN_EVENTS_REDIS?.trim().toLowerCase();
@@ -125,6 +154,21 @@ export function mergeWithDefaults(raw: RuntimeStackFileConfig): ResolvedRuntimeS
         apiKey: raw.llm?.anthropic?.apiKey ?? defaultStackConfig.llm.anthropic.apiKey,
         baseUrl: raw.llm?.anthropic?.baseUrl ?? defaultStackConfig.llm.anthropic.baseUrl,
       },
+    },
+    vector: {
+      enabled: raw.vector?.enabled ?? defaultStackConfig.vector.enabled,
+      openai: {
+        embeddingModel:
+          raw.vector?.openai?.embeddingModel ??
+          defaultStackConfig.vector.openai.embeddingModel,
+      },
+      indexPrefix: raw.vector?.indexPrefix ?? defaultStackConfig.vector.indexPrefix,
+      keyPrefix: raw.vector?.keyPrefix ?? defaultStackConfig.vector.keyPrefix,
+      distanceMetric: normalizeVectorDistanceMetric(raw.vector?.distanceMetric),
+      queryExpansionFactor: normalizePositiveInteger(
+        raw.vector?.queryExpansionFactor,
+        defaultStackConfig.vector.queryExpansionFactor,
+      ),
     },
     planner: {
       defaultAgent: {

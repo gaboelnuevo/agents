@@ -2,7 +2,7 @@
 
 ## Recommended for easy use
 
-**Docker Compose** runs **Redis + API + worker**. You need **`apps/runtime/config/docker.stack.yaml`** on the host (copy from **`docker.stack.example.yaml`**) — Compose mounts it read-only; **`RUNTIME_CONFIG`** points at that path.
+**Docker Compose** runs **Redis Stack + API + worker**. You need **`apps/runtime/config/docker.stack.yaml`** on the host (copy from **`docker.stack.example.yaml`**) — Compose mounts it read-only; **`RUNTIME_CONFIG`** points at that path.
 
 **Prerequisites:** [Docker](https://docs.docker.com/get-docker/) with Compose v2 (BuildKit on by default on Desktop). **No pnpm required** on the host.
 
@@ -28,7 +28,7 @@ docker compose -f apps/runtime/docker-compose-with-redis.yml up --build
 
 *Optional:* with pnpm, from **`apps/runtime`**: **`pnpm docker:up`** / **`pnpm docker:down`**.
 
-Then: [http://localhost:3010/health](http://localhost:3010/health) ([`?details=1`](http://localhost:3010/health?details=1) for **`projectId`** + queue) · [http://localhost:3010/docs](http://localhost:3010/docs) (use **Authorize** with **`REST_API_KEY`** where required).
+Then: [http://localhost:3010/health](http://localhost:3010/health) ([`?details=1`](http://localhost:3010/health?details=1) for **`projectId`** + queue) · [http://localhost:3010/docs](http://localhost:3010/docs) (use **Authorize** with **`REST_API_KEY`** where required) · [http://localhost:8001](http://localhost:8001) (RedisInsight UI bundled in Redis Stack).
 
 After changing **`.env`**, recreate containers: **`docker compose … up -d --force-recreate`**.
 
@@ -40,6 +40,15 @@ After changing **`.env`**, recreate containers: **`docker compose … up -d --fo
 - Binds **`./config/docker.stack.yaml`** (relative to the compose file in **`apps/runtime`**) into the containers.
 - Binds **`./skills`** → **`/app/apps/runtime/config/skills`** on **api** and **worker** (read-only) so OpenClaw **`skillsDirs: [./skills]`** in **`docker.stack.yaml`** resolves inside the container. See [`skills/readme.txt`](../skills/readme.txt).
 - Repo-root [`.dockerignore`](../../../.dockerignore).
+
+## Redis image choice
+
+Use the Redis image based on feature requirements:
+
+- **`redis:7-alpine`**: core Redis only (strings/lists/sets/streams/pubsub). Good for memory, run store, queue, and message bus.
+- **`redis/redis-stack:latest`**: Redis + modules (including RediSearch). Required for vector indexing/search with `RedisStackVectorAdapter` (`FT.CREATE`, `FT.SEARCH`, KNN).
+
+This runtime’s compose file uses **`redis/redis-stack:latest`** so vector tooling can be enabled via stack config (`vector.enabled: true`) without changing the image again.
 
 ## Rebuild without data loss
 
@@ -67,7 +76,4 @@ docker compose -f apps/runtime/docker-compose-with-redis.yml up -d --no-deps api
 Important:
 
 Do not use `down -v`.
-`down` without `-v` does not delete named volumes, but in this compose file (`apps/runtime/docker-compose-with-redis.yml`) Redis doesn’t even have a volume declared. That means if you destroy the Redis container, its data is not persisted in a Compose volume.
-
-If you want real Redis persistence between `down`/`up`, you would need to add a volume to the Redis service.
-
+This compose file declares a named volume (`redis-data`) for Redis persistence. `down` keeps that volume, while `down -v` deletes it.

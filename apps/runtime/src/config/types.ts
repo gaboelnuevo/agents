@@ -35,6 +35,34 @@ export interface ResolvedLlmStackConfig {
   anthropic: { apiKey: string; baseUrl: string };
 }
 
+export type VectorDistanceMetricKind = "COSINE" | "L2" | "IP";
+
+export interface RuntimeVectorFileConfig {
+  /** Enable `embeddingAdapter` + `vectorAdapter` wiring on `AgentRuntime`. */
+  enabled?: boolean;
+  openai?: {
+    /** Embedding model id used by `OpenAIEmbeddingAdapter`. */
+    embeddingModel?: string;
+  };
+  /** Redis Stack `FT.CREATE` index name prefix. */
+  indexPrefix?: string;
+  /** Redis key prefix for vector HASH documents. */
+  keyPrefix?: string;
+  /** Distance metric used by RediSearch vector field. */
+  distanceMetric?: VectorDistanceMetricKind;
+  /** Expansion factor when a metadata filter is present (post-filtering). */
+  queryExpansionFactor?: number;
+}
+
+export interface ResolvedRuntimeVectorStackConfig {
+  enabled: boolean;
+  openai: { embeddingModel: string };
+  indexPrefix: string;
+  keyPrefix: string;
+  distanceMetric: VectorDistanceMetricKind;
+  queryExpansionFactor: number;
+}
+
 export interface RuntimeStackFileConfig {
   /** Hint for operators; not read by workers, useful in logs or docs. */
   environment?: RuntimeEnvironmentKind;
@@ -79,6 +107,7 @@ export interface RuntimeStackFileConfig {
     publicBaseUrl?: string;
   };
   llm?: RuntimeLlmFileConfig;
+  vector?: RuntimeVectorFileConfig;
   /**
    * Dynamic planner (`spawn_agent` default LLM when the tool omits `llm`).
    * Omit to infer provider from configured API keys + `llm.defaultProvider`, and use conservative default model ids.
@@ -144,6 +173,7 @@ export interface ResolvedRuntimeStackConfig {
   openclaw: { enabled: boolean; skillsDirs: string[] };
   artifacts: { enabled: boolean; rootDir: string; publicBaseUrl: string };
   llm: ResolvedLlmStackConfig;
+  vector: ResolvedRuntimeVectorStackConfig;
   planner: {
     defaultAgent: {
       enabled: boolean;

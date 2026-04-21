@@ -50,6 +50,28 @@ For Docker Compose in this repo: **`cp config/docker.stack.example.yaml config/d
 
 Agents pick **`llm.provider`** from stored JSON. If `config/local.yaml` is missing, the loader suggests copying **`config/local.example.yaml`**.
 
+## `vector` (optional)
+
+Enable Redis Stack vector tools on the runtime:
+
+```yaml
+vector:
+  enabled: true
+  openai:
+    embeddingModel: text-embedding-3-small
+  indexPrefix: vecidx:
+  keyPrefix: vecdoc:
+  distanceMetric: COSINE # COSINE | L2 | IP
+  queryExpansionFactor: 5
+```
+
+Notes:
+
+- Requires Redis Stack / RediSearch vector support.
+- Uses `OpenAIEmbeddingAdapter` + `RedisStackVectorAdapter` wiring on `AgentRuntime`.
+- Requires a non-empty `llm.openai.apiKey` when `vector.enabled: true`.
+- When enabled, runtime can execute `system_vector_search`, `system_vector_upsert`, and `system_vector_delete` for agents that have those tool ids.
+
 ### Default LLM model environment
 
 Model ids for the **default seeded agents** can come from the stack (**`planner.defaultAgent.llm`**, **`planner.subAgent`**, **`chat.defaultAgent.llm`**) or from process env. **`pnpm config:env`** does **not** print these — they are ordinary **`process.env`** reads in the worker/API when building or lazy-seeding agent rows.

@@ -32,6 +32,16 @@ llm:
     apiKey: "${ANTHROPIC_API_KEY}"
     baseUrl: ""
 
+# Optional — vector tools (`system_vector_*`) on Redis Stack + OpenAI embeddings.
+# vector:
+#   enabled: true
+#   openai:
+#     embeddingModel: text-embedding-3-small
+#   indexPrefix: vecidx:
+#   keyPrefix: vecdoc:
+#   distanceMetric: COSINE # COSINE | L2 | IP
+#   queryExpansionFactor: 5
+
 # Mount skills at config/skills in the container/pod so ./skills resolves (same as Docker image/Compose).
 openclaw:
   enabled: true
