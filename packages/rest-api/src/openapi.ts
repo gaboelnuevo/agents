@@ -409,6 +409,15 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
                 properties: {
                   message: { type: "string" },
                   sessionId: { type: "string" },
+                  expiresAtMs: {
+                    type: "number",
+                    description: "Absolute Unix ms deadline for the Session used by this request",
+                  },
+                  extendSessionTtlMs: {
+                    type: "number",
+                    description:
+                      "Extend the Session lifetime by this many ms; applied on top of the later of `expiresAtMs` or now",
+                  },
                   ...(multiProject
                     ? {
                         projectId: {
@@ -549,6 +558,15 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
               properties: {
                 runId: { type: "string" },
                 sessionId: { type: "string" },
+                expiresAtMs: {
+                  type: "number",
+                  description: "Absolute Unix ms deadline for the Session used by this resume",
+                },
+                extendSessionTtlMs: {
+                  type: "number",
+                  description:
+                    "Extend the Session lifetime by this many ms; applied on top of the later of `expiresAtMs` or now",
+                },
                 ...(multiProject ? { projectId: { type: "string" } } : {}),
                 ...(hasDispatch ? { wait: { type: "boolean" } } : {}),
                 resumeInput: {
@@ -601,6 +619,15 @@ export function buildRuntimeRestOpenApiSpec(input: RuntimeRestOpenApiInput): Rec
                 runId: { type: "string" },
                 sessionId: { type: "string" },
                 message: { type: "string", description: "Next user message for this run" },
+                expiresAtMs: {
+                  type: "number",
+                  description: "Absolute Unix ms deadline for the Session used by this continue",
+                },
+                extendSessionTtlMs: {
+                  type: "number",
+                  description:
+                    "Extend the Session lifetime by this many ms; applied on top of the later of `expiresAtMs` or now",
+                },
                 ...(multiProject ? { projectId: { type: "string" } } : {}),
                 ...(hasDispatch ? { wait: { type: "boolean" } } : {}),
               },

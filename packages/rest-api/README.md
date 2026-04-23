@@ -19,12 +19,12 @@ Install **`@opencoreagents/adapters-bullmq`** and **`bullmq`** when using **`dis
 | **GET** | `/agents` | With **`agentIds`**: intersection of allowlist and registry for the effective **`projectId`**. Without: all agents **`Agent.load`** can resolve. |
 | **GET** | `/agents/:agentId/memory` | **When `runtime` is set:** **`?sessionId=`** and **`?memoryType=`** required; optional **`?endUserId=`**. Returns **`{ projectId, agentId, sessionId, memoryType, items }`** from **`MemoryAdapter.query`** (same scope as **`system_get_memory`**). Omitting **`runtime`** (enqueue-only API) leaves this route **unregistered**. |
 | **POST** | `/agents/:fromAgentId/send` | **When `runtime` is set:** body **`toAgentId`**, **`payload`** (required); optional **`type`** (**`event`** \| **`request`** \| **`reply`**), **`correlationId`** (required for **`request`**/**`reply`**), **`sessionId`**, **`endUserId`** (for **`sendMessageTargetPolicy`** only). **501** if **`AgentRuntime`** has no **`messageBus`**. **403** when policy denies the target. Unregistered without **`runtime`**. |
-| **POST** | `/agents/:agentId/run` | Body: `{ "message": string, "sessionId"?: string, "projectId"?: string, "wait"?: boolean }`. **`wait`**: only with **`dispatch`** (+ **`queueEvents`**). Success JSON includes **`projectId`** (effective tenant). |
-| **POST** | `/agents/:agentId/resume` | Body: `{ runId, sessionId, resumeInput, "projectId"?, "wait"? }`. **Inline** mode needs **`runStore`** on **`AgentRuntime`**. **Queue** mode does not need **`runStore`** on the API process (worker must persist runs). Success JSON includes **`projectId`**. |
-| **POST** | `/agents/:agentId/continue` | Body: `{ runId, sessionId, message, "projectId"?, "wait"? }`. Appends a user turn to a **`completed`** run (**same `runId`**). Same **`runStore`** / **`dispatch`** rules as **`resume`**. |
+| **POST** | `/agents/:agentId/run` | Body: `{ "message": string, "sessionId"?: string, "expiresAtMs"?: number, "extendSessionTtlMs"?: number, "projectId"?: string, "wait"?: boolean }`. **`wait`**: only with **`dispatch`** (+ **`queueEvents`**). Success JSON includes **`projectId`** (effective tenant). |
+| **POST** | `/agents/:agentId/resume` | Body: `{ runId, sessionId, resumeInput, "expiresAtMs"?: number, "extendSessionTtlMs"?: number, "projectId"?, "wait"? }`. **Inline** mode needs **`runStore`** on **`AgentRuntime`**. **Queue** mode does not need **`runStore`** on the API process (worker must persist runs). Success JSON includes **`projectId`**. |
+| **POST** | `/agents/:agentId/continue` | Body: `{ runId, sessionId, message, "expiresAtMs"?: number, "extendSessionTtlMs"?: number, "projectId"?, "wait"? }`. Appends a user turn to a **`completed`** run (**same `runId`**). Same **`runStore`** / **`dispatch`** rules as **`resume`**. |
 | **GET** | `/runs/:runId?sessionId=` | Requires **`runStore`**. **`sessionId`** must match the run when stored. If the run has **`projectId`** (set on new runs in **`@opencoreagents/core`**), the effective tenant must match or the handler returns **403**; the JSON body may include **`projectId`**. In **multi-project** mode, send **`X-Project-Id`** or **`?projectId=`** (same resolution as below). |
 | **GET** | `/runs/:runId/history?sessionId=` | Same auth as **`GET /runs/:runId`** — returns **`Run.history`** (**`ProtocolMessage[]`**) plus **`runId`**, **`agentId`**, **`status`**, optional **`sessionId`** / **`projectId`**. |
-| **GET** | `/agents/:agentId/runs` | Requires **`runStore`**. Optional **`?status=`** (**`running` \| `waiting` \| `completed` \| `failed`**), **`?sessionId=`**, **`?limit=`** (default **50**, max **100**). **`RunStore.listByAgent`** — same **`run.projectId`** vs tenant rule as **`GET /runs`** when **`projectId`** is set on rows. |
+| **GET** | `/agents/:agentId/runs` | Requires **`runStore`**. Optional **`?status=`** (**`running` \| `waiting` \| `completed` \| `failed`**), **`?sessionId=`**, **`?limit=`** (default **50**, max **100**). When **`sessionId`** is set, the router uses **`RunStore.listByAgentAndSession(agentId, sessionId, { status?, limit?, order: "desc" })`**; otherwise it falls back to **`listByAgent`**. Same **`run.projectId`** vs tenant rule as **`GET /runs`** when **`projectId`** is set on rows. |
 | **GET** | `/jobs/:jobId` | Only when **`dispatch`** is set — poll BullMQ job (**`state`**, **`run`** summary when completed), same idea as **`GET /v1/jobs/:id`** in **`dynamic-runtime-rest`**. |
 
 Optional auth: **`resolveApiKey(req, res)`** (recommended — lazy env, **per-`projectId` secrets** via **`getRuntimeRestRouterProjectId(res)`**) and/or static **`apiKey`**. Tenant middleware runs **before** API-key checks. When the effective secret is non-empty, clients must send **`Authorization: Bearer …`** or **`X-Api-Key`**. Use **`createOptionalRuntimeRestApiKeyMiddleware({ … })`** (same rules) to protect **other** Express mounts with the same secret (e.g. admin routes next to this router).
@@ -48,6 +48,15 @@ When **`agentIds` is omitted**, every agent registered for that tenant (plus glo
 ### Engine errors (inline routes)
 
 For **`EngineError`** subclasses from **`@opencoreagents/core`**, inline **`POST …/run`**, **`POST …/resume`**, **`GET /runs/:runId`**, and **`GET /runs/:runId/history`** return a stable **`code`** (e.g. **`SESSION_EXPIRED`** → **401**, **`RUN_INVALID_STATE`** → **409**, **`LLM_RATE_LIMIT`** → **429**) plus **`error`** text. You can reuse **`mapEngineErrorToHttp(err)`** in your own middleware. Non-engine failures keep generic status bodies. The OpenAPI spec includes **`components.schemas.RuntimeRestJsonError`** (`error` required, `code` optional); **`RUNTIME_REST_ENGINE_ERROR_CODES`** lists codes with explicit HTTP mapping in **`mapEngineErrorToHttp`**.
+
+### Session expiry inputs
+
+Inline and queued **`run`**, **`resume`**, and **`continue`** accept two optional timing fields:
+
+- **`expiresAtMs`** — absolute Unix ms deadline forwarded to **`Session({ expiresAtMs })`** / **`EngineJobPayload.expiresAtMs`**
+- **`extendSessionTtlMs`** — extend the session lifetime by this many ms
+
+If both are present, the router applies **`extendSessionTtlMs`** on top of the later of **`expiresAtMs`** or **now**. This gives hosts a simple “keep this session alive for N more milliseconds” input without recomputing an absolute deadline client-side.
 
 ## Phased plan ([`docs/planning/plan-rest.md`](../../docs/planning/plan-rest.md))
 

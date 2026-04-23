@@ -122,6 +122,27 @@ Use:
 - `RedisDynamicDefinitionsStore`
 - `memoryKeyPrefix`
 
+## RunStore notes
+
+`RedisRunStore` supports the base `RunStore` contract plus session-scoped lookup:
+
+```ts
+interface RunStore {
+  listByAgentAndSession(
+    agentId: string,
+    sessionId: string,
+    opts?: {
+      status?: RunStatus;
+      limit?: number;
+      cursor?: string;
+      order?: "asc" | "desc";
+    }
+  ): Promise<{ runs: Run[]; nextCursor?: string }>;
+}
+```
+
+The Redis implementation maintains a secondary `agentId + sessionId` index so common history paths scale with runs in that session instead of all runs for the agent.
+
 ## Key Compatibility
 
 Memory/run/message-bus key semantics are aligned with `@opencoreagents/adapters-upstash`, which helps when switching between TCP Redis and Upstash REST setups.

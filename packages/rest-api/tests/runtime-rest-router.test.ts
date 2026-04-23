@@ -719,6 +719,106 @@ describe("createRuntimeRestRouter", () => {
     });
   });
 
+  it("inline run accepts expiresAtMs and extendSessionTtlMs", async () => {
+    const runStore = new InMemoryRunStore();
+    const runtime = new AgentRuntime({
+      llmAdapter: new TwoStepLlm(),
+      memoryAdapter: new InMemoryMemoryAdapter(),
+      runStore,
+      maxIterations: 10,
+    });
+
+    await Agent.define({
+      id: "ttl-bot",
+      projectId: "p1",
+      systemPrompt: "x",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o-mini" },
+    });
+
+    const app = express();
+    app.use(
+      createRuntimeRestRouter({
+        runtime,
+        projectId: "p1",
+        agentIds: ["ttl-bot"],
+        runStore,
+      }),
+    );
+
+    await request(app)
+      .post("/agents/ttl-bot/run")
+      .send({ message: "x", expiresAtMs: Date.now() - 1 })
+      .expect(401);
+
+    const ok = await request(app)
+      .post("/agents/ttl-bot/run")
+      .send({
+        message: "x",
+        expiresAtMs: Date.now() - 1,
+        extendSessionTtlMs: 60_000,
+      })
+      .expect(200);
+
+    expect(ok.body.status).toBe("completed");
+  });
+
+  it("inline resume accepts extendSessionTtlMs", async () => {
+    const runStore = new InMemoryRunStore();
+    const runtime = new AgentRuntime({
+      llmAdapter: new WaitThenResultLlm(),
+      memoryAdapter: new InMemoryMemoryAdapter(),
+      runStore,
+      maxIterations: 10,
+    });
+
+    await Agent.define({
+      id: "resume-ttl",
+      projectId: "p1",
+      systemPrompt: "x",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o-mini" },
+    });
+
+    const app = express();
+    app.use(
+      createRuntimeRestRouter({
+        runtime,
+        projectId: "p1",
+        agentIds: ["resume-ttl"],
+        runStore,
+      }),
+    );
+
+    const started = await request(app)
+      .post("/agents/resume-ttl/run")
+      .send({ message: "start", sessionId: "sess-ttl" })
+      .expect(200);
+
+    await request(app)
+      .post("/agents/resume-ttl/resume")
+      .send({
+        runId: started.body.runId,
+        sessionId: "sess-ttl",
+        resumeInput: { type: "text", content: "late" },
+        expiresAtMs: Date.now() - 1,
+      })
+      .expect(401);
+
+    const resumed = await request(app)
+      .post("/agents/resume-ttl/resume")
+      .send({
+        runId: started.body.runId,
+        sessionId: "sess-ttl",
+        resumeInput: { type: "text", content: "now" },
+        expiresAtMs: Date.now() - 1,
+        extendSessionTtlMs: 60_000,
+      })
+      .expect(200);
+
+    expect(resumed.body.status).toBe("completed");
+  });
+
   it("multi-project: X-Project-Id selects tenant", async () => {
     const runStore = new InMemoryRunStore();
     const runtime = new AgentRuntime({

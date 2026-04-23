@@ -2,13 +2,17 @@ import type { RunStore } from "@opencoreagents/core";
 
 /**
  * Convenience implementation of {@link WaitingRunLookup} using a {@link RunStore}.
- * Lists **waiting** runs for `agentId` and picks the one whose `sessionId` matches.
+ * Queries **waiting** runs for `agentId` + `sessionId` directly and returns the newest match.
  */
 export async function findWaitingRunIdFromRunStore(
   runStore: RunStore,
   sessionId: string,
   agentId: string,
 ): Promise<string | undefined> {
-  const waiting = await runStore.listByAgent(agentId, "waiting");
-  return waiting.find((r) => r.sessionId === sessionId)?.runId;
+  const { runs } = await runStore.listByAgentAndSession(agentId, sessionId, {
+    status: "waiting",
+    limit: 1,
+    order: "desc",
+  });
+  return runs[0]?.runId;
 }

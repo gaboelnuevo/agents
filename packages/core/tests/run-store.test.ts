@@ -24,4 +24,46 @@ describe("InMemoryRunStore saveIfStatus", () => {
     );
     expect((await store.load("r1"))!.status).toBe("completed");
   });
+
+  it("lists runs by agent and session with recency ordering and pagination", async () => {
+    const store = new InMemoryRunStore();
+    await store.save(
+      baseRun({
+        runId: "r-old",
+        status: "completed",
+        history: [{ type: "result", content: "old", meta: { ts: "2026-01-01T00:00:00.000Z", source: "engine" } }],
+      }),
+    );
+    await store.save(
+      baseRun({
+        runId: "r-new",
+        status: "waiting",
+        history: [{ type: "result", content: "new", meta: { ts: "2026-01-02T00:00:00.000Z", source: "engine" } }],
+      }),
+    );
+    await store.save(
+      baseRun({
+        runId: "r-other-session",
+        sessionId: "s2",
+        history: [{ type: "result", content: "skip", meta: { ts: "2026-01-03T00:00:00.000Z", source: "engine" } }],
+      }),
+    );
+
+    const firstPage = await store.listByAgentAndSession("a1", "s1", { limit: 1 });
+    expect(firstPage.runs.map((run) => run.runId)).toEqual(["r-new"]);
+    expect(firstPage.nextCursor).toBe("1");
+
+    const secondPage = await store.listByAgentAndSession("a1", "s1", {
+      limit: 1,
+      cursor: firstPage.nextCursor,
+    });
+    expect(secondPage.runs.map((run) => run.runId)).toEqual(["r-old"]);
+    expect(secondPage.nextCursor).toBeUndefined();
+
+    const waitingOnly = await store.listByAgentAndSession("a1", "s1", {
+      status: "waiting",
+      order: "asc",
+    });
+    expect(waitingOnly.runs.map((run) => run.runId)).toEqual(["r-new"]);
+  });
 });

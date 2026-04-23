@@ -43,7 +43,11 @@ export type {
 
 export type { MessageBus, AgentMessage } from "./bus/MessageBus.js";
 
-export type { RunStore } from "./adapters/run/RunStore.js";
+export type {
+  RunStore,
+  RunStoreListByAgentAndSessionOptions,
+  RunStoreListResult,
+} from "./adapters/run/RunStore.js";
 
 export type { BuiltContext, ContextBuilderInput } from "./context/types.js";
 

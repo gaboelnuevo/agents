@@ -179,7 +179,7 @@ Prioritize by what you want to teach (operators vs integrators). None of these e
 
 - [x] **`wait` + `resume` (same process)** — [`rag-contact-support/`](./rag-contact-support/) uses **`InMemoryRunStore`** and **`Agent.resume(runId, { type: "text", content })`** after **`wait`**. **HTTP resume** — [`real-world-with-express/`](./real-world-with-express/) (`POST …/resume`). A **second worker** resuming the same run ID with a shared **`RedisRunStore`** (or similar) remains a good follow-up; see [`docs/core/19-cluster-deployment.md`](../docs/core/19-cluster-deployment.md).
 - [x] **`RunBuilder.onWait`** (in-process) — covered by [`console-wait/`](./console-wait/) (stdin).
-- [ ] **Session expiry** — `Session({ expiresAtMs })` + **`SessionExpiredError`** on `run` / `resume` after expiry.
+- [x] **Session expiry** — `Session({ expiresAtMs })` + **`SessionExpiredError`** on `run` / `resume` after expiry; REST routes also accept **`expiresAtMs`** and **`extendSessionTtlMs`** on `run` / `resume` / `continue`.
 - [ ] **Hooks + `watchUsage`** — `onThought` / `onAction` logging; token totals and “wasted” tokens after failed parses.
 
 ### Adapters & infrastructure

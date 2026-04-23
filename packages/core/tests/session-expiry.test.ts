@@ -107,6 +107,29 @@ describe("session expiry", () => {
     expect(open.isExpired()).toBe(false);
   });
 
+  it("Session.extendBy extends from the current deadline when still active", () => {
+    const session = new Session({
+      id: "s-extend",
+      projectId: "p",
+      expiresAtMs: 1_000,
+    });
+    const extended = session.extendBy(250, 900);
+    expect(extended.expiresAtMs).toBe(1_250);
+    expect(session.expiresAtMs).toBe(1_000);
+  });
+
+  it("Session.extendBy starts from now when expiry is missing or already past", () => {
+    const open = new Session({ id: "s-open", projectId: "p" });
+    expect(open.extendBy(300, 500).expiresAtMs).toBe(800);
+
+    const expired = new Session({
+      id: "s-expired",
+      projectId: "p",
+      expiresAtMs: 100,
+    });
+    expect(expired.extendBy(300, 500).expiresAtMs).toBe(800);
+  });
+
   it("allows run when expiresAtMs is in the future", async () => {
     const mem = new InMemoryMemoryAdapter();
     const llm = new QueueLLM([

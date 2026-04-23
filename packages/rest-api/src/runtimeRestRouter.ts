@@ -344,6 +344,41 @@ function parseWait(req: Request): boolean {
   );
 }
 
+type ParsedSessionTiming =
+  | { ok: true; expiresAtMs?: number }
+  | { ok: false; error: string };
+
+function parseSessionTiming(body: unknown): ParsedSessionTiming {
+  if (body == null || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: true };
+  }
+  const record = body as Record<string, unknown>;
+  let expiresAtMs: number | undefined;
+
+  if (record.expiresAtMs !== undefined) {
+    if (typeof record.expiresAtMs !== "number" || !Number.isFinite(record.expiresAtMs)) {
+      return { ok: false, error: "expiresAtMs must be a finite number when set" };
+    }
+    expiresAtMs = Math.trunc(record.expiresAtMs);
+  }
+
+  if (record.extendSessionTtlMs !== undefined) {
+    if (
+      typeof record.extendSessionTtlMs !== "number" ||
+      !Number.isFinite(record.extendSessionTtlMs) ||
+      record.extendSessionTtlMs <= 0
+    ) {
+      return { ok: false, error: "extendSessionTtlMs must be a positive finite number when set" };
+    }
+    const ttlMs = Math.trunc(record.extendSessionTtlMs);
+    const now = Date.now();
+    const base = expiresAtMs != null && expiresAtMs > now ? expiresAtMs : now;
+    expiresAtMs = base + ttlMs;
+  }
+
+  return expiresAtMs !== undefined ? { ok: true, expiresAtMs } : { ok: true };
+}
+
 function statusUrl(req: Request, jobId: string): string {
   const base = req.baseUrl.endsWith("/") ? req.baseUrl.slice(0, -1) : req.baseUrl;
   return `${base}/jobs/${jobId}`;
@@ -600,9 +635,19 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       return;
     }
 
-    const body = req.body as { message?: unknown; sessionId?: unknown };
+    const body = req.body as {
+      message?: unknown;
+      sessionId?: unknown;
+      expiresAtMs?: unknown;
+      extendSessionTtlMs?: unknown;
+    };
     if (typeof body.message !== "string" || !body.message.trim()) {
       res.status(400).json({ error: "message (string) required" });
+      return;
+    }
+    const sessionTiming = parseSessionTiming(body);
+    if (!sessionTiming.ok) {
+      res.status(400).json({ error: sessionTiming.error });
       return;
     }
 
@@ -621,6 +666,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
           agentId,
           sessionId,
           runId,
+          ...(sessionTiming.expiresAtMs !== undefined
+            ? { expiresAtMs: sessionTiming.expiresAtMs }
+            : {}),
           userInput: body.message.trim(),
         });
         jobId = job.id ?? "";
@@ -706,7 +754,13 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
     }
 
     try {
-      const session = new Session({ id: sessionId, projectId });
+      const session = new Session({
+        id: sessionId,
+        projectId,
+        ...(sessionTiming.expiresAtMs !== undefined
+          ? { expiresAtMs: sessionTiming.expiresAtMs }
+          : {}),
+      });
       const agent = await Agent.load(agentId, runtime, { session });
       const run = await agent.run(body.message.trim());
 
@@ -763,6 +817,8 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       runId?: unknown;
       sessionId?: unknown;
       resumeInput?: unknown;
+      expiresAtMs?: unknown;
+      extendSessionTtlMs?: unknown;
     };
     if (typeof body.runId !== "string" || !body.runId.trim()) {
       res.status(400).json({ error: "runId (string) required" });
@@ -785,6 +841,11 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       return;
     }
     const resumeInput = ri as { type: string; content: string };
+    const sessionTiming = parseSessionTiming(body);
+    if (!sessionTiming.ok) {
+      res.status(400).json({ error: sessionTiming.error });
+      return;
+    }
 
     if (dispatch) {
       const wait = parseWait(req);
@@ -794,6 +855,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
           projectId,
           agentId,
           sessionId: body.sessionId.trim(),
+          ...(sessionTiming.expiresAtMs !== undefined
+            ? { expiresAtMs: sessionTiming.expiresAtMs }
+            : {}),
           runId: body.runId.trim(),
           resumeInput,
         });
@@ -883,6 +947,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       const session = new Session({
         id: body.sessionId.trim(),
         projectId,
+        ...(sessionTiming.expiresAtMs !== undefined
+          ? { expiresAtMs: sessionTiming.expiresAtMs }
+          : {}),
       });
       const agent = await Agent.load(agentId, runtime, { session });
       const run = await agent.resume(body.runId.trim(), resumeInput);
@@ -924,6 +991,8 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       runId?: unknown;
       sessionId?: unknown;
       message?: unknown;
+      expiresAtMs?: unknown;
+      extendSessionTtlMs?: unknown;
     };
     if (typeof body.runId !== "string" || !body.runId.trim()) {
       res.status(400).json({ error: "runId (string) required" });
@@ -937,6 +1006,11 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       res.status(400).json({ error: "message (string) required" });
       return;
     }
+    const sessionTiming = parseSessionTiming(body);
+    if (!sessionTiming.ok) {
+      res.status(400).json({ error: sessionTiming.error });
+      return;
+    }
 
     if (dispatch) {
       const wait = parseWait(req);
@@ -946,6 +1020,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
           projectId,
           agentId,
           sessionId: body.sessionId.trim(),
+          ...(sessionTiming.expiresAtMs !== undefined
+            ? { expiresAtMs: sessionTiming.expiresAtMs }
+            : {}),
           runId: body.runId.trim(),
           userInput: body.message.trim(),
         });
@@ -1037,6 +1114,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
       const session = new Session({
         id: body.sessionId.trim(),
         projectId,
+        ...(sessionTiming.expiresAtMs !== undefined
+          ? { expiresAtMs: sessionTiming.expiresAtMs }
+          : {}),
       });
       const agent = await Agent.load(agentId, runtime, { session });
       const run = await agent.continueRun(body.runId.trim(), body.message.trim());

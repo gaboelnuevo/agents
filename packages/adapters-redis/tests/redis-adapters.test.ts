@@ -32,9 +32,14 @@ describe("RedisRunStore", () => {
     const runningOnly = await rs.listByAgent("a1", "running");
     expect(runningOnly).toHaveLength(0);
 
+    const bySession = await rs.listByAgentAndSession("a1", "s1", { limit: 10 });
+    expect(bySession.runs).toHaveLength(1);
+    expect(bySession.runs[0]!.runId).toBe("r1");
+
     await rs.delete("r1");
     expect(await rs.load("r1")).toBeNull();
     expect(await rs.listByAgent("a1")).toHaveLength(0);
+    expect((await rs.listByAgentAndSession("a1", "s1")).runs).toHaveLength(0);
   });
 
   it("saveIfStatus succeeds only when Redis row still has expected status", async () => {
@@ -54,6 +59,52 @@ describe("RedisRunStore", () => {
     expect(await rs.saveIfStatus({ ...waiting, status: "failed" }, "waiting")).toBe(
       false,
     );
+  });
+
+  it("paginates session-scoped runs in recency order", async () => {
+    const rs = new RedisRunStore(redis);
+    await rs.save({
+      runId: "r-old",
+      agentId: "a-paginated",
+      sessionId: "s-paginated",
+      status: "completed",
+      history: [
+        { type: "result", content: "old", meta: { ts: "2026-01-01T00:00:00.000Z", source: "engine" } },
+      ],
+      state: { iteration: 0, pending: null, parseAttempts: 0, userInput: "" },
+    });
+    await rs.save({
+      runId: "r-new",
+      agentId: "a-paginated",
+      sessionId: "s-paginated",
+      status: "waiting",
+      history: [
+        { type: "result", content: "new", meta: { ts: "2026-01-02T00:00:00.000Z", source: "engine" } },
+      ],
+      state: { iteration: 0, pending: null, parseAttempts: 0, userInput: "" },
+    });
+    await rs.save({
+      runId: "r-other-session",
+      agentId: "a-paginated",
+      sessionId: "s2",
+      status: "waiting",
+      history: [
+        { type: "result", content: "other", meta: { ts: "2026-01-03T00:00:00.000Z", source: "engine" } },
+      ],
+      state: { iteration: 0, pending: null, parseAttempts: 0, userInput: "" },
+    });
+
+    const firstPage = await rs.listByAgentAndSession("a-paginated", "s-paginated", { limit: 1 });
+    expect(firstPage.runs.map((run) => run.runId)).toEqual(["r-new"]);
+    expect(firstPage.nextCursor).toBe("1");
+
+    const secondPage = await rs.listByAgentAndSession("a-paginated", "s-paginated", {
+      limit: 1,
+      cursor: firstPage.nextCursor,
+      order: "desc",
+    });
+    expect(secondPage.runs.map((run) => run.runId)).toEqual(["r-old"]);
+    expect(secondPage.nextCursor).toBeUndefined();
   });
 });
 

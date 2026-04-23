@@ -1,5 +1,17 @@
 import type { Run, RunStatus } from "../../protocol/types.js";
 
+export interface RunStoreListByAgentAndSessionOptions {
+  status?: RunStatus;
+  limit?: number;
+  cursor?: string;
+  order?: "asc" | "desc";
+}
+
+export interface RunStoreListResult {
+  runs: Run[];
+  nextCursor?: string;
+}
+
 /**
  * Persists `Run` objects for `wait`/`resume` across processes.
  *
@@ -20,4 +32,9 @@ export interface RunStore {
   load(runId: string): Promise<Run | null>;
   delete(runId: string): Promise<void>;
   listByAgent(agentId: string, status?: RunStatus): Promise<Run[]>;
+  listByAgentAndSession(
+    agentId: string,
+    sessionId: string,
+    opts?: RunStoreListByAgentAndSessionOptions,
+  ): Promise<RunStoreListResult>;
 }

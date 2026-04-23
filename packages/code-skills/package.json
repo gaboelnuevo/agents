@@ -1,6 +1,6 @@
 {
   "name": "@opencoreagents/code-skills",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "license": "Apache-2.0",
   "description": "Agent skill packs (SKILL.md) so Cursor, Claude Code, Codex, etc. know how to use @opencoreagents/* libraries.",

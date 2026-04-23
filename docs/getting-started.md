@@ -210,7 +210,7 @@ await Agent.define({
 
 ## 10. Session, load, and run
 
-Each **`Agent.load`** is scoped with a **`Session`**: a stable **`id`** for the conversation (e.g. end-user or thread) and a **`projectId`** that must match the agent definition so memory and registry lookups stay in the right tenant.
+Each **`Agent.load`** is scoped with a **`Session`**: a stable **`id`** for the conversation (e.g. end-user or thread) and a **`projectId`** that must match the agent definition so memory and registry lookups stay in the right tenant. Sessions can also carry an optional **`expiresAtMs`** deadline and can be renewed in code with **`session.withExpiresAt(...)`** or **`session.extendBy(ttlMs)`**.
 
 ```ts
 import { Session } from "@your-scope/agents";

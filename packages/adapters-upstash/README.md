@@ -11,6 +11,27 @@ Use this package when you want **serverless- or edge-friendly** `fetch`-only cal
 - `UpstashRedisMessageBus` — Redis Streams via REST (`system_send_message` across processes)
 - `UpstashVectorAdapter` — `VectorAdapter` for semantic search / upserts
 
+## RunStore notes
+
+`UpstashRunStore` implements the same session-scoped query shape as the TCP Redis adapter:
+
+```ts
+interface RunStore {
+  listByAgentAndSession(
+    agentId: string,
+    sessionId: string,
+    opts?: {
+      status?: RunStatus;
+      limit?: number;
+      cursor?: string;
+      order?: "asc" | "desc";
+    }
+  ): Promise<{ runs: Run[]; nextCursor?: string }>;
+}
+```
+
+This is useful for recall-style history reads and waiting-run lookups without scanning every run for the agent.
+
 ## Docs
 
 - [06-adapters-infrastructure.md](../../docs/core/06-adapters-infrastructure.md) (Upstash REST + vector)

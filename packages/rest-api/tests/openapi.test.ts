@@ -53,6 +53,29 @@ describe("buildRuntimeRestOpenApiSpec", () => {
     expect(content.required).toContain("projectId");
   });
 
+  it("documents session expiry fields on run, resume, and continue", () => {
+    const spec = buildRuntimeRestOpenApiSpec({
+      hasDispatch: false,
+      hasRunStore: true,
+      multiProject: false,
+      hasApiKey: false,
+    });
+    const paths = spec.paths as Record<string, { post?: { requestBody?: { content: { "application/json": { schema: { properties: Record<string, unknown> } } } } } }>;
+    const runProps =
+      paths["/agents/{agentId}/run"]!.post!.requestBody!.content["application/json"].schema.properties;
+    const resumeProps =
+      paths["/agents/{agentId}/resume"]!.post!.requestBody!.content["application/json"].schema.properties;
+    const continueProps =
+      paths["/agents/{agentId}/continue"]!.post!.requestBody!.content["application/json"].schema.properties;
+
+    expect(runProps.expiresAtMs).toBeDefined();
+    expect(runProps.extendSessionTtlMs).toBeDefined();
+    expect(resumeProps.expiresAtMs).toBeDefined();
+    expect(resumeProps.extendSessionTtlMs).toBeDefined();
+    expect(continueProps.expiresAtMs).toBeDefined();
+    expect(continueProps.extendSessionTtlMs).toBeDefined();
+  });
+
   it("merges securitySchemes with schemas when hasApiKey", () => {
     const spec = buildRuntimeRestOpenApiSpec({
       hasDispatch: false,
