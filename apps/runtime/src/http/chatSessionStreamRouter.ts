@@ -6,9 +6,11 @@ export function chatBindingRedisKey(
   definitionsKeyPrefix: string,
   projectId: string,
   sessionId: string,
+  tenantId?: string,
 ): string {
   const p = definitionsKeyPrefix.replace(/:+$/, "").trim() || "def";
-  return `${p}:chatBinding:${projectId}:${sessionId}`;
+  const t = typeof tenantId === "string" && tenantId.trim().length > 0 ? tenantId.trim() : "";
+  return t ? `${p}:chatBinding:${projectId}:${t}:${sessionId}` : `${p}:chatBinding:${projectId}:${sessionId}`;
 }
 
 /**
@@ -32,7 +34,13 @@ export function createChatSessionStreamRouter(opts: {
       return;
     }
 
-    const bindKey = chatBindingRedisKey(opts.definitionsKeyPrefix, opts.projectId, sessionId);
+    const tenantId = req.header("x-tenant-id") ?? undefined;
+    const bindKey = chatBindingRedisKey(
+      opts.definitionsKeyPrefix,
+      opts.projectId,
+      sessionId,
+      tenantId,
+    );
     const exists = await opts.redis.exists(bindKey);
     if (!exists) {
       res.status(404).json({ error: "unknown chat session" });

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RedisDynamicDefinitionsStore } from "@opencoreagents/adapters-redis";
-import type { RunStore } from "@opencoreagents/core";
+import type { Run, RunStore } from "@opencoreagents/core";
 import type { EngineQueue } from "@opencoreagents/adapters-bullmq";
 import {
   isBullmqJobWaitTimeoutError,
@@ -57,6 +57,21 @@ function parseBinding(raw: string | null): ChatBinding | null {
   }
 }
 
+async function findLastRunFromRunStore(
+  runStore: RunStore,
+  projectId: string,
+  sessionId: string,
+  agentId: string,
+  tenantId?: string,
+): Promise<Run | null> {
+  const { runs } = await runStore.listByAgentAndSession(projectId, agentId, sessionId, {
+    tenantId: tenantId || undefined,
+    limit: 1,
+    order: "desc",
+  });
+  return runs[0] ?? null;
+}
+
 export function createChatRouter(opts: {
   store: RedisDynamicDefinitionsStore;
   redis: Redis;
@@ -92,7 +107,8 @@ export function createChatRouter(opts: {
         ? body.sessionId.trim()
         : randomUUID();
 
-    const bindKey = chatBindingRedisKey(opts.definitionsKeyPrefix, opts.projectId, sessionId);
+    const tenantId = req.header("x-tenant-id") ?? undefined;
+    const bindKey = chatBindingRedisKey(opts.definitionsKeyPrefix, opts.projectId, sessionId, tenantId);
     const chatAgentId = opts.config.chat.defaultAgent.id;
 
     try {
@@ -114,10 +130,40 @@ export function createChatRouter(opts: {
     const projectId = opts.projectId;
 
     let binding = parseBinding(await opts.redis.get(bindKey));
+    let run: Run | null = null;
     let jobId = "";
 
     try {
       if (!binding) {
+        run = await findLastRunFromRunStore(opts.runStore, projectId, sessionId, chatAgentId, tenantId);
+        if (run) {
+          binding = { runId: run.runId, agentId: chatAgentId };
+          await opts.redis.set(bindKey, JSON.stringify(binding));
+        }
+      }
+
+      if (binding && !run) {
+        run = await opts.runStore.load(binding.runId);
+      }
+
+      if (binding && !run) {
+        await opts.redis.del(bindKey);
+        const recovered = await findLastRunFromRunStore(
+          opts.runStore,
+          projectId,
+          sessionId,
+          chatAgentId,
+        );
+        if (recovered) {
+          run = recovered;
+          binding = { runId: run.runId, agentId: chatAgentId };
+          await opts.redis.set(bindKey, JSON.stringify(binding));
+        } else {
+          binding = null;
+        }
+      }
+
+      if (!binding || !run) {
         const runId = randomUUID();
         binding = { runId, agentId: chatAgentId };
         await opts.redis.set(bindKey, JSON.stringify(binding));
@@ -183,69 +229,6 @@ export function createChatRouter(opts: {
           sessionId,
           error: "job finished but return value is missing or not a Run",
         });
-        return;
-      }
-
-      const run = await opts.runStore.load(binding.runId);
-      if (!run) {
-        await opts.redis.del(bindKey);
-        const runId = randomUUID();
-        const next: ChatBinding = { runId, agentId: chatAgentId };
-        await opts.redis.set(bindKey, JSON.stringify(next));
-
-        const job = await opts.engine.addRun({
-          projectId,
-          agentId: chatAgentId,
-          sessionId,
-          runId,
-          userInput: message,
-        });
-        jobId = job.id ?? "";
-        if (!jobId) {
-          await opts.redis.del(bindKey);
-          res.status(500).json({ sessionId, error: "enqueue failed (missing job id)" });
-          return;
-        }
-        if (!wait) {
-          res.status(202).json({
-            jobId,
-            sessionId,
-            projectId,
-            runId,
-            agentId: chatAgentId,
-            statusUrl: `/jobs/${jobId}`,
-            pollUrl: `/jobs/${jobId}`,
-          });
-          return;
-        }
-        let finishedValue: unknown;
-        try {
-          finishedValue = await job.waitUntilFinished(opts.queueEvents, opts.jobWaitTimeoutMs);
-        } catch (waitErr) {
-          const msg = errorMessage(waitErr);
-          if (isBullmqJobWaitTimeoutError(waitErr)) {
-            res.status(504).json({ jobId, sessionId, projectId, runId, error: msg });
-            return;
-          }
-          res.status(502).json({ jobId, sessionId, projectId, runId, error: msg });
-          return;
-        }
-        let runDone = await resolveRunForChatReply(opts.runStore, finishedValue);
-        if (!runDone) runDone = await resolveRunForChatReply(opts.runStore, job.returnvalue);
-        if (runDone) {
-          const s = summarizeEngineRun(runDone);
-          res.json({
-            jobId,
-            sessionId,
-            projectId,
-            runId: s.runId,
-            agentId: chatAgentId,
-            status: s.status,
-            ...(s.reply !== undefined ? { reply: s.reply } : {}),
-          });
-          return;
-        }
-        res.status(500).json({ jobId, sessionId, error: "job finished but return value is missing or not a Run" });
         return;
       }
 

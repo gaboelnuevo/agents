@@ -13,4 +13,10 @@ describe("chatBindingRedisKey", () => {
   it("uses def when prefix is empty after trim", () => {
     expect(chatBindingRedisKey("   ", "p", "s")).toBe("def:chatBinding:p:s");
   });
+
+  it("adds tenant segment when tenantId is provided", () => {
+    expect(chatBindingRedisKey("def", "p1", "sess-a", "tenant-x")).toBe(
+      "def:chatBinding:p1:tenant-x:sess-a",
+    );
+  });
 });

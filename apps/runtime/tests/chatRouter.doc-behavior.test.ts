@@ -69,6 +69,22 @@ function mockRunStore(runs: Map<string, Run>): RunStore {
     saveIfStatus: vi.fn(),
     delete: vi.fn(),
     listByAgent: vi.fn(),
+    listByAgentAndSession: vi.fn().mockImplementation(
+      async (
+        projectId: string,
+        agentId: string,
+        sessionId: string,
+        opts?: { status?: Run["status"]; limit?: number; order?: "asc" | "desc" },
+      ) => {
+        let rows = [...runs.values()].filter(
+          (r) => r.projectId === projectId && r.agentId === agentId && r.sessionId === sessionId,
+        );
+        if (opts?.status) rows = rows.filter((r) => r.status === opts.status);
+        if (opts?.order !== "asc") rows = rows.reverse();
+        const limit = opts?.limit ?? rows.length;
+        return { runs: rows.slice(0, limit) };
+      },
+    ),
   } as unknown as RunStore;
 }
 
@@ -311,5 +327,77 @@ describe("POST /v1/chat (docs/chat-runs-and-planner.md)", () => {
     const bindKey = chatBindingRedisKey(PREFIX, PROJECT, sessionId);
     const bound = JSON.parse((await redis.get(bindKey))!);
     expect(bound.runId).toBe(runId1);
+  });
+
+  it("without Redis binding, recovers latest run from RunStore and uses addContinue", async () => {
+    const redis = makeRedis();
+    const sessionId = "sess-native-last";
+    const runId = "run-last-1";
+    const runs = new Map<string, Run>([
+      [
+        runId,
+        stubRun({
+          runId,
+          status: "completed",
+          sessionId,
+          projectId: PROJECT,
+          agentId: CHAT_ID,
+        }),
+      ],
+    ]);
+    const addRun = vi.fn().mockReturnValue(mockJob("job-new"));
+    const addContinue = vi.fn().mockReturnValue(mockJob("job-cont"));
+    const app = mountChatRouter({
+      config: { ...defaultStackConfig, project: { id: PROJECT } },
+      redis,
+      runs,
+      addRun,
+      addContinue,
+    });
+
+    await request(app).post("/v1/chat").send({ message: "resume from store", sessionId }).expect(202);
+
+    expect(addRun).not.toHaveBeenCalled();
+    expect(addContinue).toHaveBeenCalledTimes(1);
+    expect(addContinue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId,
+        sessionId,
+        agentId: CHAT_ID,
+        userInput: "resume from store",
+      }),
+    );
+
+    const bindKey = chatBindingRedisKey(PREFIX, PROJECT, sessionId);
+    expect(JSON.parse((await redis.get(bindKey))!)).toEqual({ runId, agentId: CHAT_ID });
+  });
+
+  it("stores chat binding in a tenant-scoped key when x-tenant-id is provided", async () => {
+    const redis = makeRedis();
+    const runs = new Map<string, Run>();
+    const addRun = vi.fn().mockReturnValue(mockJob("job-tenant"));
+    const app = mountChatRouter({
+      config: { ...defaultStackConfig, project: { id: PROJECT } },
+      redis,
+      runs,
+      addRun,
+      addContinue: vi.fn(),
+    });
+
+    const sessionId = "sess-tenant-key";
+    const tenantId = "tenant-a";
+    const res = await request(app)
+      .post("/v1/chat")
+      .set("x-tenant-id", tenantId)
+      .send({ message: "hello tenant", sessionId })
+      .expect(202);
+
+    const tenantBindKey = chatBindingRedisKey(PREFIX, PROJECT, sessionId, tenantId);
+    const globalBindKey = chatBindingRedisKey(PREFIX, PROJECT, sessionId);
+    expect(JSON.parse((await redis.get(tenantBindKey))!)).toEqual({
+      runId: res.body.runId,
+      agentId: CHAT_ID,
+    });
+    expect(await redis.get(globalBindKey)).toBeNull();
   });
 });
