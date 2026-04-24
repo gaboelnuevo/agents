@@ -1,120 +1,124 @@
 # OpenCore Agents
 
-TypeScript **monorepo**: **`@opencoreagents/*`** in **`packages/`**, consumed via **`pnpm` workspaces** from a clone. **Not** on public npm yet.
+TypeScript monorepo for production-shaped agent backends.
 
-**Production-shaped agent backends in TypeScript**—so you ship **APIs and workers** your team can own, not a demo script that dies on the first timeout.
+OpenCore Agents helps teams ship agent APIs and workers they can own in production, not demo scripts that collapse on timeouts or process restarts.
 
-Use the OpenClaw skill ecosystem you already know, but run it your way. **`@opencoreagents/runtime`** gives you the freedom to build, customize, and scale your assistant without relying on the OpenClaw Gateway.
+Use the OpenClaw skill ecosystem you already know, but run it your way. `@opencoreagents/runtime` gives you control to build, customize, and scale assistants without depending on the OpenClaw Gateway.
 
-Stop hand-rolling the same glue: a **typed agent loop** (`thought` → `action` → `observation` → `result`, plus **`wait` / `resume`**), **tools and RAG**, **shared memory and run state**, and **BullMQ** execution.
+Stop hand-rolling the same glue:
 
-There is also an optional path where **prompts and tool configs live in Redis** and update **without redeploying workers**. Plug in OpenAI, Anthropic, Redis, Upstash, Express—**no global singleton** hiding who runs what.
+- Typed execution loop (`thought` -> `action` -> `observation` -> `result`) with `wait`/`resume`
+- Autonomous planning primitives (`invoke_planner`, `wait_for_agents`, sub-agent spawn patterns)
+- Tools, skills, and RAG support
+- Shared memory and run state patterns
+- BullMQ worker execution
+- Optional dynamic definitions in Redis (update prompts/tools without redeploying workers)
 
-*Apache License 2.0 — use and ship it in commercial products without copyleft baggage.*
+Plug in OpenAI, Anthropic, Redis, Upstash, Express. Explicit wiring, no hidden global singleton.
 
----
+Apache License 2.0: use it in commercial products without copyleft constraints.
 
 ## Easy getting started (runnable stack)
 
-To try the **REST API** contract ([**plan-rest**](docs/roadmap/plan-rest.md)) against a real **Redis + API + BullMQ worker** without wiring packages yourself, use the reference app **`@opencoreagents/runtime`**:
+To try the REST API contract against a real Redis + API + BullMQ worker without wiring packages manually, use the reference app in `apps/runtime`.
 
-1. Install [Docker](https://docs.docker.com/get-docker/) (Desktop or Engine + Compose v2). No pnpm required.
-2. Configure YAML: in **`apps/runtime`**, **`cp config/docker.stack.example.yaml config/docker.stack.yaml`** and edit (see **[`apps/runtime/README.md`](apps/runtime/README.md)**).
-3. From the **repository root**: **`docker compose -f apps/runtime/docker-compose-with-redis.yml up --build`**
-4. Open [http://localhost:3010/health](http://localhost:3010/health) (optional [?details=1](http://localhost:3010/health?details=1) for `projectId` and queue) and the OpenAPI UI at `/docs` on the same port.
+The runnable stack includes a dynamic planner path: default orchestrator agent seed, background planner invocation, optional SSE notifications, and continuous run follow-up (`/agents/:agentId/continue` with same `runId`).
 
-Full guides (Docker, config, security, cloud): **[`apps/runtime/README.md`](apps/runtime/README.md)** and **[`apps/runtime/docs/`](apps/runtime/docs/README.md)**.
+1. Install [Docker](https://docs.docker.com/get-docker/).
+2. Configure stack YAML:
+`cp apps/runtime/config/docker.stack.example.yaml apps/runtime/config/docker.stack.yaml`
+3. From repo root:
+`docker compose -f apps/runtime/docker-compose-with-redis.yml up --build`
+4. Verify:
+[http://localhost:3010/health](http://localhost:3010/health)
 
-**Using Cursor, Claude Code, Codex, or similar?** Point them at **[`@opencoreagents/code-skills`](packages/code-skills/README.md)** (`SKILL.md` packs for this repo’s engine, REST/RAG, and layout)—see [Coding assistant skill packs](#coding-assistant-skill-packs) and the [table below](#assistant-skills-cursor--claude--codex).
+Optional checks after boot:
 
----
+- [http://localhost:3010/docs](http://localhost:3010/docs) for OpenAPI
+- [http://localhost:3010/ui](http://localhost:3010/ui) for interactive playground
 
-## Contents
-
-- [Easy getting started (runnable stack)](#easy-getting-started-runnable-stack)
-- [What you ship faster](#what-you-ship-faster)
-- [What teams build with it](#what-teams-build-with-it)
-- [Under the hood](#under-the-hood)
-- [Library, not a hosted product](#library-not-a-hosted-product)
-- [How it works](#how-it-works)
-- [Packages](#packages)
-- [Examples](#examples)
-- [Docs](#docs) (includes [Planning](#planning) and [coding assistant skill packs](#coding-assistant-skill-packs))
-- [Develop](#develop)
-- [License](#license)
-
----
+Full runtime guides: [apps/runtime/README](apps/runtime/README.md), [apps/runtime/docs](apps/runtime/docs/README.md).
 
 ## What you ship faster
 
-- **A real execution model** — long runs, human-in-the-loop, resume across processes when you add a **`RunStore`**; observe every step with **`RunBuilder`** hooks.
-
-- **A SaaS-friendly split** — HTTP surface (**`@opencoreagents/rest-api`**) plus **queue workers**; the API stays responsive while **`dispatchEngineJob` / `runtime.dispatch`** does the heavy lifting.
-
-- **Configurable agents for B2B** — definitions in **`RedisDynamicDefinitionsStore`**; workers **hydrate per job** so each tenant’s prompts and HTTP tools can change on the next job ([`examples/dynamic-runtime-rest`](examples/dynamic-runtime-rest/)).
-
-- **Batteries you can swap** — `LLMAdapter`, `MemoryAdapter`, vectors, gateways: keep what fits your stack, replace what does not.
-
----
+- Real execution lifecycle: long runs, human-in-the-loop, `wait`/`resume`, step observers
+- SaaS-friendly architecture: API layer + async workers
+- Autonomous orchestration: background planning jobs, planner tool invocation, and sub-agent patterns
+- Configurable B2B agents: Redis-backed definitions hydrated per job
+- Replaceable infrastructure: adapters for LLM, memory, queues, vectors, gateways
 
 ## What teams build with it
 
-| You are building… | What here helps |
-|-------------------|-----------------|
-| **B2B / multi-tenant “configurable agents”** | Store **agents, skills, and HTTP tool JSON** in Redis (`RedisDynamicDefinitionsStore`); workers **hydrate per job** so prompt/tool changes apply **without redeploy**.<br><br>Walkthrough: [`examples/dynamic-runtime-rest`](examples/dynamic-runtime-rest/) · [`docs/reference/core/21-dynamic-runtime-rest.md`](docs/reference/core/21-dynamic-runtime-rest.md) |
-| **HTTP API + workers (classic SaaS shape)** | **`@opencoreagents/rest-api`** for plan-shaped routes; **`dispatchEngineJob`** / **`AgentRuntime.dispatch`** for **BullMQ**—enqueue from the API, execute in workers.<br><br>Minimal REST-only: [`examples/plan-rest-express`](examples/plan-rest-express/). Full stack (Redis + queue): [`examples/dynamic-runtime-rest`](examples/dynamic-runtime-rest/). [`docs/roadmap/plan-rest.md`](docs/roadmap/plan-rest.md) |
-| **Support or internal copilots** | **RAG** packages + **HTTP tools** to reach tickets/CRMs; **`wait` / `resume`** when the agent needs human input.<br><br>[`examples/rag-contact-support`](examples/rag-contact-support/) · [`examples/real-world-with-express`](examples/real-world-with-express/) |
-| **Multi-agent or gateway flows** | In-process **message bus**, **`@opencoreagents/conversation-gateway`** for normalized inbound events (e.g. messaging webhooks).<br><br>[`examples/multi-agent`](examples/multi-agent/) · [`examples/telegram-example-mocked`](examples/telegram-example-mocked/) (mock Telegram → gateway, no real Bot API) |
+| You are building | What here helps |
+|---|---|
+| B2B multi-tenant configurable agents | Redis definitions (`RedisDynamicDefinitionsStore`) + per-job hydration for no-redeploy prompt/tool updates. See [dynamic runtime example](examples/dynamic-runtime-rest/) and [dynamic runtime reference](docs/reference/core/21-dynamic-runtime-rest.md). |
+| HTTP API + workers | `@opencoreagents/rest-api` + `dispatchEngineJob` / `AgentRuntime.dispatch` + BullMQ. See [plan REST example](examples/plan-rest-express/), [full Redis+worker example](examples/dynamic-runtime-rest/), and [REST plan](docs/roadmap/plan-rest.md). |
+| Autonomous planning agents | Dynamic planner tools + `invoke_planner` to enqueue planning runs in background, with optional stream notifications and run continuation. See [runtime app README](apps/runtime/README.md) and [runs/planner guide](apps/runtime/docs/chat-runs-and-planner.md). |
+| Support copilots / internal assistants | RAG + HTTP tools + `wait`/`resume`. See [RAG contact support](examples/rag-contact-support/) and [real-world express](examples/real-world-with-express/). |
+| Multi-agent / gateway flows | Message bus + conversation gateway. See [multi-agent](examples/multi-agent/) and [telegram mocked gateway](examples/telegram-example-mocked/). |
 
-**Skip this repo** if you only need a single `chat.completions` call with no tools, session memory, or background jobs—the vendor SDK is enough.
-
----
-
-## Under the hood
-
-Stateful **engine**: protocol loop, pluggable adapters (LLM, memory, vector, queues), RAG and multi-agent helpers, CLI/scaffold.
-
-Sixteen **`@opencoreagents/*`** packages in **`packages/`** (see [Packages](#packages) below). Registry releases, when used, are **maintainer-only**: [GitHub Packages](#github-packages).
-
----
+If you only need a single `chat.completions` call without tools, memory, or background jobs, a vendor SDK is usually enough.
 
 ## Library, not a hosted product
 
-You keep **auth, tenant isolation, billing, and your data plane**.
+You keep auth, tenant isolation, billing, and your data plane.
 
-This codebase gives you the **agent runtime and integration patterns** so you are not rebuilding loops, job dispatch, and dynamic registration from scratch.
+This repo gives you runtime primitives and integration patterns so you do not rebuild loops, dispatch, and dynamic registration from scratch.
 
-Before customer traffic, read [**`docs/roadmap/technical-debt.md`**](docs/roadmap/technical-debt.md) (start with [**`technical-debt-security-production.md`**](docs/roadmap/technical-debt-security-production.md) for tenancy and HTTP gaps) and [**`docs/reference/core/11-scope-and-security.md`**](docs/reference/core/11-scope-and-security.md).
+Before customer traffic, read:
 
-Demos use permissive defaults (mock LLM, in-memory stores) on purpose—**swap them for Redis, real LLMs, and strict keys** in your deployment.
-
----
+- [technical debt hub](docs/roadmap/technical-debt.md)
+- [security and production debt](docs/roadmap/technical-debt-security-production.md)
+- [scope and security reference](docs/reference/core/11-scope-and-security.md)
 
 ## How it works
 
-Define **tools**, **skills**, and **agents** in code (or hydrate from a store).
+Define tools, skills, and agents in code (or hydrate from a store).
 
-Create one **`AgentRuntime`** per process/worker, then **`Agent.load(id, runtime, { session })`** and **`run()`**.
+Create one `AgentRuntime` per process/worker, then `Agent.load(id, runtime, { session })` and `run()`.
 
-The engine runs the loop, memory scopes, optional **`RunStore`** for cluster **`resume`**, and **`dispatchEngineJob(runtime, payload)`** (**`@opencoreagents/core`**, also on **`@opencoreagents/adapters-bullmq`**) for workers—**explicit wiring**, no hidden global executor.
+Use `RunStore` for cross-process resume and BullMQ workers for async execution (`dispatchEngineJob` / `runtime.dispatch`).
 
-### Minimal example (OpenAI)
+For autonomous orchestration, the runtime stack can delegate planning to background runs and continue the same conversation thread with `continue` semantics on the same `runId`.
 
-Requires **`OPENAI_API_KEY`**.
+### Promise-style runtime API (observers, wait, and scale)
 
-**`OpenAILLMAdapter`** is the real **`LLMAdapter`** for Chat Completions. For **keyless** mock-LLM walkthroughs, see [`examples/minimal-run`](examples/minimal-run/) (smallest loop) and [`examples/load-openclaw-skills`](examples/load-openclaw-skills/) (**`SKILL.md`** packs + **`exec`** via **`skill-loader-openclaw`**).
+`agent.run(input)` returns a `RunBuilder` that feels like promise-style composition:
 
-**`InMemoryMemoryAdapter`** keeps session memory **inside the Node process** only—fine for tests and single-process demos; it is **not** shared across workers or restarts.
+- Chain lifecycle observers (`onThought`, `onAction`, `onObservation`, `onWait`)
+- Keep local, interactive flows simple
+- Resolve to a final `Run` with full history for audit/debug
+
+```typescript
+// `agent` = await Agent.load(..., runtime, { session })
+await agent
+  .run("Ticket #4412: refund still pending after 5 business days — what should we do next?")
+  .onThought((t) => console.debug("[thought]", t.content))
+  .onAction((a) => console.debug("[action]", a.tool, a.input))
+  .onObservation((o) => console.debug("[observation]", o))
+  .onWait(async (w) => {
+    // Return a string to continue in-process; return undefined to keep status = waiting
+    if (w.reason === "user_input") {
+      return prompt((w.details as { question?: string })?.question ?? "");
+    }
+  })
+  .then((run) => {
+    const ended = run.history.find((h) => h.type === "result");
+    console.log("[result]", ended?.content);
+  });
+```
+
+Same developer ergonomics, different deployment shape: keep this API for local flows, then move the long-running path to `RunStore` + BullMQ workers when you need cross-process durability.
+
+Minimal example with OpenAI adapter:
 
 ```typescript
 import { OpenAILLMAdapter } from "@opencoreagents/adapters-openai";
 import { Agent, AgentRuntime, Session, InMemoryMemoryAdapter } from "@opencoreagents/core";
 
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) throw new Error("Set OPENAI_API_KEY");
-
 const runtime = new AgentRuntime({
-  llmAdapter: new OpenAILLMAdapter(apiKey),
+  llmAdapter: new OpenAILLMAdapter(process.env.OPENAI_API_KEY!),
   memoryAdapter: new InMemoryMemoryAdapter(),
 });
 
@@ -134,234 +138,55 @@ const run = await agent.run("Say hello.");
 console.log(run.status, run.history);
 ```
 
-### LLM and memory adapters
+For production memory/scale details, use:
 
-**Other LLM providers:** swap **`OpenAILLMAdapter`** for **`AnthropicLLMAdapter`** from **`@opencoreagents/adapters-anthropic`**, or implement **`LLMAdapter`** yourself (see mocks in [`examples/minimal-run`](examples/minimal-run/) and [`examples/load-openclaw-skills`](examples/load-openclaw-skills/)).
+- [cluster deployment reference](docs/reference/core/16-cluster-deployment.md)
+- [adapters contracts](docs/reference/core/05-adapters-contracts.md)
+- [adapters infrastructure](docs/reference/core/13-adapters-infrastructure.md)
 
-**Memory — in-process vs Redis:** keep **`InMemoryMemoryAdapter`** when a single process owns the whole run and you do not need durability or sharing.
+## Packages (high level)
 
-For **multiple API instances or queue workers** (or memory that survives process restarts), use **`RedisMemoryAdapter`** from **`@opencoreagents/adapters-redis`** (TCP Redis) or **`UpstashRedisMemoryAdapter`** from **`@opencoreagents/adapters-upstash`** so every worker sees the same scoped memory for a given session.
-
-### Observers, `wait`, and scaling out
-
-**`agent.run(input)`** returns a **`RunBuilder`**: chain observers, then resolve to a **`Run`** (inspect **`run.history`** for the final **`result`** message).
-
-```typescript
-// `agent` = await Agent.load(..., runtime, { session }) as above
-await agent
-  .run("Ticket #4412: refund still pending after 5 business days — what should we do next?")
-  .onThought((t) => console.debug("[thought]", t.content))
-  .onAction((a) => console.debug("[action]", a.tool, a.input))
-  .onObservation((o) => console.debug("[observation]", o))
-  .onWait(async (w) => {
-    // Agent paused — return a string to continue in-process, or `undefined` to stay `waiting`
-    if (w.reason === "user_input") {
-      return prompt((w.details as { question?: string })?.question ?? "");
-    }
-  })
-  .then((run) => {
-    const ended = run.history.find((h) => h.type === "result");
-    console.log("[result]", ended?.content);
-  });
-```
-
-When you move past a single process, add **`RedisMemoryAdapter`** / **`RedisRunStore`** as needed and **`@opencoreagents/adapters-bullmq`** so **`dispatchEngineJob`** runs work off the HTTP request path.
-
-### REST API (`@opencoreagents/rest-api`)
-
-Mount **`createRuntimeRestRouter`** after **`Agent.define`** and **`AgentRuntime`** so HTTP clients use the plan-shaped JSON routes (`GET /agents`, `POST /agents/:id/run`, run history, optional Swagger).
-
-Runnable demo: [`examples/plan-rest-express`](examples/plan-rest-express/). Route contract: [`docs/roadmap/plan-rest.md`](docs/roadmap/plan-rest.md).
-
-```typescript
-import express from "express";
-import { createRuntimeRestRouter } from "@opencoreagents/rest-api";
-
-const app = express();
-app.use(
-  createRuntimeRestRouter({
-    runtime,
-    projectId: "my-project",
-    runStore, // e.g. InMemoryRunStore or RedisRunStore
-    resolveApiKey: () => process.env.REST_API_KEY?.trim() || undefined,
-  }),
-);
-app.listen(3050);
-```
-
-### Dynamic definitions (Redis + worker)
-
-Put **agents / skills / HTTP tools** in **`RedisDynamicDefinitionsStore`**.
-
-On the worker, set **`dynamicDefinitionsStore`** (and optional **`dynamicDefinitionsSecrets`**) on **`AgentRuntime`** so **`runtime.dispatch(job.data)`** (or **`dispatchEngineJob`**) **hydrates from Redis per job**—edits in Redis apply on the next job without redeploying workers.
-
-End-to-end sample: [`examples/dynamic-runtime-rest`](examples/dynamic-runtime-rest/). Deep dive: [`docs/reference/core/21-dynamic-runtime-rest.md`](docs/reference/core/21-dynamic-runtime-rest.md).
-
-```typescript
-import { createEngineWorker } from "@opencoreagents/adapters-bullmq";
-import { RedisDynamicDefinitionsStore } from "@opencoreagents/adapters-redis";
-import { AgentRuntime } from "@opencoreagents/core";
-
-const store = new RedisDynamicDefinitionsStore(redis, { keyPrefix: "myapp:defs" });
-const runtime = new AgentRuntime({
-  llmAdapter,
-  memoryAdapter,
-  dynamicDefinitionsStore: store,
-  // Optional: resolve {{secret:*}} in HTTP tool templates during hydration
-  dynamicDefinitionsSecrets: () => ({ api_token: process.env.DOWNSTREAM_API_TOKEN ?? "" }),
-});
-
-createEngineWorker("engine", workerRedisConnection, async (job) => runtime.dispatch(job.data));
-```
-
-Your **HTTP control plane** (Express or any framework) typically **writes definitions** through the store facade and **enqueues** run/resume jobs—see [`examples/dynamic-runtime-rest/src/api.ts`](examples/dynamic-runtime-rest/src/api.ts).
-
----
-
-## Packages
-
-### Core engine
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/core`](packages/core/README.md) | Engine, `Tool` / `Skill` / `Agent`, `RunBuilder`, `executeRun`, built-in tools |
-
-### LLM providers
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/adapters-openai`](packages/adapters-openai/README.md) | OpenAI chat + embeddings |
-| [`@opencoreagents/adapters-anthropic`](packages/adapters-anthropic/README.md) | Anthropic Messages API (`AnthropicLLMAdapter`) |
-
-### Redis, vector search, and job queues
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/adapters-redis`](packages/adapters-redis/README.md) | TCP Redis: memory, `RunStore`, `MessageBus`, `RedisDynamicDefinitionsStore` (`DynamicDefinitionsStore`: `store.methods` + `store.Agent` / `Skill` / `HttpTool`) |
-| [`@opencoreagents/adapters-upstash`](packages/adapters-upstash/README.md) | Upstash REST Redis + vector |
-| [`@opencoreagents/adapters-bullmq`](packages/adapters-bullmq/README.md) | BullMQ queue/worker (re-exports `dispatchEngineJob` from `core`) |
-
-### Dynamic definitions
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/dynamic-definitions`](packages/dynamic-definitions/README.md) | Store + upsert/sync agents, skills, HTTP tools into the registry |
-
-### HTTP tools, messaging, and REST
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/adapters-http-tool`](packages/adapters-http-tool/README.md) | JSON-configured HTTP `ToolAdapter`s (`registerHttpToolsFromDefinitions`) |
-| [`@opencoreagents/conversation-gateway`](packages/conversation-gateway/README.md) | Normalized inbound messages + gateway helpers for webhooks |
-| [`@opencoreagents/rest-api`](packages/rest-api/README.md) | Express **`createRuntimeRestRouter`** — JSON routes per [`docs/roadmap/plan-rest.md`](docs/roadmap/plan-rest.md) after **`Agent.define`** |
-
-### RAG and shared utilities
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/rag`](packages/rag/README.md) | File/RAG tools + skills |
-| [`@opencoreagents/utils`](packages/utils/README.md) | Parsers, chunking, file resolver |
-
-### CLI and scaffolding
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/cli`](packages/cli/README.md) | `runtime` CLI (`init`, `generate`, …) |
-| [`@opencoreagents/scaffold`](packages/scaffold/README.md) | Programmatic project generation |
-
-### Assistant skills (Cursor / Claude / Codex)
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/code-skills`](packages/code-skills/README.md) | **`SKILL.md`** skill trees under `packages/code-skills/skills/<id>/` (after `pnpm build --filter=@opencoreagents/code-skills`, or `dist/skills/<id>/` when published) — workspace map, engine, REST/workers, RAG. **Not** runtime `Skill.define`; see [Coding assistant skill packs](#coding-assistant-skill-packs). |
-
-### OpenClaw-compatible skills (runtime)
-
-| Package | Role |
-|---------|------|
-| [`@opencoreagents/skill-loader-openclaw`](packages/skill-loader-openclaw/) | **OpenClaw / AgentSkills**-style **`SKILL.md`** on disk: **`loadOpenClawSkills`**, load-time gates, optional **`registerOpenClawExecTool`**, ClawHub HTTP install. **Runnable demo:** [`examples/load-openclaw-skills`](examples/load-openclaw-skills/) ([`README.md`](examples/load-openclaw-skills/README.md), [`add-skills.md`](examples/load-openclaw-skills/add-skills.md)). |
-
----
+| Area | Packages |
+|---|---|
+| Engine | [`@opencoreagents/core`](packages/core/README.md) |
+| LLM adapters | [`@opencoreagents/adapters-openai`](packages/adapters-openai/README.md), [`@opencoreagents/adapters-anthropic`](packages/adapters-anthropic/README.md) |
+| Redis and queues | [`@opencoreagents/adapters-redis`](packages/adapters-redis/README.md), [`@opencoreagents/adapters-upstash`](packages/adapters-upstash/README.md), [`@opencoreagents/adapters-bullmq`](packages/adapters-bullmq/README.md) |
+| REST and HTTP tools | [`@opencoreagents/rest-api`](packages/rest-api/README.md), [`@opencoreagents/adapters-http-tool`](packages/adapters-http-tool/README.md), [`@opencoreagents/conversation-gateway`](packages/conversation-gateway/README.md) |
+| Dynamic definitions and RAG | [`@opencoreagents/dynamic-definitions`](packages/dynamic-definitions/README.md), [`@opencoreagents/rag`](packages/rag/README.md), [`@opencoreagents/utils`](packages/utils/README.md) |
+| CLI and scaffold | [`@opencoreagents/cli`](packages/cli/README.md), [`@opencoreagents/scaffold`](packages/scaffold/README.md) |
+| Assistant skills | [`@opencoreagents/code-skills`](packages/code-skills/README.md), [`@opencoreagents/skill-loader-openclaw`](packages/skill-loader-openclaw/README.md) |
 
 ## Examples
 
-**Index (all 11 samples, scripts, backlog):** [`examples/README.md`](examples/README.md).
+Start here: [examples index](examples/README.md).
 
-### Core loop and tools
+Recommended first steps:
 
-- **Runnable minimal run:** [`examples/minimal-run`](examples/minimal-run/) — mock LLM, no keys.
-- **OpenClaw / AgentSkills `SKILL.md` packs + `exec`:** [`examples/load-openclaw-skills`](examples/load-openclaw-skills/) — **`@opencoreagents/skill-loader-openclaw`** (`loadOpenClawSkills`, `registerOpenClawExecTool`); mock LLM, no API keys.
-- **OpenAI + tool + skill:** [`examples/openai-tools-skill`](examples/openai-tools-skill/) — requires `OPENAI_API_KEY`.
-- **Console `wait` + stdin:** [`examples/console-wait`](examples/console-wait/).
+1. [minimal-run](examples/minimal-run/)
+2. [plan-rest-express](examples/plan-rest-express/)
+3. [dynamic-runtime-rest](examples/dynamic-runtime-rest/)
+4. [real-world-with-express](examples/real-world-with-express/)
 
-### RAG and support-style flows
+## Documentation
 
-- **RAG + catalog:** [`examples/rag`](examples/rag/).
-- **RAG + support ticket tool:** [`examples/rag-contact-support`](examples/rag-contact-support/) — `contact_support` after KB search (scripted LLM).
+Main hub: [docs/README](docs/README.md)
 
-### HTTP and multi-agent
+- Onboarding: [guides](docs/guides/README.md), [getting started](docs/getting-started.md)
+- Contracts and behavior: [reference](docs/reference/README.md)
+- Engine deep dive: [core reference index](docs/reference/core/README.md)
+- Plans and known gaps: [roadmap](docs/roadmap/README.md)
+- Historical context: [archive](docs/archive/README.md)
 
-- **Multi-agent (in-process bus):** [`examples/multi-agent`](examples/multi-agent/).
-- **Express HTTP API + static HTML/JS UI (chat, SSE hook stream, `/status`, run + session status, wait/resume):** [`examples/real-world-with-express`](examples/real-world-with-express/).
-- **Telegram-shaped webhook + `ConversationGateway` (mock outbound, no Bot API keys):** [`examples/telegram-example-mocked`](examples/telegram-example-mocked/).
+## Coding assistant skill packs
 
-### REST and dynamic definitions
+Package: [@opencoreagents/code-skills](packages/code-skills/README.md)
 
-- **Plan-shaped REST (`@opencoreagents/rest-api`):** [`examples/plan-rest-express`](examples/plan-rest-express/) — minimal Express with **`createRuntimeRestRouter`** and in-code **`Agent.define`**; routes match [`docs/roadmap/plan-rest.md`](docs/roadmap/plan-rest.md) (`GET /agents`, `POST /agents/:id/run`, …).
-
-- **Dynamic definitions + HTTP API + BullMQ:** [`examples/dynamic-runtime-rest`](examples/dynamic-runtime-rest/) — **`RedisDynamicDefinitionsStore`**, Express control plane (custom routes that write definitions and enqueue jobs), worker with **`dynamicDefinitionsStore`** / **`runtime.dispatch`** and per-job hydration (**`@opencoreagents/dynamic-definitions`**). For **`createRuntimeRestRouter`** only, use [`examples/plan-rest-express`](examples/plan-rest-express/). Doc: [`docs/reference/core/21-dynamic-runtime-rest.md`](docs/reference/core/21-dynamic-runtime-rest.md).
-
----
-
-## Docs
-
-**Start here**
-
-- [`docs/README.md`](docs/README.md) — documentation hub with reading paths and navigation by intent (`guides`, `reference`, `roadmap`, `archive`)
-- [`docs/getting-started.md`](docs/getting-started.md) — tutorial, architecture summary, and further reading
-- [`examples/README.md`](examples/README.md) — runnable **`examples/*`** workspace packages (minimal run, RAG, REST, BullMQ + Redis defs, …)
-
-**Engine and layout**
-
-- [`docs/reference/README.md`](docs/reference/README.md) — canonical reference entrypoint
-- [`docs/reference/core/README.md`](docs/reference/core/README.md) — engine reference
-- [`docs/roadmap/scaffold.md`](docs/roadmap/scaffold.md) — monorepo layout
-
-### Coding assistant skill packs
-
-[`packages/code-skills/README.md`](packages/code-skills/README.md) (**[`@opencoreagents/code-skills`](packages/code-skills/README.md)**) ships **agent-oriented** markdown for IDEs: each `skills/<id>/SKILL.md` bundles focused instructions and a subset of `docs/` (and package README stubs) so assistants stay aligned with **`@opencoreagents/*`**.
-
-**Quick install via CLI:**
+Common commands:
 
 ```bash
-# Install a skill directly (e.g., opencoreagents-engine)
-npx @opencoreagents/code-skills add opencoreagents-engine
-
-# List available skills
 npx @opencoreagents/code-skills list
-
-# Install all four
-npx @opencoreagents/code-skills add opencoreagents-workspace
 npx @opencoreagents/code-skills add opencoreagents-engine
-npx @opencoreagents/code-skills add opencoreagents-rest-workers
-npx @opencoreagents/code-skills add opencoreagents-rag-dynamic
 ```
-
-
-Skill ids: **`opencoreagents-workspace`**, **`opencoreagents-engine`**, **`opencoreagents-rest-workers`**, and **`opencoreagents-rag-dynamic`**. From a clone, run **`pnpm build --filter=@opencoreagents/code-skills`** so generated `docs/` / `packages/` folders exist next to each skill; from a registry install, use paths under **`node_modules/.../dist/skills/<id>/`**.
-**APIs and dynamic config**
-
-- [`docs/roadmap/plan-rest.md`](docs/roadmap/plan-rest.md) — REST API shape (roadmap + plugin)
-- [`docs/reference/core/21-dynamic-runtime-rest.md`](docs/reference/core/21-dynamic-runtime-rest.md) — dynamic definitions, Redis, workers (no redeploy for prompt/tool edits)
-
-### Planning
-
-- [`docs/roadmap/README.md`](docs/roadmap/README.md) — planning entrypoint
-- [`docs/roadmap/README.md`](docs/roadmap/README.md) — index (plan, scaffold, technical debt, REST, CLI, MCP)
-- [`docs/roadmap/plan.md`](docs/roadmap/plan.md) — implementation plan
-- [`docs/roadmap/technical-debt.md`](docs/roadmap/technical-debt.md) — known gaps (hub; priority splits: [`technical-debt-security-production.md`](docs/roadmap/technical-debt-security-production.md), [`technical-debt-platform-core-ci.md`](docs/roadmap/technical-debt-platform-core-ci.md), [`technical-debt-deferred.md`](docs/roadmap/technical-debt-deferred.md))
-
----
 
 ## Develop
 
@@ -370,19 +195,10 @@ pnpm install
 pnpm turbo run build test lint
 ```
 
-CI runs the same via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+## GitHub Packages
 
-### GitHub Packages
-
-**Maintainers only.** The workflow [`.github/workflows/publish.yml`](.github/workflows/publish.yml) builds every `packages/*` workspace package and runs **`pnpm publish -r`** against **`https://npm.pkg.github.com`**. It uses **`GITHUB_TOKEN`**, which only authorizes publishes **for this repository**—not for arbitrary forks publishing the same package names.
-
-- **Manual:** Actions → *Publish to GitHub Packages* → run workflow. Leave **dry run** checked to verify without uploading; uncheck to publish (**requires** `packages: write` / maintainer role on **this** repo).
-- **Release:** Publishing a **GitHub Release** (not only a git tag) runs the same path with **dry run** off. Bump `version` in each `packages/*/package.json` before the release so the registry accepts it.
-- **Scope:** Packages are **`@opencoreagents/*`**. GitHub ties that npm scope to the **repository owner** (user or org). If the repo is not under the `opencoreagents` account, either move it there or rename the scope in every `package.json`.
-- **Consumers (after a maintainer has published):** Copy [`.npmrc.example`](.npmrc.example) to `.npmrc`, add a PAT with `read:packages` (and SSO if your org requires it), then install `@opencoreagents/...` from the GitHub registry. Until then, depend on **git + workspace** or **path** dependencies from a clone.
-
----
+Publishing is maintainers-only via [publish workflow](.github/workflows/publish.yml).
 
 ## License
 
-Apache License 2.0. See [LICENSE](./LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
