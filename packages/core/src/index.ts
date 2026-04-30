@@ -5,6 +5,7 @@ export type { AgentInstance } from "./define/Agent.js";
 export { Session } from "./define/Session.js";
 export { RunBuilder } from "./define/RunBuilder.js";
 export { ContextBuilder } from "./context/ContextBuilder.js";
+export { BASE_PROMPT, BASE_PROMPT_WITH_SHORT_ANSWERS } from "./prompts/basePrompts.js";
 export { ToolRunner, type ToolRunnerOptions } from "./tools/ToolRunner.js";
 export {
   CORE_SYSTEM_TOOL_IDS,
