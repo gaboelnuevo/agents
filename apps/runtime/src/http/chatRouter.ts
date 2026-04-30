@@ -220,6 +220,7 @@ export function createChatRouter(opts: {
             agentId: chatAgentId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -313,6 +314,7 @@ export function createChatRouter(opts: {
             agentId: chatAgentId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }

@@ -40,6 +40,20 @@ class WaitThenResultLlm implements LLMAdapter {
   }
 }
 
+class JsonResultWithShortAnswersLlm implements LLMAdapter {
+  async generate(_req: LLMRequest): Promise<LLMResponse> {
+    return {
+      content: JSON.stringify({
+        type: "result",
+        content: JSON.stringify({
+          reply: "I can share quick options.",
+          short_answers: ["Option A", "Option B"],
+        }),
+      }),
+    };
+  }
+}
+
 describe("createRuntimeRestRouter", () => {
   beforeEach(() => {
     clearAllRegistriesForTests();
@@ -264,6 +278,40 @@ describe("createRuntimeRestRouter", () => {
     expect(run.body.projectId).toBe("p1");
     expect(typeof run.body.sessionId).toBe("string");
     expect(typeof run.body.runId).toBe("string");
+  });
+
+  it("POST /agents/:id/run returns short_answers when model emits reply envelope JSON", async () => {
+    const runStore = new InMemoryRunStore();
+    const runtime = new AgentRuntime({
+      llmAdapter: new JsonResultWithShortAnswersLlm(),
+      memoryAdapter: new InMemoryMemoryAdapter(),
+      runStore,
+      maxIterations: 10,
+    });
+
+    await Agent.define({
+      id: "greeter-json",
+      projectId: "p1",
+      systemPrompt: "x",
+      tools: [],
+      llm: { provider: "openai", model: "gpt-4o-mini" },
+    });
+
+    const app = express();
+    app.use(createRuntimeRestRouter({
+      runtime,
+      projectId: "p1",
+      agentIds: ["greeter-json"],
+      runStore,
+    }));
+
+    const run = await request(app)
+      .post("/agents/greeter-json/run")
+      .send({ message: "hi" })
+      .expect(200);
+
+    expect(run.body.reply).toBe("I can share quick options.");
+    expect(run.body.short_answers).toEqual(["Option A", "Option B"]);
   });
 
   it("returns 401 when apiKey set and header missing", async () => {

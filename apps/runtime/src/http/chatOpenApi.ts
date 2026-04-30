@@ -85,6 +85,7 @@ export function extendOpenApiWithChat(
                   agentId: { type: "string" },
                   status: { type: "string" },
                   reply: { type: "string" },
+                  short_answers: { type: "array", items: { type: "string" } },
                 },
               },
             },

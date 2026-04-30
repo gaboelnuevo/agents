@@ -39,6 +39,29 @@ describe("summarizeEngineRun", () => {
     expect(s.failedReason).toBe("boom");
   });
 
+  it("extracts reply + short_answers from JSON result envelope", () => {
+    const run = {
+      runId: "r-json",
+      agentId: "a",
+      status: "completed",
+      history: [
+        {
+          type: "result",
+          content: JSON.stringify({
+            reply: "Sure, I can help with that.",
+            short_answers: ["Yes", "No", "Tell me more"],
+          }),
+          meta: { ts: "1", source: "llm" as const },
+        },
+      ],
+      state: { iteration: 0, pending: null },
+    } as Run;
+
+    const s = summarizeEngineRun(run);
+    expect(s.reply).toBe("Sure, I can help with that.");
+    expect(s.short_answers).toEqual(["Yes", "No", "Tell me more"]);
+  });
+
   it("reply undefined when no result step", () => {
     const run = {
       runId: "r3",
