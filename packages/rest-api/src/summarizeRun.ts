@@ -7,6 +7,11 @@ export interface EngineRunSummary {
   /** Last **`result`** step **`content`** in **`run.history`**, if any. */
   reply: string | undefined;
   /**
+   * Optional short suggested replies (for chat UIs, bots, quick-reply chips).
+   * Returned only when the final result content can be parsed as JSON carrying `short_answers`.
+   */
+  short_answers: string[] | undefined;
+  /**
    * Copy of **`run.state.failedReason`** when set (trimmed), else **`undefined`**.
    * Always present on the object so callers can read **`summary.failedReason`** without optional chaining quirks.
    */
@@ -28,6 +33,16 @@ export interface EngineRunSummary {
  */
 export function summarizeEngineRun(run: Run): EngineRunSummary {
   const result = run.history.filter((h) => h.type === "result").pop();
+  let reply: string | undefined =
+    result && typeof result.content === "string" ? result.content : undefined;
+  let shortAnswers: string[] | undefined;
+  if (reply) {
+    const parsed = parseReplyEnvelope(reply);
+    if (parsed) {
+      reply = parsed.reply;
+      shortAnswers = parsed.shortAnswers;
+    }
+  }
   const failedReason =
     typeof run.state.failedReason === "string" && run.state.failedReason.trim()
       ? run.state.failedReason.trim()
@@ -35,9 +50,41 @@ export function summarizeEngineRun(run: Run): EngineRunSummary {
   return {
     status: run.status,
     runId: run.runId,
-    reply: result && typeof result.content === "string" ? result.content : undefined,
+    reply,
+    short_answers: shortAnswers,
     failedReason,
   };
+}
+
+function parseReplyEnvelope(
+  raw: string,
+): { reply: string; shortAnswers?: string[] } | null {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return null;
+    const replyCandidate =
+      typeof parsed.reply === "string"
+        ? parsed.reply
+        : typeof parsed.content === "string"
+          ? parsed.content
+          : null;
+    if (!replyCandidate) return null;
+    const reply = replyCandidate.trim();
+    if (!reply) return null;
+    const shortRaw = parsed.short_answers;
+    const shortAnswers =
+      Array.isArray(shortRaw) && shortRaw.length > 0
+        ? shortRaw
+            .filter((x): x is string => typeof x === "string")
+            .map((x) => x.trim())
+            .filter((x) => x.length > 0)
+        : undefined;
+    return shortAnswers && shortAnswers.length > 0 ? { reply, shortAnswers } : { reply };
+  } catch {
+    return null;
+  }
 }
 
 /** Compact row for **`GET /agents/:agentId/runs`** (dashboards — not full step log). */
@@ -52,11 +99,12 @@ export interface RuntimeRestRunListItem {
   historyStepCount: number;
   userInput?: string;
   reply?: string;
+  short_answers?: string[];
   failedReason?: string;
 }
 
 export function summarizeRunListEntry(run: Run): RuntimeRestRunListItem {
-  const { reply, failedReason } = summarizeEngineRun(run);
+  const { reply, short_answers, failedReason } = summarizeEngineRun(run);
   const userInput =
     typeof run.state.userInput === "string" ? run.state.userInput : undefined;
   const row: RuntimeRestRunListItem = {
@@ -71,6 +119,7 @@ export function summarizeRunListEntry(run: Run): RuntimeRestRunListItem {
   if (run.tenantId !== undefined) row.tenantId = run.tenantId;
   if (userInput !== undefined) row.userInput = userInput;
   if (reply !== undefined) row.reply = reply;
+  if (short_answers !== undefined) row.short_answers = short_answers;
   if (failedReason !== undefined) row.failedReason = failedReason;
   return row;
 }

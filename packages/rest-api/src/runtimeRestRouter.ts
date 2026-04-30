@@ -169,11 +169,6 @@ export function defaultRuntimeRestResolveTenantId(req: Request): string | undefi
   return undefined;
 }
 
-function resultText(run: Run): string | undefined {
-  const last = run.history.filter((h) => h.type === "result").pop();
-  return last && typeof last.content === "string" ? last.content : undefined;
-}
-
 function optionalApiKeyAuth(config: {
   apiKey?: string;
   resolveApiKey?: (req: Request, res: Response) => string | undefined;
@@ -828,6 +823,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             runId: s.runId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -843,6 +839,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             runId: s.runId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -882,8 +879,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         ...(tenantId !== undefined ? { tenantId } : {}),
         status: run.status,
       };
-      const reply = resultText(run);
-      if (reply !== undefined) payload.reply = reply;
+      const summary = summarizeEngineRun(run);
+      if (summary.reply !== undefined) payload.reply = summary.reply;
+      if (summary.short_answers !== undefined) payload.short_answers = summary.short_answers;
       if (run.status === "waiting") {
         const hint: Record<string, unknown> = {
           method: "POST",
@@ -1050,6 +1048,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             runId: s.runId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -1065,6 +1064,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             runId: s.runId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -1103,8 +1103,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         ...(tenantId !== undefined ? { tenantId } : {}),
         status: run.status,
       };
-      const reply = resultText(run);
-      if (reply !== undefined) payload.reply = reply;
+      const summary = summarizeEngineRun(run);
+      if (summary.reply !== undefined) payload.reply = summary.reply;
+      if (summary.short_answers !== undefined) payload.short_answers = summary.short_answers;
 
       res.json(payload);
     } catch (e) {
@@ -1245,6 +1246,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             runId: s.runId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -1260,6 +1262,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             runId: s.runId,
             status: s.status,
             ...(s.reply !== undefined ? { reply: s.reply } : {}),
+            ...(s.short_answers !== undefined ? { short_answers: s.short_answers } : {}),
           });
           return;
         }
@@ -1300,8 +1303,9 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         ...(tenantId !== undefined ? { tenantId } : {}),
         status: run.status,
       };
-      const reply = resultText(run);
-      if (reply !== undefined) payload.reply = reply;
+      const summary = summarizeEngineRun(run);
+      if (summary.reply !== undefined) payload.reply = summary.reply;
+      if (summary.short_answers !== undefined) payload.short_answers = summary.short_answers;
 
       res.json(payload);
     } catch (e) {
@@ -1437,6 +1441,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
             ...(continueInputs ? { continueInputs } : {}),
             historyStepCount: merged.length,
             reply: sum.reply,
+            ...(sum.short_answers !== undefined ? { short_answers: sum.short_answers } : {}),
             ...(sum.failedReason !== undefined ? { failedReason: sum.failedReason } : {}),
             ...(r.status === "waiting" ? { waitReason: lastWaitReason(r) } : {}),
             iteration: r.state.iteration,
@@ -1557,6 +1562,7 @@ export function createRuntimeRestRouter(options: RuntimeRestPluginOptions): Rout
         ...(continueInputs ? { continueInputs } : {}),
         ...(run.status === "waiting" ? { waitReason: lastWaitReason(run) } : {}),
         reply: sum.reply,
+        ...(sum.short_answers !== undefined ? { short_answers: sum.short_answers } : {}),
         ...(sum.failedReason !== undefined ? { failedReason: sum.failedReason } : {}),
         iteration: run.state.iteration,
         historyStepCount: merged ? merged.length : run.history.length,
