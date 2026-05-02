@@ -17,6 +17,30 @@ function scopePrefix(scope: MemoryScope): string {
   return `m:${scope.projectId}:${scope.agentId}:${scope.sessionId}:${eu}`;
 }
 
+function formatUpstashFilterValue(value: unknown): string {
+  if (typeof value === "string") {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (value == null) return "null";
+  return `"${JSON.stringify(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function normalizeUpstashFilter(filter: unknown): unknown {
+  if (filter == null || typeof filter === "string") return filter;
+  if (typeof filter !== "object" || Array.isArray(filter)) return filter;
+
+  const clauses = Object.entries(filter as Record<string, unknown>)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key} = ${formatUpstashFilterValue(value)}`);
+
+  if (clauses.length === 0) return undefined;
+  if (clauses.length === 1) return clauses[0];
+  return clauses.map((clause) => `(${clause})`).join(" AND ");
+}
+
 /**
  * Memory adapter backed by Upstash Redis REST. Each memory type uses a Redis **LIST** (`RPUSH`)
  * for atomic append under concurrency; legacy STRING blobs (JSON array) migrate on first write.
@@ -93,9 +117,13 @@ export class UpstashVectorAdapter implements VectorAdapter {
   async upsert(namespace: string, documents: VectorDocument[]): Promise<void> {
     await this.post(`/upsert/${encodeURIComponent(namespace)}`, {
       vectors: documents.map((d) => ({
+        data: d.data,
         id: d.id,
         vector: d.vector,
-        metadata: { data: d.data, ...d.metadata },
+        metadata:
+          d.metadata && Object.prototype.hasOwnProperty.call(d.metadata, "data")
+            ? d.metadata
+            : { ...d.metadata, data: d.data },
       })),
     });
   }
@@ -106,16 +134,37 @@ export class UpstashVectorAdapter implements VectorAdapter {
       topK: params.topK,
       includeMetadata: params.includeMetadata ?? true,
       includeData: params.includeData ?? true,
-      filter: params.filter,
+      filter: normalizeUpstashFilter(params.filter),
       scoreThreshold: params.scoreThreshold,
-    })) as { result?: VectorResult[] };
-    return data.result ?? [];
+    })) as {
+      result?: Array<{
+        id: string;
+        score: number;
+        data?: unknown;
+        metadata?: Record<string, unknown>;
+      }>;
+    };
+    return (data.result ?? []).map((item) => ({
+      id: item.id,
+      score: item.score,
+      ...(params.includeData !== false
+        ? {
+            data:
+              typeof item.data === "string"
+                ? item.data
+                : typeof item.metadata?.data === "string"
+                  ? item.metadata.data
+                  : "",
+          }
+        : {}),
+      ...(params.includeMetadata !== false ? { metadata: item.metadata } : {}),
+    }));
   }
 
   async delete(namespace: string, params: VectorDeleteParams): Promise<void> {
     await this.post(`/delete/${encodeURIComponent(namespace)}`, {
       ids: params.ids,
-      filter: params.filter,
+      filter: normalizeUpstashFilter(params.filter),
       deleteAll: params.deleteAll,
     });
   }
