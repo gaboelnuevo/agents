@@ -62,11 +62,13 @@ describe("UpstashVectorAdapter filter normalization", () => {
     ]);
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(String(init.body)) as {
-      vectors: Array<{ data?: string; metadata?: Record<string, unknown> }>;
-    };
-    expect(body.vectors[0]?.data).toBe("hello world");
-    expect(body.vectors[0]?.metadata?.source).toBe("common-gps-tracking-issues.md");
+    const body = JSON.parse(String(init.body)) as Array<{
+      data?: string;
+      metadata?: Record<string, unknown>;
+    }>;
+    expect(Array.isArray(body)).toBe(true);
+    expect(body[0]?.data).toBe("hello world");
+    expect(body[0]?.metadata?.source).toBe("common-gps-tracking-issues.md");
   });
 
   it("maps query data from metadata fallback when provider omits top-level data", async () => {

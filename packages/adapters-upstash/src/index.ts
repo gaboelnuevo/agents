@@ -115,8 +115,9 @@ export class UpstashVectorAdapter implements VectorAdapter {
   }
 
   async upsert(namespace: string, documents: VectorDocument[]): Promise<void> {
-    await this.post(`/upsert/${encodeURIComponent(namespace)}`, {
-      vectors: documents.map((d) => ({
+    await this.post(
+      `/upsert/${encodeURIComponent(namespace)}`,
+      documents.map((d) => ({
         data: d.data,
         id: d.id,
         vector: d.vector,
@@ -125,7 +126,7 @@ export class UpstashVectorAdapter implements VectorAdapter {
             ? d.metadata
             : { ...d.metadata, data: d.data },
       })),
-    });
+    );
   }
 
   async query(namespace: string, params: VectorQuery): Promise<VectorResult[]> {
